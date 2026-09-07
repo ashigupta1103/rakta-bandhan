@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import '../services/admin_mock_service.dart';
+import '../services/admin_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/avatar_badge.dart';
 import '../widgets/status_badge.dart';
@@ -18,7 +18,7 @@ class AdminDonorDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final service = AdminMockService.instance;
+    final service = AdminService.instance;
     return Scaffold(
       backgroundColor: AppColors.warmPageBackground,
       appBar: AppBar(

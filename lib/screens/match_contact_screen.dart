@@ -9,11 +9,11 @@ import '../widgets/two_person_connection.dart';
 import 'donation_confirm_screen.dart';
 
 /// Shows the requester's contact info for a request this donor accepted.
-/// The requester's name/phone aren't stored on the request doc itself
-/// (backend.dart's createRequest() never writes them there) — but since
-/// every requester is also a registered donor, their real name/phone are
-/// read from their own `donors/{requester_uid}` doc. Real data, composed
-/// from two existing reads; no schema change, no mock identity needed.
+/// `createRequest()` denormalizes `requester_name`/`requester_phone` onto
+/// the request doc itself at creation time specifically so this screen
+/// never needs to read `donors/{requester_uid}` directly — under
+/// firestore.rules that doc is owner/admin-only, and the accepting donor
+/// is neither.
 class MatchContactScreen extends StatefulWidget {
   final String requestId;
 
@@ -67,87 +67,79 @@ class _MatchContactScreenState extends State<MatchContactScreen> {
               if (request == null) {
                 return const Center(child: Text('Request not found.', style: TextStyle(color: Colors.white70)));
               }
-              final requesterUid = request['requester_uid'] as String?;
               final bloodGroup = request['blood_group'] as String? ?? '';
               final location = (request['location_label'] as String?)?.isNotEmpty == true ? request['location_label'] as String : 'the requester';
+              final name = request['requester_name'] as String? ?? 'Requester';
+              final phone = request['requester_phone'] as String? ?? '—';
+              final initials = name.trim().isEmpty ? '?' : name.trim().split(RegExp(r'\s+')).take(2).map((w) => w[0].toUpperCase()).join();
 
-              return FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                future: requesterUid == null ? null : FirebaseFirestore.instance.collection('donors').doc(requesterUid).get(),
-                builder: (context, donorSnap) {
-                  final requesterData = donorSnap.data?.data() ?? {};
-                  final name = requesterData['name'] as String? ?? 'Requester';
-                  final phone = requesterData['phone'] as String? ?? '—';
-                  final initials = name.trim().isEmpty ? '?' : name.trim().split(RegExp(r'\s+')).take(2).map((w) => w[0].toUpperCase()).join();
-
-                  return Column(
-                    children: [
-                      SizedBox(
-                        height: 48,
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: IconButton(icon: const Icon(LucideIcons.arrowLeft, color: Colors.white), onPressed: () => Navigator.pop(context)),
+              return Column(
+                children: [
+                  SizedBox(
+                    height: 48,
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: IconButton(icon: const Icon(LucideIcons.arrowLeft, color: Colors.white), onPressed: () => Navigator.pop(context)),
+                    ),
+                  ),
+                  Expanded(child: TwoPersonConnection(leftLabel: 'You', rightInitials: initials)),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 28),
+                    child: Column(
+                      children: [
+                        const Text("YOU'RE CONNECTED", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 1.5, color: Color(0xFFE0A8AF))),
+                        const SizedBox(height: 12),
+                        Text(
+                          '$name needs your help',
+                          textAlign: TextAlign.center,
+                          style: AppTextStyles.display(fontSize: 26, color: const Color(0xFFFFF9F5), height: 1.2),
                         ),
-                      ),
-                      Expanded(child: TwoPersonConnection(leftLabel: 'You', rightInitials: initials)),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 28),
-                        child: Column(
-                          children: [
-                            const Text("YOU'RE CONNECTED", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 1.5, color: Color(0xFFE0A8AF))),
-                            const SizedBox(height: 12),
-                            Text(
-                              '$name needs your help',
-                              textAlign: TextAlign.center,
-                              style: AppTextStyles.display(fontSize: 26, color: const Color(0xFFFFF9F5), height: 1.2),
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              '$bloodGroup needed · $location. Reach out and agree a time.',
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(fontSize: 13.5, color: Color(0xFFE9BFC4), height: 1.6),
-                            ),
-                            const SizedBox(height: 20),
-                            BloodGroupDroplet(label: bloodGroup, size: 34, filled: true, color: AppColors.primary, textColor: const Color(0xFFFBE6E8), fontSize: 12),
-                          ],
+                        const SizedBox(height: 12),
+                        Text(
+                          '$bloodGroup needed · $location. Reach out and agree a time.',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 13.5, color: Color(0xFFE9BFC4), height: 1.6),
                         ),
-                      ),
-                      const SizedBox(height: 24),
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(28, 0, 28, 20),
-                        child: Column(
-                          children: [
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton.icon(
-                                style: ElevatedButton.styleFrom(backgroundColor: AppColors.warmPageBackground, foregroundColor: AppColors.gradientEmberMid),
-                                onPressed: () => _placeholder('Call'),
-                                icon: const Icon(LucideIcons.phone, size: 16),
-                                label: Text('Call · $phone', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            SizedBox(
-                              width: double.infinity,
-                              child: OutlinedButton.icon(
-                                style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFFFBE6E8), side: const BorderSide(color: Color(0x8CFBE6E8))),
-                                onPressed: () => _placeholder('WhatsApp'),
-                                icon: const Icon(LucideIcons.messageSquare, size: 15),
-                                label: const Text('WhatsApp'),
-                              ),
-                            ),
-                            const SizedBox(height: 14),
-                            TextButton(
-                              onPressed: _markingDonated ? null : _markDonated,
-                              child: _markingDonated
-                                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                                  : const Text('Mark as donated', style: TextStyle(fontSize: 13.5, color: Color(0xFFE9BFC4))),
-                            ),
-                          ],
+                        const SizedBox(height: 20),
+                        BloodGroupDroplet(label: bloodGroup, size: 34, filled: true, color: AppColors.primary, textColor: const Color(0xFFFBE6E8), fontSize: 12),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(28, 0, 28, 20),
+                    child: Column(
+                      children: [
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(backgroundColor: AppColors.warmPageBackground, foregroundColor: AppColors.gradientEmberMid),
+                            onPressed: () => _placeholder('Call'),
+                            icon: const Icon(LucideIcons.phone, size: 16),
+                            label: Text('Call · $phone', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                          ),
                         ),
-                      ),
-                    ],
-                  );
-                },
+                        const SizedBox(height: 10),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFFFBE6E8), side: const BorderSide(color: Color(0x8CFBE6E8))),
+                            onPressed: () => _placeholder('WhatsApp'),
+                            icon: const Icon(LucideIcons.messageSquare, size: 15),
+                            label: const Text('WhatsApp'),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        TextButton(
+                          onPressed: _markingDonated ? null : _markDonated,
+                          child: _markingDonated
+                              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                              : const Text('Mark as donated', style: TextStyle(fontSize: 13.5, color: Color(0xFFE9BFC4))),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               );
             },
           ),

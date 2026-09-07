@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import '../services/admin_mock_service.dart';
+import '../services/admin_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/status_badge.dart';
 

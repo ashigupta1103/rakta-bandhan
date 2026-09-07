@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import '../services/admin_mock_service.dart';
+import '../services/admin_service.dart';
+import '../services/backend.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/filter_chip_row.dart';
@@ -12,9 +13,7 @@ import 'admin_request_detail_screen.dart';
 enum _AdminTab { dashboard, donors, requests, hospitals, activity }
 
 /// Mobile-companion admin console. All data/actions route through
-/// AdminMockService — no real auth, no Firestore writes. The backend
-/// developer swaps AdminMockService for a real implementation behind the
-/// same shape without rebuilding these screens.
+/// AdminService (real Firestore, gated by firestore.rules' isAdmin()).
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
 
@@ -23,8 +22,14 @@ class AdminDashboardScreen extends StatefulWidget {
 }
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
-  final _service = AdminMockService.instance;
+  final _service = AdminService.instance;
   _AdminTab _tab = _AdminTab.dashboard;
+
+  @override
+  void initState() {
+    super.initState();
+    _service.init();
+  }
 
   String _donorSearch = '';
   DonorVerificationStatus? _donorFilter;
@@ -65,7 +70,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   const Spacer(),
                   IconButton(
                     icon: const Icon(LucideIcons.logOut, size: 18, color: AppColors.textMuted),
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () async {
+                      await Backend.instance.signOut();
+                      if (context.mounted) Navigator.pop(context);
+                    },
                   ),
                 ],
               ),

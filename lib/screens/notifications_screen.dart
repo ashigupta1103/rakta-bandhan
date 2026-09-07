@@ -12,7 +12,7 @@ class NotificationsScreen extends StatefulWidget {
 }
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
-  final NotificationsService _service = MockNotificationsService();
+  final NotificationsService _service = FirestoreNotificationsService();
   int _retryToken = 0;
 
   @override

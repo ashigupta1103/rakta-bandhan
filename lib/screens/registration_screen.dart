@@ -33,6 +33,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   double? _selectedLat;
   double? _selectedLng;
   bool _searchingAddress = false;
+  bool _locatingCurrent = false;
   Timer? _addressDebounce;
 
   final List<String> _bloodGroups = [
@@ -44,6 +45,28 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   void initState() {
     super.initState();
     _whatsappController.text = widget.phoneNumber;
+    _useCurrentLocation(silent: true);
+  }
+
+  /// Same "detect and pre-fill" pattern as create_request_screen.dart —
+  /// Uber/Rapido-style: the field opens with your actual current address
+  /// already in it, editable/replaceable via search.
+  Future<void> _useCurrentLocation({bool silent = false}) async {
+    if (!silent) setState(() => _locatingCurrent = true);
+    try {
+      final position = await Backend.instance.currentPosition();
+      final label = await Backend.instance.reverseGeocode(position.latitude, position.longitude);
+      if (!mounted) return;
+      setState(() {
+        _selectedLat = position.latitude;
+        _selectedLng = position.longitude;
+        _locationController.text = label ?? 'Current location';
+        _locatingCurrent = false;
+        _addressSuggestions = [];
+      });
+    } catch (_) {
+      if (mounted) setState(() => _locatingCurrent = false);
+    }
   }
 
   @override
@@ -112,6 +135,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         bloodGroup: _selectedBloodGroup!,
         lat: lat,
         lng: lng,
+        locationLabel: _locationController.text.trim(),
       );
       if (!mounted) return;
       setState(() => _isSubmitting = false);
@@ -230,7 +254,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                 onChanged: _onLocationChanged,
                 decoration: InputDecoration(
                   hintText: 'Search city or area',
-                  suffixIcon: _searchingAddress
+                  suffixIcon: (_searchingAddress || _locatingCurrent)
                       ? const Padding(
                           padding: EdgeInsets.all(14),
                           child: SizedBox(
@@ -268,14 +292,22 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                     ],
                   ),
                 )
-              else if (_selectedLat != null)
+              else
                 Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: Text(
-                    'Location pinned',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.statusAvailableText,
+                  padding: const EdgeInsets.only(top: 8),
+                  child: GestureDetector(
+                    onTap: _locatingCurrent ? null : () => _useCurrentLocation(),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(LucideIcons.mapPin, size: 13, color: AppColors.primary),
+                        const SizedBox(width: 6),
+                        Text(
+                          _selectedLat != null ? 'Location pinned · use current location again' : 'Use current location',
+                          style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.primary),
                         ),
+                      ],
+                    ),
                   ),
                 ),
               const SizedBox(height: 24),

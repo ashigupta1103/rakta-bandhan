@@ -230,6 +230,9 @@ class _RequestsScreenState extends State<RequestsScreen> {
   }
 
   Widget _requestCard(String requestId, Map<String, dynamic> request, {required _CardAction primaryAction}) {
+    // Lazy stand-in for the Blaze-only expireOldRequests scheduled
+    // function — no-op unless this doc is genuinely open and past due.
+    Backend.instance.expireIfStale(requestId, request);
     final status = request['status'] as String? ?? 'open';
     final bloodGroup = request['blood_group'] as String? ?? '';
     final locationLabel = (request['location_label'] as String?)?.isNotEmpty == true

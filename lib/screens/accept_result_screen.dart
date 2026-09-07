@@ -124,62 +124,58 @@ class _SuccessConnection extends StatelessWidget {
                 return const Center(child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white));
               }
               final request = requestSnap.data!.data() ?? {};
-              final requesterUid = request['requester_uid'] as String?;
               final bloodGroup = request['blood_group'] as String? ?? '';
               final units = request['units_needed'] ?? 1;
               final location = (request['location_label'] as String?)?.isNotEmpty == true ? request['location_label'] as String : 'the requester';
+              // requester_name is denormalized onto the request doc at
+              // creation (see Backend.createRequest) specifically so this
+              // screen never needs to read donors/{requester_uid} directly
+              // — under firestore.rules that doc is owner/admin-only.
+              final name = request['requester_name'] as String? ?? 'the requester';
+              final initials = name.trim().isEmpty || name == 'the requester'
+                  ? '?'
+                  : name.trim().split(RegExp(r'\s+')).take(2).map((w) => w[0].toUpperCase()).join();
 
-              return FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                future: requesterUid == null ? null : FirebaseFirestore.instance.collection('donors').doc(requesterUid).get(),
-                builder: (context, donorSnap) {
-                  final requesterData = donorSnap.data?.data() ?? {};
-                  final name = requesterData['name'] as String? ?? 'the requester';
-                  final initials = name.trim().isEmpty || name == 'the requester'
-                      ? '?'
-                      : name.trim().split(RegExp(r'\s+')).take(2).map((w) => w[0].toUpperCase()).join();
-
-                  return Column(
-                    children: [
-                      const SizedBox(height: 48),
-                      Expanded(child: TwoPersonConnection(leftLabel: 'You', rightInitials: initials)),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 28),
-                        child: Column(
-                          children: [
-                            const Text("YOU'RE CONNECTED", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 1.5, color: Color(0xFFE0A8AF))),
-                            const SizedBox(height: 12),
-                            Text(
-                              '${name == 'the requester' ? 'The requester' : name} is\nexpecting you',
-                              textAlign: TextAlign.center,
-                              style: AppTextStyles.display(fontSize: 28, color: const Color(0xFFFFF9F5), height: 1.2),
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              '$bloodGroup · $units unit${units == 1 ? '' : 's'} · $location',
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(fontSize: 13.5, color: Color(0xFFE9BFC4), height: 1.6),
-                            ),
-                          ],
+              return Column(
+                children: [
+                  const SizedBox(height: 48),
+                  Expanded(child: TwoPersonConnection(leftLabel: 'You', rightInitials: initials)),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 28),
+                    child: Column(
+                      children: [
+                        const Text("YOU'RE CONNECTED", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 1.5, color: Color(0xFFE0A8AF))),
+                        const SizedBox(height: 12),
+                        Text(
+                          '${name == 'the requester' ? 'The requester' : name} is\nexpecting you',
+                          textAlign: TextAlign.center,
+                          style: AppTextStyles.display(fontSize: 28, color: const Color(0xFFFFF9F5), height: 1.2),
                         ),
-                      ),
-                      const SizedBox(height: 24),
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(28, 0, 28, 20),
-                        child: SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(backgroundColor: AppColors.warmPageBackground, foregroundColor: AppColors.gradientEmberMid),
-                            onPressed: () => Navigator.pushReplacement(
-                              context,
-                              MaterialPageRoute(builder: (context) => MatchContactScreen(requestId: requestId)),
-                            ),
-                            child: const Text('View contact details', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-                          ),
+                        const SizedBox(height: 12),
+                        Text(
+                          '$bloodGroup · $units unit${units == 1 ? '' : 's'} · $location',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 13.5, color: Color(0xFFE9BFC4), height: 1.6),
                         ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(28, 0, 28, 20),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.warmPageBackground, foregroundColor: AppColors.gradientEmberMid),
+                        onPressed: () => Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(builder: (context) => MatchContactScreen(requestId: requestId)),
+                        ),
+                        child: const Text('View contact details', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
                       ),
-                    ],
-                  );
-                },
+                    ),
+                  ),
+                ],
               );
             },
           ),

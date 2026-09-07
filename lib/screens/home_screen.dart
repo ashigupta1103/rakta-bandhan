@@ -138,6 +138,12 @@ class _HomeScreenState extends State<HomeScreen> {
                     builder: (context, snapshot) {
                       final myUid = Backend.instance.currentUser?.uid;
                       final docs = (snapshot.data?.docs ?? []).where((d) => d.data()['requester_uid'] != myUid).toList();
+                      // Lazy stand-in for the Blaze-only expireOldRequests
+                      // scheduled function — sweep stale docs whenever this
+                      // list is rendered (no-op unless genuinely past due).
+                      for (final d in docs) {
+                        Backend.instance.expireIfStale(d.id, d.data());
+                      }
 
                       if (!snapshot.hasData) {
                         return const Padding(padding: EdgeInsets.symmetric(vertical: 24), child: Center(child: CircularProgressIndicator(strokeWidth: 2)));

@@ -11,10 +11,9 @@ import '../widgets/state_card.dart';
 /// vertical timeline replaces the date column... the impact trail at the
 /// top shows [donations] given against a ten-unit horizon."
 ///
-/// Total-donations count comes from the real Backend.instance
-/// (myDonationCount) — the per-donation list itself uses
-/// DonationHistoryService/MockDonationHistoryService since backend.dart
-/// doesn't expose a query for individual fulfilled-request records yet.
+/// Total-donations count comes from Backend.instance.myDonationCount();
+/// the per-donation list comes from FirestoreDonationHistoryService,
+/// which reads the real `donation_history` collection.
 class DonationHistoryScreen extends StatefulWidget {
   const DonationHistoryScreen({super.key});
 
@@ -23,7 +22,7 @@ class DonationHistoryScreen extends StatefulWidget {
 }
 
 class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
-  final DonationHistoryService _service = MockDonationHistoryService();
+  final DonationHistoryService _service = FirestoreDonationHistoryService();
   late final Future<(int, List<DonationRecord>)> _future;
 
   @override

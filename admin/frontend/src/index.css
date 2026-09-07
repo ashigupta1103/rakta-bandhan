@@ -1,0 +1,58 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/**
+ * Rakta Bandhan admin theme — extracted from the live app's own brand
+ * (deep red #8C1F2B, warm cream background, 14px radius; see
+ * app/frontend/lib/theme/app_colors.dart) rather than a generic palette,
+ * so admin and app read as one product. Light-only by design.
+ */
+@layer base {
+  :root {
+    --background: 30 25% 97%;
+    --foreground: 20 10% 12%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 20 10% 12%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 20 10% 12%;
+
+    --primary: 353 60% 34%;
+    --primary-foreground: 355 60% 96%;
+
+    --secondary: 30 18% 93%;
+    --secondary-foreground: 20 10% 18%;
+
+    --muted: 30 18% 94%;
+    --muted-foreground: 25 8% 42%;
+
+    --accent: 30 22% 91%;
+    --accent-foreground: 20 10% 18%;
+
+    --destructive: 4 70% 45%;
+    --destructive-foreground: 355 60% 96%;
+
+    --border: 30 15% 88%;
+    --input: 30 15% 86%;
+    --ring: 353 60% 34%;
+
+    --radius: 0.875rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  .shadow-warm {
+    box-shadow: 0 1px 2px rgba(31, 20, 16, 0.04), 0 6px 16px rgba(31, 20, 16, 0.05);
+  }
+}

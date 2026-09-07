@@ -6,17 +6,16 @@ import '../theme/app_text_styles.dart';
 import '../widgets/blood_group_droplet.dart';
 import '../widgets/two_person_connection.dart';
 
-/// Terminal screen of the mock matching ladder's "donor found" outcome —
-/// the "Matched" emotional peak per Product Art Direction: two avatars
-/// joined by a hairline on a dark ember field, the committed ring group at
-/// 0.90x recentred on the connection itself, both discs seated on the
-/// middle ring's own radius. The donor identity comes from
-/// DonorMatchService/MockDonorMatchService — no real donor accepted
-/// anything (see MatchingScreen). The backend developer swaps in a real
-/// matched-donor lookup behind that interface without changing this screen.
+/// Terminal screen of the matching ladder's "donor found" outcome — the
+/// "Matched" emotional peak per Product Art Direction: two avatars joined
+/// by a hairline on a dark ember field, the committed ring group at 0.90x
+/// recentred on the connection itself, both discs seated on the middle
+/// ring's own radius. The donor identity comes from
+/// FirestoreDonorMatchService, reading the real match written by
+/// Backend.acceptRequest (see donor_match_service.dart).
 class DonorFoundScreen extends StatelessWidget {
   final String requestId;
-  final DonorMatchService _service = MockDonorMatchService();
+  final DonorMatchService _service = FirestoreDonorMatchService();
 
   DonorFoundScreen({super.key, required this.requestId});
 

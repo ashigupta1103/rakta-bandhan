@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../services/backend.dart';
 import '../theme/app_colors.dart';
 import '../widgets/gradient_hero_card.dart';
 import '../widgets/step_tracker.dart';
@@ -41,6 +42,7 @@ class TrackingScreen extends StatelessWidget {
             if (data == null) {
               return const Center(child: Text('Request not found.', style: TextStyle(color: AppColors.textSecondary)));
             }
+            Backend.instance.expireIfStale(requestId, data);
             final status = data['status'] as String? ?? 'open';
             final bloodGroup = data['blood_group'] as String? ?? '';
             final location = (data['location_label'] as String?)?.isNotEmpty == true ? data['location_label'] as String : 'Blood request';
