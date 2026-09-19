@@ -1,0 +1,177 @@
+rules_version = '2';
+
+// Rakta Bandhan — Firestore security rules (Spark/free-plan).
+//
+// No Cloud Functions run behind this app (see backend/README.md) — every
+// invariant that a Cloud Function would normally enforce (single-active
+// -match locking, contact reveal, admin-only verification/ban) is enforced
+// here instead, against the same client-side transactions in
+// lib/services/backend.dart.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // A doc's mere existence at admins/{uid} is the admin flag — no
+    // custom claims (those need the Admin SDK / a Cloud Function, which
+    // Spark can't deploy).
+    function isAdmin() {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // True account disable needs the Admin SDK (Blaze-only) — this is the
+    // Spark stand-in: a banned donor's own donors/{uid} doc is flagged,
+    // and every write that matters (their own profile, new requests,
+    // accepting a request) is denied while it's set, everywhere the
+    // signed-in user's own uid is checkable without an extra read.
+    function isBanned() {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/donors/$(request.auth.uid)).data.is_banned == true;
+    }
+
+    // ---------------------------------------------------------------
+    // donors/{uid} — private profile: name, phone, exact location.
+    // Owner or admin only, ever. is_verified / is_banned are admin-set
+    // only — a donor's own update can't touch either field.
+    match /donors/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+
+      allow create: if isOwner(uid)
+        && request.resource.data.is_verified == false
+        && request.resource.data.is_banned == false;
+
+      allow update: if isAdmin()
+        || (isOwner(uid)
+            && resource.data.is_banned == false
+            && request.resource.data.is_verified == resource.data.is_verified
+            && request.resource.data.is_banned == resource.data.is_banned);
+
+      allow delete: if isAdmin();
+    }
+
+    // donors_public/{uid} — map-safe mirror. No phone field, ever.
+    //
+    // NOTE: get()/exists() inside a transaction's rule evaluation sees the
+    // database as of BEFORE the transaction started — never a sibling
+    // write made earlier in that same transaction. registerDonor() (and
+    // every admin/self write below) sets donors/{uid} and donors_public/{uid}
+    // together in one transaction, so a rule here that called
+    // get(donors/{uid}) would read a doc that doesn't exist yet (brand-new
+    // donor) or a stale pre-write value (verify/ban/availability) — always
+    // denying. Every check below reads only this document's own fields
+    // instead, so it can't depend on write order within the transaction.
+    match /donors_public/{uid} {
+      allow read: if isSignedIn();
+
+      // A fresh donor always starts unverified (see registerDonor).
+      allow create: if (isOwner(uid) || isAdmin())
+        && !('phone' in request.resource.data)
+        && request.resource.data.is_verified == false;
+
+      // is_verified can only change via an admin write — an owner's own
+      // update must leave it exactly as it already was.
+      allow update: if (isOwner(uid) || isAdmin())
+        && !('phone' in request.resource.data)
+        && (isAdmin() || (!isBanned()
+              && request.resource.data.is_verified == resource.data.is_verified));
+
+      allow delete: if isOwner(uid) || isAdmin();
+    }
+
+    // requests/{id} — the marketplace. Open requests are readable by any
+    // signed-in user (that's how donors discover them); once a request
+    // stops being open, only the two people involved (or admin) can read
+    // it — this is what keeps matched_donor_phone/requester_phone from
+    // being visible to a random signed-in user who isn't part of the
+    // match. Writes are limited to exactly the transitions
+    // backend.dart's client-side transactions perform.
+    match /requests/{id} {
+      function coreUnchanged() {
+        return request.resource.data.requester_uid == resource.data.requester_uid
+          && request.resource.data.blood_group == resource.data.blood_group
+          && request.resource.data.units_needed == resource.data.units_needed
+          && request.resource.data.created_at == resource.data.created_at;
+      }
+
+      allow read: if isSignedIn() &&
+        (resource.data.status == 'open'
+         || resource.data.requester_uid == request.auth.uid
+         || resource.data.matched_donor_id == request.auth.uid
+         || isAdmin());
+
+      allow create: if isSignedIn()
+        && !isBanned()
+        && request.resource.data.requester_uid == request.auth.uid
+        && request.resource.data.status == 'open';
+
+      allow update: if isAdmin() || (isSignedIn() && coreUnchanged() && (
+          // requester cancels their own open or matched request
+          (resource.data.requester_uid == request.auth.uid
+            && resource.data.status in ['open', 'matched']
+            && request.resource.data.status == 'cancelled')
+          ||
+          // a donor accepts an open request
+          (resource.data.status == 'open'
+            && request.resource.data.status == 'matched'
+            && request.resource.data.matched_donor_id == request.auth.uid
+            && !isBanned())
+          ||
+          // the matched donor self-reports the donation done
+          (resource.data.status == 'matched'
+            && resource.data.matched_donor_id == request.auth.uid
+            && request.resource.data.status == 'fulfilled')
+          ||
+          // lazy expiry (stands in for the Blaze-only expireOldRequests
+          // scheduled function) — any signed-in user, only once genuinely
+          // past due, so it can't be used to kill a live request early
+          (resource.data.status == 'open'
+            && request.resource.data.status == 'expired'
+            && request.time > resource.data.expires_at)
+      ));
+    }
+
+    // donation_history/{id} — immutable once written. Self-reported by
+    // the donor (the only real path today) or written by an admin.
+    match /donation_history/{id} {
+      allow read: if isAdmin() ||
+        (isSignedIn() && resource.data.donor_id == request.auth.uid);
+      allow create: if isAdmin() ||
+        (isSignedIn() && request.resource.data.donor_id == request.auth.uid);
+      allow update, delete: if isAdmin();
+    }
+
+    // admins/{uid} — existence = admin. Nothing in-app can create the
+    // first one (see backend/README.md, manual bootstrap via console); an
+    // existing admin can add more. A user may read their OWN doc (so the
+    // client can check "am I an admin") without being able to enumerate
+    // other admins.
+    match /admins/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // hospitals/{id} — plain reference data.
+    match /hospitals/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // audit_log/{id} — admin actions only, admin-only visibility, never
+    // edited or deleted after the fact.
+    match /audit_log/{id} {
+      allow read, create: if isAdmin();
+      allow update, delete: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

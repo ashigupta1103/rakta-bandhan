@@ -4,21 +4,16 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../services/backend.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
-import '../widgets/heart_connector.dart';
+import '../widgets/blood_group_droplet.dart';
+import '../widgets/two_person_connection.dart';
 import 'donation_confirm_screen.dart';
 
 /// Shows the requester's contact info for a request this donor accepted.
-/// The requester's name/phone aren't stored on the request doc itself
-/// (backend.dart's createRequest() never writes them there) — but since
-/// every requester is also a registered donor, their real name/phone are
-/// read from their own `donors/{requester_uid}` doc. Real data, composed
-/// from two existing reads; no schema change, no mock identity needed.
-///
-/// A normal-urgency request never exposes the requester's phone number —
-/// the donor stays in-app. A critical request's number is masked until the
-/// donor explicitly taps to reveal it (there is no persisted per-request
-/// consent field to gate on instead, since that would mean changing the
-/// Firestore schema, which this phase does not do).
+/// `createRequest()` denormalizes `requester_name`/`requester_phone` onto
+/// the request doc itself at creation time specifically so this screen
+/// never needs to read `donors/{requester_uid}` directly — under
+/// firestore.rules that doc is owner/admin-only, and the accepting donor
+/// is neither.
 class MatchContactScreen extends StatefulWidget {
   final String requestId;
 
@@ -30,7 +25,6 @@ class MatchContactScreen extends StatefulWidget {
 
 class _MatchContactScreenState extends State<MatchContactScreen> {
   bool _markingDonated = false;
-  bool _numberRevealed = false;
 
   void _placeholder(String label) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$label — coming soon.')));
@@ -52,14 +46,14 @@ class _MatchContactScreenState extends State<MatchContactScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF3A050B),
+      backgroundColor: AppColors.gradientEmberStart,
       body: Container(
         decoration: const BoxDecoration(
-          gradient: RadialGradient(
-            center: Alignment(-0.4, -0.9),
-            radius: 1.5,
-            colors: [Color(0xFF8C1420), Color(0xFF5C0C14), Color(0xFF3A050B)],
-            stops: [0, 0.55, 1],
+          gradient: LinearGradient(
+            begin: Alignment(-0.25, -1),
+            end: Alignment(0.25, 1),
+            colors: [AppColors.gradientEmberStart, AppColors.gradientEmberMid, AppColors.gradientEmberEnd],
+            stops: [0, 0.68, 1],
           ),
         ),
         child: SafeArea(
@@ -73,118 +67,79 @@ class _MatchContactScreenState extends State<MatchContactScreen> {
               if (request == null) {
                 return const Center(child: Text('Request not found.', style: TextStyle(color: Colors.white70)));
               }
-              final requesterUid = request['requester_uid'] as String?;
               final bloodGroup = request['blood_group'] as String? ?? '';
-              final urgency = request['urgency'] as String? ?? 'normal';
-              final isCritical = urgency == 'critical';
               final location = (request['location_label'] as String?)?.isNotEmpty == true ? request['location_label'] as String : 'the requester';
+              final name = request['requester_name'] as String? ?? 'Requester';
+              final phone = request['requester_phone'] as String? ?? '—';
+              final initials = name.trim().isEmpty ? '?' : name.trim().split(RegExp(r'\s+')).take(2).map((w) => w[0].toUpperCase()).join();
 
-              return FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                future: requesterUid == null ? null : FirebaseFirestore.instance.collection('donors').doc(requesterUid).get(),
-                builder: (context, donorSnap) {
-                  final requesterData = donorSnap.data?.data() ?? {};
-                  final name = requesterData['name'] as String? ?? 'Requester';
-                  final phone = requesterData['phone'] as String? ?? '—';
-                  final initials = name.trim().isEmpty ? '?' : name.trim().split(RegExp(r'\s+')).take(2).map((w) => w[0].toUpperCase()).join();
-
-                  return Column(
-                    children: [
-                      SizedBox(
-                        height: 48,
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: IconButton(icon: const Icon(LucideIcons.arrowLeft, color: Colors.white), onPressed: () => Navigator.pop(context)),
+              return Column(
+                children: [
+                  SizedBox(
+                    height: 48,
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: IconButton(icon: const Icon(LucideIcons.arrowLeft, color: Colors.white), onPressed: () => Navigator.pop(context)),
+                    ),
+                  ),
+                  Expanded(child: TwoPersonConnection(leftLabel: 'You', rightInitials: initials)),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 28),
+                    child: Column(
+                      children: [
+                        const Text("YOU'RE CONNECTED", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 1.5, color: Color(0xFFE0A8AF))),
+                        const SizedBox(height: 12),
+                        Text(
+                          '$name needs your help',
+                          textAlign: TextAlign.center,
+                          style: AppTextStyles.display(fontSize: 26, color: const Color(0xFFFFF9F5), height: 1.2),
                         ),
-                      ),
-                      Expanded(
-                        child: SingleChildScrollView(
-                          padding: const EdgeInsets.symmetric(horizontal: 28),
-                          child: Column(
-                            children: [
-                              const SizedBox(height: 12),
-                              // "You" is the donor here, so the donor role
-                              // (public/gold) sits on the left and the
-                              // requester (private/burgundy) on the right —
-                              // the same two roles as Donor Accepted, mirrored.
-                              HeartConnector(
-                                leftInitials: 'You',
-                                rightInitials: initials,
-                                leftIsPublic: true,
-                                rightIsPublic: false,
-                                discSize: 68,
-                              ),
-                              const SizedBox(height: 26),
-                              const Text("YOU'RE CONNECTED", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 1.5, color: Color(0xFFE0A8AF))),
-                              const SizedBox(height: 12),
-                              Text(
-                                '$name needs your help',
-                                textAlign: TextAlign.center,
-                                style: AppTextStyles.display(fontSize: 30, color: const Color(0xFFFFF9F5), height: 1.15),
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                '$bloodGroup needed · $location',
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(fontSize: 14.5, color: Color(0xFFE9BFC4), height: 1.5),
-                              ),
-                              const SizedBox(height: 24),
-                            ],
+                        const SizedBox(height: 12),
+                        Text(
+                          '$bloodGroup needed · $location. Reach out and agree a time.',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 13.5, color: Color(0xFFE9BFC4), height: 1.6),
+                        ),
+                        const SizedBox(height: 20),
+                        BloodGroupDroplet(label: bloodGroup, size: 34, filled: true, color: AppColors.primary, textColor: const Color(0xFFFBE6E8), fontSize: 12),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(28, 0, 28, 20),
+                    child: Column(
+                      children: [
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(backgroundColor: AppColors.warmPageBackground, foregroundColor: AppColors.gradientEmberMid),
+                            onPressed: () => _placeholder('Call'),
+                            icon: const Icon(LucideIcons.phone, size: 16),
+                            label: Text('Call · $phone', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
                           ),
                         ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(24, 0, 24, 22),
-                        child: Column(
-                          children: [
-                            if (!isCritical) ...[
-                              Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.all(14),
-                                decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(14)),
-                                child: const Text(
-                                  'Normal requests stay in-app — no phone number is shared. Agree on a time here, then mark it done once you\'ve donated.',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(fontSize: 12.5, color: Color(0xFFE9BFC4), height: 1.5),
-                                ),
-                              ),
-                              const SizedBox(height: 14),
-                            ] else if (!_numberRevealed) ...[
-                              SizedBox(
-                                width: double.infinity,
-                                child: OutlinedButton.icon(
-                                  style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFFFBE6E8), side: const BorderSide(color: Color(0x8CFBE6E8)), padding: const EdgeInsets.symmetric(vertical: 15)),
-                                  onPressed: () => setState(() => _numberRevealed = true),
-                                  icon: const Icon(LucideIcons.phone, size: 16),
-                                  label: const Text('Show number to call'),
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              const Text('This is a critical request — the number is shown only once you ask.', textAlign: TextAlign.center, style: TextStyle(fontSize: 11.5, color: Color(0xFFD9AFB4))),
-                              const SizedBox(height: 10),
-                            ] else ...[
-                              SizedBox(
-                                width: double.infinity,
-                                child: ElevatedButton.icon(
-                                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.warmPageBackground, foregroundColor: const Color(0xFF5C0C14), padding: const EdgeInsets.symmetric(vertical: 15)),
-                                  onPressed: () => _placeholder('Call'),
-                                  icon: const Icon(LucideIcons.phone, size: 16),
-                                  label: Text('Call · $phone', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-                                ),
-                              ),
-                              const SizedBox(height: 10),
-                            ],
-                            TextButton(
-                              onPressed: _markingDonated ? null : _markDonated,
-                              child: _markingDonated
-                                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                                  : const Text('Mark as donated', style: TextStyle(fontSize: 13.5, color: Color(0xFFE9BFC4), fontWeight: FontWeight.w600)),
-                            ),
-                          ],
+                        const SizedBox(height: 10),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFFFBE6E8), side: const BorderSide(color: Color(0x8CFBE6E8))),
+                            onPressed: () => _placeholder('WhatsApp'),
+                            icon: const Icon(LucideIcons.messageSquare, size: 15),
+                            label: const Text('WhatsApp'),
+                          ),
                         ),
-                      ),
-                    ],
-                  );
-                },
+                        const SizedBox(height: 14),
+                        TextButton(
+                          onPressed: _markingDonated ? null : _markDonated,
+                          child: _markingDonated
+                              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                              : const Text('Mark as donated', style: TextStyle(fontSize: 13.5, color: Color(0xFFE9BFC4))),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               );
             },
           ),

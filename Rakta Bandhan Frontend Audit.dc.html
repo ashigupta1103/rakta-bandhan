@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/industry-8a2a055e-4bc9-4f8d-9e72-51a59da0069a/styles.css">
+<script src="_ds/industry-8a2a055e-4bc9-4f8d-9e72-51a59da0069a/_ds_bundle.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&display=swap">
+<style>
+body { margin: 0; background: var(--color-bg); }
+a { color: var(--color-accent-700); text-decoration: none; border-bottom: 1px solid var(--color-accent-300); }
+a:hover { color: var(--color-accent-800); border-bottom-color: var(--color-accent); }
+</style>
+</helmet>
+
+<div style="max-width: 1180px; margin: 0 auto; padding: 40px 24px 96px; color: var(--color-text); font-family: var(--font-body); font-size: 15px; line-height: 1.6">
+
+  <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-end; justify-content: space-between; border-bottom: 1px solid var(--color-text); padding-bottom: 16px">
+    <div>
+      <div style="font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--color-accent-700); font-weight: 600">Frontend audit &amp; redesign direction — for approval</div>
+      <h1 style="font-size: 54px; margin: 6px 0 0; letter-spacing: -0.02em">Rakta Bandhan</h1>
+    </div>
+    <div style="display: grid; grid-template-columns: auto auto; gap: 2px 16px; font-size: 12.5px; align-items: baseline">
+      <span style="opacity: 0.6">Source</span><span>ashigupta1103/rakta-bandhan @ master</span>
+      <span style="opacity: 0.6">Read</span><span>32 screens · 13 widgets · 3 theme files · 7 services</span>
+      <span style="opacity: 0.6">Status</span><span>Audit only — no repository files modified</span>
+    </div>
+  </div>
+
+  <p style="max-width: 760px; margin: 24px 0 0; font-size: 17px; line-height: 1.65">This is a read of the app as it exists today: what each screen is for, where it holds together, and where it does not. Nothing here has been applied to the repository. The backend seam — <code>services/backend.dart</code>, Firebase, Firestore, auth, schemas and rules — is treated as fixed throughout, and every recommendation below is a presentation-layer change that reads the same data the current screens already read.</p>
+
+  <!-- ══════════════ 01 STATE OF THE BUILD ══════════════ -->
+  <div style="display: flex; align-items: center; gap: 14px; margin: 56px 0 20px">
+    <span style="font-family: var(--font-heading); font-size: 13px; letter-spacing: 0.14em; color: var(--color-accent-700)">01</span>
+    <h2 style="font-size: 30px; margin: 0">State of the build</h2>
+    <span style="flex: 1; height: 1px; background: var(--color-divider)"></span>
+  </div>
+
+  <p style="max-width: 780px; margin: 0 0 24px">The app is further along than a first look suggests, and less coherent. Roughly a third of the screens have already been rebuilt against the <code>design_new/</code> proposals — warm cream ground, serif display numerals, the droplet motif, one raised object per screen. The rest still run the earlier flat card system. Both live in the same theme file at once, and the theme file says so out loud.</p>
+
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px">
+    <div class="blueprint card" style="padding: 18px">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <div class="card-kicker">Layer A — redesigned</div>
+      <div style="font-family: var(--font-heading); font-size: 40px; line-height: 1">11</div>
+      <div style="font-size: 13px; line-height: 1.5">Splash, Login, Home, Profile, Notifications, Donation history, Create request, Matching, Request detail, and the two ember outcome screens. Warm ground, serif display, droplet vocabulary.</div>
+    </div>
+    <div class="blueprint card" style="padding: 18px">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <div class="card-kicker">Layer B — legacy flat</div>
+      <div style="font-family: var(--font-heading); font-size: 40px; line-height: 1">10</div>
+      <div style="font-size: 13px; line-height: 1.5">Requests, Find donors, Donor details, Tracking, Settings, Cooldown, OTP, Registration, Consent, Verifying. Pill tabs, status chips, gradient hero cards, 14px radius everywhere.</div>
+    </div>
+    <div class="blueprint card" style="padding: 18px">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <div class="card-kicker">Layer C — admin console</div>
+      <div style="font-family: var(--font-heading); font-size: 40px; line-height: 1">5</div>
+      <div style="font-size: 13px; line-height: 1.5">Admin login, dashboard, donor detail, request detail, hospital form. Reached through a "Admin (temporary)" row in user Settings. No design pass at all.</div>
+    </div>
+    <div class="blueprint card" style="padding: 18px">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <div class="card-kicker">Layer D — designed, never applied</div>
+      <div style="font-family: var(--font-heading); font-size: 40px; line-height: 1">6</div>
+      <div style="font-size: 13px; line-height: 1.5">Personal information, Emergency contact, Terms, Privacy policy, Data usage, Consent preferences. Written in <code>design_new/flutter/</code>, absent from <code>lib/screens/</code>. Their entry points currently fire a toast.</div>
+    </div>
+  </div>
+
+  <div class="blueprint" style="margin-top: 28px; padding: 20px 22px; border: 1px solid var(--color-accent); background: var(--color-accent-100)">
+    <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+    <div style="font-family: var(--font-heading); font-size: 20px; margin-bottom: 6px">The core finding: the app runs two design systems side by side</div>
+    <p style="margin: 0; max-width: 860px; font-size: 14.5px">
+      <code>lib/theme/app_colors.dart</code> declares both. One set — <code>pageBackground</code>, <code>border</code>, <code>statusUrgentBg</code>, <code>statusPendingBg</code>, <code>tabTrackBackground</code> — drives the flat screens. A second set — <code>warmPageBackground</code>, <code>cardBorderWarm</code>, <code>dividerWarm</code>, <code>warmAmberBg</code>, <code>warmGreenBg</code>, <code>textPrimaryWarm</code> — drives the redesigned ones. The file's own comment says the two are "deliberately separate" and "distinct near-duplicate shades… don't collapse them into one." That was a sound call while the redesign was partial. It is now the single biggest source of visual drift: <code>#F7F6F2</code> against <code>#FBF7F1</code>, <code>#1A1A1A</code> against <code>#241416</code>, <code>#E5E3DD</code> against <code>#EEE8DF</code> — differences too small to read as intent and too large to read as the same product.
+    </p>
+  </div>
+
+  <!-- ══════════════ 02 APP MAP ══════════════ -->
+  <div style="display: flex; align-items: center; gap: 14px; margin: 56px 0 20px">
+    <span style="font-family: var(--font-heading); font-size: 13px; letter-spacing: 0.14em; color: var(--color-accent-700)">02</span>
+    <h2 style="font-size: 30px; margin: 0">Flows, as built</h2>
+    <span style="flex: 1; height: 1px; background: var(--color-divider)"></span>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px">
+    <div class="blueprint" style="padding: 18px 20px">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <div class="card-kicker">Flow 1 — entry</div>
+      <div style="font-family: var(--font-heading); font-size: 19px; margin: 2px 0 10px">Launch to verified donor</div>
+      <div style="font-size: 13.5px; line-height: 1.9">Splash <span style="opacity:.45">›</span> Onboarding ×4 <span style="opacity:.45">›</span> Login (phone) <span style="opacity:.45">›</span> OTP <span style="opacity:.45">›</span> Registration <span style="opacity:.45">›</span> Consent <span style="opacity:.45">›</span> Verifying <span style="opacity:.45">›</span> Home</div>
+      <div style="margin-top: 10px; font-size: 12.5px; opacity: 0.75">Splash routes on two facts: has a donor profile, has seen onboarding. Seven screens before the product is visible.</div>
+    </div>
+    <div class="blueprint" style="padding: 18px 20px">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <div class="card-kicker">Flow 2 — donor</div>
+      <div style="font-family: var(--font-heading); font-size: 19px; margin: 2px 0 10px">Alert to donation</div>
+      <div style="font-size: 13.5px; line-height: 1.9">Home / Notifications <span style="opacity:.45">›</span> Request detail <span style="opacity:.45">›</span> Accept result <span style="opacity:.45">›</span> Match contact <span style="opacity:.45">›</span> Donation confirm <span style="opacity:.45">›</span> Cooldown</div>
+      <div style="margin-top: 10px; font-size: 12.5px; opacity: 0.75">The emotional spine of the product. Accept enforces one active match at a time by query, and can land on blocked or already-claimed.</div>
+    </div>
+    <div class="blueprint" style="padding: 18px 20px">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <div class="card-kicker">Flow 3 — requester</div>
+      <div style="font-family: var(--font-heading); font-size: 19px; margin: 2px 0 10px">Need to match</div>
+      <div style="font-size: 13.5px; line-height: 1.9">Create request <span style="opacity:.45">›</span> Matching ladder <span style="opacity:.45">›</span> Donor found <span style="opacity:.45">/</span> No donor found <span style="opacity:.45">›</span> Tracking <span style="opacity:.45">›</span> Requests tab</div>
+      <div style="margin-top: 10px; font-size: 12.5px; opacity: 0.75">The request document is real; the ladder animation is a front-end simulation whose outcome is decided from a real snapshot of compatible donors.</div>
+    </div>
+    <div class="blueprint" style="padding: 18px 20px">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <div class="card-kicker">Flow 4 — discovery &amp; identity</div>
+      <div style="font-family: var(--font-heading); font-size: 19px; margin: 2px 0 10px">Map, profile, history</div>
+      <div style="font-size: 13.5px; line-height: 1.9">Find donors (map + sheet) <span style="opacity:.45">›</span> Donor details · Profile <span style="opacity:.45">›</span> Donation history <span style="opacity:.45">›</span> Settings <span style="opacity:.45">›</span> Admin console</div>
+      <div style="margin-top: 10px; font-size: 12.5px; opacity: 0.75">Only three of these are in the tab bar. Find donors is reached from a small grey text link at the bottom of Home.</div>
+    </div>
+  </div>
+
+  <div class="blueprint" style="margin-top: 20px; padding: 18px 20px">
+    <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+    <div style="font-family: var(--font-heading); font-size: 19px; margin-bottom: 8px">Navigation problems that are really visual problems</div>
+    <ul style="margin: 0; padding-left: 18px; font-size: 14px; line-height: 1.75; max-width: 900px">
+      <li>Three tabs — Home, Requests, Profile — carry a product with four flows. The map and the requester flow have no permanent home, so both are demoted to text links at the bottom of a scroll.</li>
+      <li>The Requests tab is pushed as a tab but built as a pushed screen: it renders its own back arrow in an AppBar, which does nothing meaningful from a tab root.</li>
+      <li>Every deep screen constructs its own header. Three different patterns coexist: a real <code>AppBar</code> with a centred 18/w500 title, a hand-built 52px <code>Stack</code> with a 17/w600 title, and a hand-built 48px <code>Row</code> with a left-aligned 16/w600 title.</li>
+      <li>Outcome screens are pushed rather than replaced in several places, so the back stack can return the user to a request they have already accepted.</li>
+      <li>Nothing in the shell ever shows the donor's own live state — availability, cooldown, or an unread alert count — except on the two screens that happen to render it inline.</li>
+    </ul>
+  </div>
+
+  <!-- ══════════════ 03 SCREEN AUDIT ══════════════ -->
+  <div style="display: flex; align-items: center; gap: 14px; margin: 56px 0 8px">
+    <span style="font-family: var(--font-heading); font-size: 13px; letter-spacing: 0.14em; color: var(--color-accent-700)">03</span>
+    <h2 style="font-size: 30px; margin: 0">Screen-by-screen audit</h2>
+    <span style="flex: 1; height: 1px; background: var(--color-divider)"></span>
+  </div>
+  <p style="margin: 0 0 24px; font-size: 14px; opacity: 0.75">Each card: what the screen is for, what it puts first, what is wrong, what is thin, and where it should go.</p>
+
+  <div style="display: flex; flex-direction: column; gap: 18px">
+
+    <!-- SPLASH + ONBOARDING -->
+    <div class="blueprint" style="padding: 22px 24px">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: baseline; margin-bottom: 14px">
+        <span style="font-family: var(--font-heading); font-size: 24px">Splash &amp; Onboarding</span>
+        <span class="tag tag-accent">Layer A</span>
+        <span class="tag tag-neutral">4 intro pages</span>
+        <sc-if value="{{ showFilePaths }}" hint-placeholder-val="{{ true }}"><span style="font-size: 12px; opacity: 0.6; font-family: var(--font-heading); letter-spacing: 0.04em">splash_screen.dart · onboarding_screen.dart</span></sc-if>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 20px 26px; font-size: 13.5px; line-height: 1.6">
+        <div><div style="font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent-700); font-weight: 600; margin-bottom: 5px">Purpose</div>A brand reveal, then a four-page argument for registering — and the one gate that decides where a returning user lands.</div>
+        <div><div style="font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent-700); font-weight: 600; margin-bottom: 5px">Hierarchy today</div>Logo plate at 176px on cream, tagline fading in beneath. Onboarding page 1 uses the ember gradient field; pages 2–4 return to the light ground.</div>
+        <div><div style="font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent-700); font-weight: 600; margin-bottom: 5px">Problems</div>The mark is a 4160×4160 JPEG on a white rounded plate — a logo in a box, not a logo. A transparent PNG exists in <code>design_new/</code> and is unused. The reveal holds 550ms after decode, then a 400ms fade, on every cold launch forever.</div>
+        <div><div style="font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent-700); font-weight: 600; margin-bottom: 5px">Direction</div>Drop the plate; set the transparent mark directly on the ground and let the ember field arrive behind it, carrying straight into onboarding page 1 as one continuous move. Shorten the hold for returning users.</div>
+      </div>
+    </div>
+
+    <!-- LOGIN / OTP / REGISTRATION -->
+    <div class="blueprint" style="padding: 22px 24px">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: baseline; margin-bottom: 14px">
+        <span style="font-family: var(--font-heading); font-size: 24px">Login · OTP · Registration · Consent · Verifying</span>
+        <span class="tag tag-outline">Mixed layers</span>
+        <sc-if value="{{ showFilePaths }}" hint-placeholder-val="{{ true }}"><span style="font-size: 12px; opacity: 0.6; font-family: var(--font-heading); letter-spacing: 0.04em">login · otp · registration · consent · verifying</span></sc-if>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 20px 26px; font-size: 13.5px; line-height: 1.6">
+        <div><div style="font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent-700); font-weight: 600; margin-bottom: 5px">Purpose</div>Phone-number identity, then the donor record: name, blood group, location, eligibility — and the consent the product needs before it can page anyone.</div>
+        <div><div style="font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent-700); font-weight: 600; margin-bottom: 5px">Hierarchy today</div>Login is the strongest screen in the app: brand mark, serif welcome, one pill-shaped country + phone field, one filled button. The screens after it revert to stacked 14px-radius form fields under a plain AppBar.</div>
+        <div><div style="font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent-700); font-weight: 600; margin-bottom: 5px">Problems</div>Login's radius is 30px; every other field in the app is 14px. The <code>hands_heart.png</code> illustration is dropped in at the foot of Login at full width with no size or crop control, and appears nowhere else. On web the whole flow stretches to the browser width — the phone field becomes a 1700px bar. Registration asks for everything on one long scroll with no sense of progress.</div>
+        <div><div style="font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent-700); font-weight: 600; margin-bottom: 5px">Direction</div>Make Login's treatment the standard for the whole entry sequence: one question per screen, generous type, a persistent thin progress rule, and the ember field reserved for the consent moment. Bring the illustration under a fixed art frame or retire it.</div>
+      </div>
+    </div>
+
+    <!-- HOME -->
+    <div class="blueprint" style="padding: 22px 24px">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: baseline; margin-bottom: 14px">
+        <span style="font-family: var(--font-heading); font-size: 24px">Home</span>
+        <span class="tag tag-accent">Layer A</span>
+        <span class="tag tag-neutral">Tab 1</span>
+        <sc-if value="{{ showFilePaths }}" hint-placeholder-val="{{ true }}"><span style="font-size: 12px; opacity: 0.6; font-family: var(--font-heading); letter-spacing: 0.04em">home_screen.dart</span></sc-if>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 20px 26px; font-size: 13.5px; line-height: 1.6">
+        <div><div style="font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent-700); font-weight: 600; margin-bottom: 5px">Purpose</div>One live nearby request, the donor's own state, their record, and a quiet way to become a requester.</div>
+        <div><div style="font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent-700); font-weight: 600; margin-bottom: 5px">Hierarchy today</div>Greeting and first name in 30px serif, availability pulse, then the single request card as the only raised object, then the donation count at 44px serif with five droplets. Deliberate and mostly working.</div>
+        <div><div style="font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent-700); font-weight: 600; margin-bottom: 5px">Problems</div>It shows <code>docs.first</code> — the newest open request, not the nearest or the most compatible — and hard-codes "just now" as its timestamp regardless of age. Blood-group compatibility is not filtered here, so a donor can be shown a request they cannot fulfil; the Requests tab does filter. Distance renders "—" until GPS resolves. The empty state is a single grey sentence where the product's whole argument should be. "SOMEONE NEEDS YOU" sits in 11px letterspaced caps above a card that already says it.</div>
+        <div><div style="font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent-700); font-weight: 600; margin-bottom: 5px">Direction</div>Keep the one-object composition, fix what it selects: nearest compatible request, real elapsed time, live distance. Give the caught-up state real substance — the donor's own standing, days to eligibility, what happened nearby this week. This is the screen most users see most often and it currently ends in a grey line of text.</div>
+      </div>
+    </div>
+
+    <!-- REQUESTS -->
+    <div class="blueprint" style="padding: 22px 24px">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: baseline; margin-bottom: 14px">
+        <span style="font-family: var(--font-heading); font-size: 24px">Requests</span>
+        <span class="tag tag-outline">Layer B</span>
+        <span class="tag tag-neutral">Tab 2</span>
+        <sc-if value="{{ showFilePaths }}" hint-placeholder-val="{{ true }}"><span style="font-size: 12px; opacity: 0.6; font-family: var(--font-heading); letter-spacing: 0.04em">requests_screen.dart</span></sc-if>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 20px 26px; font-size: 13.5px; line-height: 1.6">
+        <div><div style="font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent-700); font-weight: 600; margin-bottom: 5px">Purpose</div>Two inboxes in one screen: open requests this donor can fulfil plus what they have accepted, and the requests they themselves raised.</div>
+        <div><div style="font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent-700); font-weight: 600; margin-bottom: 5px">Hierarchy today</div>A solid-red pill tab track, then identical white cards. Every card carries a status badge, a droplet, a location line and one or two buttons of equal weight.</div>
+        <div><div style="font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent-700); font-weight: 600; margin-bottom: 5px">Problems</div>The clearest example of the two-system split: this screen mixes flat status colours with warm redesign tokens in the same card. Nothing is ranked — a critical request four hours old looks exactly like a normal one raised yesterday; urgency is not shown at all in the card. "Track status" and "Cancel request" are both outlined buttons of the same size, so cancelling is as easy as checking. The location line silently falls back to "1 unit(s) needed" as a title. It back-arrows out of a tab.</div>
+        <div><div style="font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent-700); font-weight: 600; margin-bottom: 5px">Direction</div>Rebuild as one ranked list with real segmentation — urgency and distance drive order and visual weight; matched requests carry the donor's face and a live status line; terminal states drop to a quiet archival row. One primary action per card, destructive actions demoted to text.</div>
+      </div>
+    </div>
+
+    <!-- FIND DONORS -->
+    <div class="blueprint" style="padding: 22px 24px">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: baseline; margin-bottom: 14px">
+        <span style="font-family: var(--font-heading); font-size: 24px">Find donors — map</span>
+        <span class="tag tag-outline">Layer B</span>
+        <span class="tag tag-accent">Highest-risk screen</span>
+        <sc-if value="{{ showFilePaths }}" hint-placeholder-val="{{ true }}"><span style="font-size: 12px; opacity: 0.6; font-family: var(--font-heading); letter-spacing: 0.04em">find_donors_screen.dart · donor_details_screen.dart</span></sc-if>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 20px 26px; font-size: 13.5px; line-height: 1.6">
+        <div><div style="font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent-700); font-weight: 600; margin-bottom: 5px">Purpose</div>Browse available donors near a searched location, filter by group, open a donor, or fire a request.</div>
+        <div><div style="font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent-700); font-weight: 600; margin-bottom: 5px">Hierarchy today</div>A search field and nine filter chips float over the map; a fixed 340px white sheet holds the ranked donor list. Markers are avatar discs with a group droplet and a pointer tail — the best-drawn objects in the app.</div>
+        <div><div style="font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent-700); font-weight: 600; margin-bottom: 5px">Problems</div>There is no map. The ground is a flat <code>#E8E6E1</code> fill with three hand-painted grey strokes, and the two donor markers are pinned at hard-coded pixel coordinates that bear no relation to their real latitude and longitude — the sheet's distances are real, the picture is not. A "you are here" halo is drawn at fixed 200/165 as well. The sheet cannot be dragged despite having a drag handle. Only two of N donors ever get a marker. Both card buttons are outlined, so "Request" — which writes a live urgent request document — reads as secondary. The nine chips overflow horizontally with no affordance.</div>
+        <div><div style="font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent-700); font-weight: 600; margin-bottom: 5px">Direction</div>Two honest options, and this needs your decision: either a real tiled map with correctly projected markers and a draggable sheet, or drop the map entirely and design this as a proximity list — concentric distance bands, the donor's disc placed by bearing and range rather than by street. The current halfway state reads as a broken map, which costs trust on the screen where trust matters most. Keep the avatar-disc marker either way.</div>
+      </div>
+    </div>
+
+    <!-- CREATE REQUEST -->
+    <div class="blueprint" style="padding: 22px 24px">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: baseline; margin-bottom: 14px">
+        <span style="font-family: var(--font-heading); font-size: 24px">Create request</span>
+        <span class="tag tag-accent">Layer A</span>
+        <sc-if value="{{ showFilePaths }}" hint-placeholder-val="{{ true }}"><span style="font-size: 12px; opacity: 0.6; font-family: var(--font-heading); letter-spacing: 0.04em">create_request_screen.dart</span></sc-if>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 20px 26px; font-size: 13.5px; line-height: 1.6">
+        <div><div style="font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent-700); font-weight: 600; margin-bottom: 5px">Purpose</div>Three questions — group and units, urgency, location — asked one at a time, all answers staying visible and editable.</div>
+        <div><div style="font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent-700); font-weight: 600; margin-bottom: 5px">Hierarchy today</div>"Who needs blood?" in 27px serif, then question blocks separated by hairlines. The live question carries a red ring marker; answered ones collapse to a green check row. Structurally the most sophisticated screen in the app.</div>
+        <div><div style="font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent-700); font-weight: 600; margin-bottom: 5px">Problems</div>The selection states are unfinished: all eight blood-group droplets render identically in neutral grey with no selected state — selection is only visible after the section collapses. Urgency radios never fill, and the <code>bars</code> weight defined for each level is never drawn. Units are steppable in two different places with different type sizes. The three "ring markers" are hand-built circles here, while <code>widgets/ring_field.dart</code> and <code>step_tracker.dart</code> already exist. Location errors introduce a left red rule that appears nowhere else in the app.</div>
+        <div><div style="font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent-700); font-weight: 600; margin-bottom: 5px">Direction</div>Keep the flow exactly as approved; finish its states. Selected droplet fills crimson, urgency draws its three-bar weight and a filled radio, one units control, and the question marker becomes a shared component with the tracker used on Matching and Tracking.</div>
+      </div>
+    </div>
+
+    <!-- MATCHING + OUTCOMES -->
+    <div class="blueprint" style="padding: 22px 24px">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: baseline; margin-bottom: 14px">
+        <span style="font-family: var(--font-heading); font-size: 24px">Matching ladder &amp; outcome screens</span>
+        <span class="tag tag-accent">Layer A · ember field</span>
+        <sc-if value="{{ showFilePaths }}" hint-placeholder-val="{{ true }}"><span style="font-size: 12px; opacity: 0.6; font-family: var(--font-heading); letter-spacing: 0.04em">matching · donor_found · no_donor_found · accept_result · match_contact · donation_confirm · cancel_confirm</span></sc-if>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 20px 26px; font-size: 13.5px; line-height: 1.6">
+        <div><div style="font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent-700); font-weight: 600; margin-bottom: 5px">Purpose</div>Hold the requester through the wait, then deliver the result: a donor, or none. Then the seven small screens that close every branch of both flows.</div>
+        <div><div style="font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent-700); font-weight: 600; margin-bottom: 5px">Hierarchy today</div>Matching is the app's one dark screen: a near-black red gradient, concentric rings, a rotating sweep, anonymous notified-donor dots, the group droplet at centre, and a stage ladder in a glass panel. The outcome screens share an ember field and a light inverted button.</div>
+        <div><div style="font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent-700); font-weight: 600; margin-bottom: 5px">Problems</div>Matching uses <code>gradientMatchingStart/End</code> while the outcome screens it flows into use <code>gradientEmberStart/Mid/End</code> — two different dark fields back to back. Seven near-identical outcome screens each rebuild their own layout, so paddings, button styles and copy tone drift. The dark screens sit outside the theme entirely: white-with-alpha values are written inline, and the ladder's success green <code>#7FCB8E</code> exists nowhere else. The sweep animation runs on a 3400ms loop with no relation to the ladder's real stage timing. Several outcomes are pushed rather than replaced.</div>
+        <div><div style="font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent-700); font-weight: 600; margin-bottom: 5px">Direction</div>One ember field, one dark-surface token set, and one outcome template — full-bleed field, one line of serif truth, one supporting line, one primary action, one quiet escape — that all seven screens fill in. Tie the sweep to real stage transitions so the motion means something. This is where the product earns the word "meaningful"; it should feel like the same room throughout.</div>
+      </div>
+    </div>
+
+    <!-- TRACKING -->
+    <div class="blueprint" style="padding: 22px 24px">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: baseline; margin-bottom: 14px">
+        <span style="font-family: var(--font-heading); font-size: 24px">Tracking</span>
+        <span class="tag tag-outline">Layer B</span>
+        <sc-if value="{{ showFilePaths }}" hint-placeholder-val="{{ true }}"><span style="font-size: 12px; opacity: 0.6; font-family: var(--font-heading); letter-spacing: 0.04em">tracking_screen.dart · widgets/step_tracker.dart</span></sc-if>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 20px 26px; font-size: 13.5px; line-height: 1.6">
+        <div><div style="font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent-700); font-weight: 600; margin-bottom: 5px">Purpose</div>Live status of one request across four steps, read straight from the request document.</div>
+        <div><div style="font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent-700); font-weight: 600; margin-bottom: 5px">Hierarchy today</div>A red gradient hero card with the group and location, then a white card holding the four-step tracker.</div>
+        <div><div style="font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent-700); font-weight: 600; margin-bottom: 5px">Problems</div>The <code>GradientHeroCard</code> here is the last survivor of a treatment the redesign explicitly removed from Home — a red gradient block competing with the content below it. Cancelled and expired both render as a grey "pending" step, so a cancelled request looks like it is still waiting. The matched step names the donor but offers no way to reach them, though Match contact exists. Terminal states show an alert triangle in a grey square that appears in this shape nowhere else.</div>
+        <div><div style="font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent-700); font-weight: 600; margin-bottom: 5px">Direction</div>Retire the gradient hero. Lead with the request in plain warm type, make the tracker the object on the page, give failed steps their own crossed state, and put the matched donor's disc and a contact action inside the matched step.</div>
+      </div>
+    </div>
+
+    <!-- PROFILE + HISTORY + COOLDOWN -->
+    <div class="blueprint" style="padding: 22px 24px">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: baseline; margin-bottom: 14px">
+        <span style="font-family: var(--font-heading); font-size: 24px">Profile · Donation history · Cooldown</span>
+        <span class="tag tag-accent">Layer A</span>
+        <span class="tag tag-neutral">Tab 3</span>
+        <sc-if value="{{ showFilePaths }}" hint-placeholder-val="{{ true }}"><span style="font-size: 12px; opacity: 0.6; font-family: var(--font-heading); letter-spacing: 0.04em">profile · donation_history · cooldown</span></sc-if>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 20px 26px; font-size: 13.5px; line-height: 1.6">
+        <div><div style="font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent-700); font-weight: 600; margin-bottom: 5px">Purpose</div>Donor identity and standing: who you are, whether you are available, what you have given, when you are eligible again.</div>
+        <div><div style="font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent-700); font-weight: 600; margin-bottom: 5px">Hierarchy today</div>Initials avatar with the group droplet attached, name in 26px serif, verification pill, an availability card with a switch, the count at 48px serif, then a four-row menu. History repeats the same count at 44px over a ten-droplet trail and a real vertical timeline.</div>
+        <div><div style="font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent-700); font-weight: 600; margin-bottom: 5px">Problems</div>The impact trail is drawn three times at three horizons — five droplets on Home, four on Profile, ten in History — so the same donor's progress reads differently on each screen. Profile's "Personal information" and "Emergency contact" rows open a toast, not a screen; both screens exist in <code>design_new/flutter/</code> and were never applied. Cooldown is reachable only if you already know it exists, and its 18-segment bar, Profile's 11-segment bar and History's 10-droplet trail are three renderings of one idea. Cooldown still uses <code>statusPendingText</code> amber from the flat system. Verification pending is stated but never explained — no idea what happens next or how long.</div>
+        <div><div style="font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent-700); font-weight: 600; margin-bottom: 5px">Direction</div>One impact-trail component with one fixed horizon, used everywhere. Fold Cooldown into Profile as the eligibility state of the availability object rather than a screen you cannot find. Ship the two missing screens. Give verification a real explanation and a visible stage.</div>
+      </div>
+    </div>
+
+    <!-- NOTIFICATIONS -->
+    <div class="blueprint" style="padding: 22px 24px">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: baseline; margin-bottom: 14px">
+        <span style="font-family: var(--font-heading); font-size: 24px">Notifications</span>
+        <span class="tag tag-accent">Layer A</span>
+        <sc-if value="{{ showFilePaths }}" hint-placeholder-val="{{ true }}"><span style="font-size: 12px; opacity: 0.6; font-family: var(--font-heading); letter-spacing: 0.04em">notifications_screen.dart</span></sc-if>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 20px 26px; font-size: 13.5px; line-height: 1.6">
+        <div><div style="font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent-700); font-weight: 600; margin-bottom: 5px">Purpose</div>The alert feed — one actionable item promoted, everything else archival.</div>
+        <div><div style="font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent-700); font-weight: 600; margin-bottom: 5px">Hierarchy today</div>Exactly one raised card with a red top edge and the only button; earlier items as hairline-divided rows with a dot or a green droplet. The rule is well chosen and well executed.</div>
+        <div><div style="font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent-700); font-weight: 600; margin-bottom: 5px">Problems</div>Its one button opens a toast — "Opening request — coming soon" — so the app's most urgent surface is a dead end, though <code>RequestDetailScreen</code> already takes a request id. "Enable notifications" is also a toast. Home's bell shows a static red dot that is never tied to unread state. Timestamps arrive pre-formatted as strings from the service, so nothing can group by day. Three hard-coded browns appear here and nowhere else.</div>
+        <div><div style="font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent-700); font-weight: 600; margin-bottom: 5px">Direction</div>Wire the card to the request it names, bind the bell to real unread count, group the archive by day, and pull the amber and brown values into tokens. No new design needed here — this screen mainly needs to be connected.</div>
+      </div>
+    </div>
+
+    <!-- SETTINGS + ADMIN -->
+    <sc-if value="{{ showAdmin }}" hint-placeholder-val="{{ true }}">
+    <div class="blueprint" style="padding: 22px 24px">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: baseline; margin-bottom: 14px">
+        <span style="font-family: var(--font-heading); font-size: 24px">Settings &amp; Admin console</span>
+        <span class="tag tag-outline">Layer B / C</span>
+        <sc-if value="{{ showFilePaths }}" hint-placeholder-val="{{ true }}"><span style="font-size: 12px; opacity: 0.6; font-family: var(--font-heading); letter-spacing: 0.04em">settings · admin_login · admin_dashboard · admin_donor_detail · admin_request_detail · admin_hospital_form</span></sc-if>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 20px 26px; font-size: 13.5px; line-height: 1.6">
+        <div><div style="font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent-700); font-weight: 600; margin-bottom: 5px">Purpose</div>Privacy and account controls for the donor; verification, request moderation and hospital records for staff.</div>
+        <div><div style="font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent-700); font-weight: 600; margin-bottom: 5px">Hierarchy today</div>Three bordered groups of plain rows. Every actionable row is crimson text of identical weight, so "Download my data", "Request data deletion" and "Log out of all devices" all look the same. Admin is a separate visual world reached from the bottom of this list.</div>
+        <div><div style="font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent-700); font-weight: 600; margin-bottom: 5px">Problems</div>Settings is the weakest screen in the app. Section headings are 12px uppercase muted grey — the only place that pattern appears. The "Show exact address to matched donors" toggle is local state that is never persisted, on a genuinely sensitive privacy promise. Two of the three account actions are toasts. Data deletion, an irreversible action, has no confirmation and no destructive styling. There is no legal section at all, though five legal screens exist in <code>design_new/flutter/</code>. "Admin (temporary)" ships a staff back door inside the consumer app.</div>
+        <div><div style="font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent-700); font-weight: 600; margin-bottom: 5px">Direction</div>Rebuild Settings on the standard grouped-row component with real section headers, one destructive treatment, persisted privacy state, and the legal documents in place. Move the admin entry behind something that is not a row in the user's own settings, and give the console its own coherent frame — it is a different product for a different person and should look like one.</div>
+      </div>
+    </div>
+    </sc-if>
+
+  </div>
+
+  <!-- ══════════════ 04 CROSS-CUTTING ══════════════ -->
+  <div style="display: flex; align-items: center; gap: 14px; margin: 56px 0 20px">
+    <span style="font-family: var(--font-heading); font-size: 13px; letter-spacing: 0.14em; color: var(--color-accent-700)">04</span>
+    <h2 style="font-size: 30px; margin: 0">Cross-cutting problems</h2>
+    <span style="flex: 1; height: 1px; background: var(--color-divider)"></span>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px">
+    <div class="blueprint" style="padding: 18px 20px">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <div class="card-kicker">01 — Colour</div>
+      <div style="font-family: var(--font-heading); font-size: 18px; margin: 2px 0 8px">Two palettes, one app</div>
+      <div style="font-size: 13.5px; line-height: 1.6">Flat and warm token sets coexist by design decision. Nineteen colour values also appear inline across screens — <code>#7FCB8E</code>, <code>#7A4A08</code>, <code>#8A7350</code>, <code>#E0A8AF</code>, <code>#FFF9F5</code>, every <code>Colors.white.withValues</code> on the dark screens — outside the theme entirely.</div>
+    </div>
+    <div class="blueprint" style="padding: 18px 20px">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <div class="card-kicker">02 — Type</div>
+      <div style="font-family: var(--font-heading); font-size: 18px; margin: 2px 0 8px">A five-step scale spent across twenty sizes</div>
+      <div style="font-size: 13.5px; line-height: 1.6">The theme defines five text styles. Screens use 10.5, 11, 11.5, 12, 12.5, 13, 13.5, 14, 14.5, 15, 15.5, 16, 17, 18, 19, 20, 24, 26, 27, 30, 32, 44 and 48px — nearly all written inline. Titles alone come in 16/w600, 17/w600, 18/w500 and 19/w500. The serif display face is used well, but by direct call rather than by scale step.</div>
+    </div>
+    <div class="blueprint" style="padding: 18px 20px">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <div class="card-kicker">03 — Shape</div>
+      <div style="font-family: var(--font-heading); font-size: 18px; margin: 2px 0 8px">Twelve radii where the spec says one</div>
+      <div style="font-size: 13.5px; line-height: 1.6">The style guide mandates 14px throughout. In practice: 8, 9, 10, 14, 15, 16, 18, 20, 22, 24, 30 and 32px. Screen padding varies too — 20, 24 and 28px left/right on screens that sit next to each other in the same flow.</div>
+    </div>
+    <div class="blueprint" style="padding: 18px 20px">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <div class="card-kicker">04 — Components</div>
+      <div style="font-family: var(--font-heading); font-size: 18px; margin: 2px 0 8px">Thirteen widgets, mostly bypassed</div>
+      <div style="font-size: 13.5px; line-height: 1.6"><code>widgets/</code> holds a droplet, ring field, step tracker, status badge, state card, avatar badge, pulsing dot, distance connector, filter chips, loading button, two-person connection and brand mark. Screens then hand-build avatars, ring markers, section labels, headers, timeline rails, stat blocks and progress bars anyway. Same idea, five implementations, five sets of values.</div>
+    </div>
+    <div class="blueprint" style="padding: 18px 20px">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <div class="card-kicker">05 — Dead ends</div>
+      <div style="font-family: var(--font-heading); font-size: 18px; margin: 2px 0 8px">Eight toasts standing in for screens</div>
+      <div style="font-size: 13.5px; line-height: 1.6">Personal information, Emergency contact, notification permissions, opening a request from a notification, data export, data deletion, and the two contact actions on the match screens all resolve to a SnackBar. Six of these have real designs sitting unapplied in <code>design_new/flutter/</code>. A polished product cannot have its most urgent button open a toast.</div>
+    </div>
+    <div class="blueprint" style="padding: 18px 20px">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <div class="card-kicker">06 — Emptiness</div>
+      <div style="font-family: var(--font-heading); font-size: 18px; margin: 2px 0 8px">The states most users see first are the thinnest</div>
+      <div style="font-size: 13.5px; line-height: 1.6">A new donor in a city with no open requests sees: a grey sentence on Home, an empty Requests tab, a zero on Profile, an empty timeline in History, and no donors on the map. Five screens, five grey lines. Loading is a bare <code>CircularProgressIndicator</code> in fourteen places; nothing is skeletonised.</div>
+    </div>
+    <div class="blueprint" style="padding: 18px 20px">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <div class="card-kicker">07 — Imagery</div>
+      <div style="font-family: var(--font-heading); font-size: 18px; margin: 2px 0 8px">Two assets, one used badly</div>
+      <div style="font-size: 13.5px; line-height: 1.6">The whole app ships one 4160px logo JPEG and one illustration, placed once, unconstrained. There is no image language — no portraiture, no texture, no illustrative system. "Visually rich" cannot be reached on type and geometry alone, and this is the largest gap between the current build and the stated target.</div>
+    </div>
+    <div class="blueprint" style="padding: 18px 20px">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <div class="card-kicker">08 — Motion</div>
+      <div style="font-family: var(--font-heading); font-size: 18px; margin: 2px 0 8px">Four animations, no shared timing</div>
+      <div style="font-size: 13.5px; line-height: 1.6">The splash reveal, the matching sweep, the pulsing dot and the ring field each define their own durations and curves. Screen transitions are default Material pushes except one hand-rolled fade. Nothing animates on state change — accepting a request, toggling availability, a match arriving.</div>
+    </div>
+  </div>
+
+  <!-- ══════════════ 05 PROPOSED SYSTEM ══════════════ -->
+  <div style="display: flex; align-items: center; gap: 14px; margin: 64px 0 20px">
+    <span style="font-family: var(--font-heading); font-size: 13px; letter-spacing: 0.14em; color: var(--color-accent-700)">05</span>
+    <h2 style="font-size: 30px; margin: 0">Proposed design system</h2>
+    <span style="flex: 1; height: 1px; background: var(--color-divider)"></span>
+  </div>
+
+  <p style="max-width: 820px; margin: 0 0 26px">Not a new look. The redesigned screens already contain the right instincts — warm cream ground, crimson as the only saturated colour, serif for the human numbers, the droplet as the unit of everything, one raised object per screen. The proposal is to promote that into the single system for the whole app, resolve the duplicate tokens in favour of the warm set, and add the two things it does not yet have: an image language and a defined motion vocabulary.</p>
+
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 18px">
+
+    <div class="blueprint" style="padding: 20px 22px">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <div class="card-kicker">Foundation 01</div>
+      <div style="font-family: var(--font-heading); font-size: 22px; margin: 2px 0 12px">Ground, ink, crimson</div>
+      <p style="margin: 0 0 14px; font-size: 13.5px">The warm set wins; the flat set is retired. Cream ground, warm near-black ink, and one crimson doing every job that needs saturation. Status meaning comes from two muted supports only — a forest green and an ochre amber — never a third hue.</p>
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px">
+        <div><div style="height: 46px; background: #FBF7F1; border: 1px solid rgba(0,0,0,.12)"></div><div style="font-size: 10px; margin-top: 3px; letter-spacing: .03em">Ground<br>#FBF7F1</div></div>
+        <div><div style="height: 46px; background: #FFFFFF; border: 1px solid rgba(0,0,0,.12)"></div><div style="font-size: 10px; margin-top: 3px">Surface<br>#FFFFFF</div></div>
+        <div><div style="height: 46px; background: #241416"></div><div style="font-size: 10px; margin-top: 3px">Ink<br>#241416</div></div>
+        <div><div style="height: 46px; background: #8C1F2B"></div><div style="font-size: 10px; margin-top: 3px">Crimson<br>#8C1F2B</div></div>
+        <div><div style="height: 46px; background: #F6DCDE"></div><div style="font-size: 10px; margin-top: 3px">Tint<br>#F6DCDE</div></div>
+        <div><div style="height: 46px; background: #2F6B3A"></div><div style="font-size: 10px; margin-top: 3px">Green<br>#2F6B3A</div></div>
+        <div><div style="height: 46px; background: #96590A"></div><div style="font-size: 10px; margin-top: 3px">Amber<br>#96590A</div></div>
+        <div><div style="height: 46px; background: linear-gradient(172deg,#7E1C26,#270B0F 58%,#160809)"></div><div style="font-size: 10px; margin-top: 3px">Ember<br>field</div></div>
+      </div>
+      <p style="margin: 14px 0 0; font-size: 12.5px; opacity: .8">Each role gets a 100–900 ramp so tints, hovers, pressed states and text-on-tint stop being invented per screen. The nineteen inline hexes resolve into ramp steps. The ember field becomes one token used by every dark surface — matching, outcomes, consent, onboarding page one.</p>
+    </div>
+
+    <div class="blueprint" style="padding: 20px 22px">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <div class="card-kicker">Foundation 02</div>
+      <div style="font-family: var(--font-heading); font-size: 22px; margin: 2px 0 12px">Two voices, seven steps</div>
+      <p style="margin: 0 0 14px; font-size: 13.5px">The serif display face already in the build carries anything human — a name, a count, a headline, a date. Everything structural stays on the sans. Seven named steps replace twenty-three inline sizes, and nothing is set below 12px.</p>
+      <div style="display: flex; flex-direction: column; gap: 9px; border-top: 1px solid var(--color-divider); padding-top: 12px">
+        <div style="display: flex; align-items: baseline; gap: 12px"><span style="font-size: 10px; width: 74px; flex: none; opacity: .6; letter-spacing: .1em; text-transform: uppercase">Display</span><span style="font-family: Georgia, serif; font-size: 32px; line-height: 1">Priya</span><span style="font-size: 10.5px; opacity: .55; margin-left: auto">serif 30–48</span></div>
+        <div style="display: flex; align-items: baseline; gap: 12px"><span style="font-size: 10px; width: 74px; flex: none; opacity: .6; letter-spacing: .1em; text-transform: uppercase">Headline</span><span style="font-family: Georgia, serif; font-size: 22px; line-height: 1">Who needs blood?</span><span style="font-size: 10.5px; opacity: .55; margin-left: auto">serif 22–27</span></div>
+        <div style="display: flex; align-items: baseline; gap: 12px"><span style="font-size: 10px; width: 74px; flex: none; opacity: .6; letter-spacing: .1em; text-transform: uppercase">Title</span><span style="font-size: 17px; font-weight: 600">Request details</span><span style="font-size: 10.5px; opacity: .55; margin-left: auto">sans 17/600</span></div>
+        <div style="display: flex; align-items: baseline; gap: 12px"><span style="font-size: 10px; width: 74px; flex: none; opacity: .6; letter-spacing: .1em; text-transform: uppercase">Body</span><span style="font-size: 15px">Sion Hospital, Mumbai</span><span style="font-size: 10.5px; opacity: .55; margin-left: auto">sans 15/400</span></div>
+        <div style="display: flex; align-items: baseline; gap: 12px"><span style="font-size: 10px; width: 74px; flex: none; opacity: .6; letter-spacing: .1em; text-transform: uppercase">Meta</span><span style="font-size: 13px; opacity: .7">2.4 km away · 12 min ago</span><span style="font-size: 10.5px; opacity: .55; margin-left: auto">sans 13/400</span></div>
+        <div style="display: flex; align-items: baseline; gap: 12px"><span style="font-size: 10px; width: 74px; flex: none; opacity: .6; letter-spacing: .1em; text-transform: uppercase">Eyebrow</span><span style="font-size: 12px; font-weight: 600; letter-spacing: .12em">SOMEONE NEEDS YOU</span><span style="font-size: 10.5px; opacity: .55; margin-left: auto">sans 12/600</span></div>
+      </div>
+    </div>
+
+    <div class="blueprint" style="padding: 20px 22px">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <div class="card-kicker">Foundation 03</div>
+      <div style="font-family: var(--font-heading); font-size: 22px; margin: 2px 0 12px">Space, shape, elevation</div>
+      <p style="margin: 0 0 12px; font-size: 13.5px">4px base. Screen gutter fixed at 24px, everywhere, including the screens currently at 20 and 28. Three radii instead of twelve: 12 for controls and inputs, 20 for raised objects, full round for discs and droplets only.</p>
+      <p style="margin: 0 0 12px; font-size: 13.5px">Elevation carries meaning rather than decoration. Ground level is the page: dividers, hairlines, no fills. Raised is reserved — one object per screen, white on cream with a soft warm shadow. The ember field is its own plane and never mixes with either.</p>
+      <div style="display: flex; gap: 10px; align-items: flex-end; margin-top: 6px">
+        <div style="flex: 1; padding: 12px; font-size: 11.5px; border-top: 1px solid rgba(0,0,0,.14)">Ground<br><span style="opacity:.65">rules, rows, labels</span></div>
+        <div style="flex: 1; padding: 12px; font-size: 11.5px; background: #fff; box-shadow: 0 8px 20px rgba(43,20,20,.10)">Raised<br><span style="opacity:.65">the one live object</span></div>
+        <div style="flex: 1; padding: 12px; font-size: 11.5px; background: linear-gradient(172deg,#7E1C26,#270B0F); color: #FBE6E8">Field<br><span style="opacity:.75">peak moments</span></div>
+      </div>
+    </div>
+
+    <div class="blueprint" style="padding: 20px 22px">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <div class="card-kicker">Foundation 04</div>
+      <div style="font-family: var(--font-heading); font-size: 22px; margin: 2px 0 12px">The device vocabulary</div>
+      <p style="margin: 0 0 12px; font-size: 13.5px">Six recurring objects carry the product's character. All six already exist in some form; the proposal is that each has exactly one implementation, one set of sizes, and one meaning.</p>
+      <ul style="margin: 0; padding-left: 18px; font-size: 13.5px; line-height: 1.75">
+        <li><b>Droplet</b> — the unit of blood group, of a donation given, of a request. Four sizes, filled or empty, never re-drawn.</li>
+        <li><b>Identity disc</b> — initials or portrait, with the group droplet attached at the corner. The same object in a card, on the map, in a tracker step and in a header.</li>
+        <li><b>Live pulse</b> — availability and searching. The only animated dot in the app.</li>
+        <li><b>Connector</b> — the line between two people, with distance or status on it. Used on cards, matches, and the tracker.</li>
+        <li><b>Ring field</b> — concentric range rings. Matching, the map's proximity bands, the create-request marker.</li>
+        <li><b>Impact trail</b> — droplets given against one fixed horizon. One horizon, all three screens.</li>
+      </ul>
+    </div>
+
+    <div class="blueprint" style="padding: 20px 22px">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <div class="card-kicker">Foundation 05 — the missing piece</div>
+      <div style="font-family: var(--font-heading); font-size: 22px; margin: 2px 0 12px">An image language</div>
+      <p style="margin: 0 0 12px; font-size: 13.5px">This is what separates the current build from "premium, warm, human". Type and geometry alone read as austere; the target needs texture and faces. Three proposed registers, each with a fixed frame so nothing is ever dropped in unconstrained again:</p>
+      <ul style="margin: 0 0 12px; padding-left: 18px; font-size: 13.5px; line-height: 1.75">
+        <li><b>Portraiture</b> — real donors and recipients, warm-toned, in identity discs and in the outcome screens. The single highest-impact addition.</li>
+        <li><b>Full-bleed field art</b> — one image per emotional peak, behind the ember gradient at low opacity: onboarding, match found, donation confirmed.</li>
+        <li><b>Line illustration</b> — a small consistent set for empty states and eligibility explanation, in crimson on cream, replacing the five grey sentences.</li>
+      </ul>
+      <p style="margin: 0; font-size: 12.5px; opacity: .8"><b>This needs you.</b> I cannot generate photography, and any illustration I draw will be a rough sketch rather than finished art. If you can supply real photography — or approve commissioning it — the redesign gets substantially warmer. If not, I would rather propose a texture-and-type direction that looks deliberate than fill the gap with weak drawings.</p>
+    </div>
+
+    <div class="blueprint" style="padding: 20px 22px">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <div class="card-kicker">Foundation 06</div>
+      <div style="font-family: var(--font-heading); font-size: 22px; margin: 2px 0 12px">Motion, with a job</div>
+      <p style="margin: 0 0 12px; font-size: 13.5px">Three durations — 160ms for controls, 320ms for transitions, 700ms+ for the two brand moments — on one easing curve. Motion is spent on four things only:</p>
+      <ul style="margin: 0; padding-left: 18px; font-size: 13.5px; line-height: 1.75">
+        <li>A request arriving: the card rises into place rather than appearing.</li>
+        <li>Accepting: the droplet fills, the connector draws, the screen becomes the field.</li>
+        <li>The search: the sweep tied to the ladder's real stage changes, not a free-running loop.</li>
+        <li>Standing changing: a donation added to the trail, availability toggling, eligibility reached.</li>
+      </ul>
+      <p style="margin: 12px 0 0; font-size: 12.5px; opacity: .8">Everything else — page pushes, list scroll, sheet drag — takes the platform default. Fewer animations, each meaning something.</p>
+    </div>
+
+  </div>
+
+  <!-- ══════════════ 06 COHERENCE ══════════════ -->
+  <div style="display: flex; align-items: center; gap: 14px; margin: 56px 0 20px">
+    <span style="font-family: var(--font-heading); font-size: 13px; letter-spacing: 0.14em; color: var(--color-accent-700)">06</span>
+    <h2 style="font-size: 30px; margin: 0">The rules that make it one product</h2>
+    <span style="flex: 1; height: 1px; background: var(--color-divider)"></span>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px">
+    <div class="blueprint" style="padding: 16px 18px; font-size: 13.5px; line-height: 1.6"><i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i><b style="font-family: var(--font-heading); font-size: 16px; display: block; margin-bottom: 4px">One raised object</b>Every screen has a single thing at raised elevation — the live request, the tracker, the availability state. Everything else sits on the ground. This rule already governs Home and Notifications; extending it is most of what makes the app feel considered.</div>
+    <div class="blueprint" style="padding: 16px 18px; font-size: 13.5px; line-height: 1.6"><i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i><b style="font-family: var(--font-heading); font-size: 16px; display: block; margin-bottom: 4px">One primary action</b>One filled crimson button per screen. Secondary actions are outlined, destructive ones are plain text and always confirmed. Fixes Requests, Find donors and Settings at a stroke.</div>
+    <div class="blueprint" style="padding: 16px 18px; font-size: 13.5px; line-height: 1.6"><i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i><b style="font-family: var(--font-heading); font-size: 16px; display: block; margin-bottom: 4px">One header component</b>Every pushed screen uses the same header: back affordance, title at one size, optional single action. Replaces three coexisting patterns.</div>
+    <div class="blueprint" style="padding: 16px 18px; font-size: 13.5px; line-height: 1.6"><i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i><b style="font-family: var(--font-heading); font-size: 16px; display: block; margin-bottom: 4px">The field is for peaks only</b>Four moments earn the ember field: the brand reveal, consent, the search, and the match. Using it anywhere else spends it.</div>
+    <div class="blueprint" style="padding: 16px 18px; font-size: 13.5px; line-height: 1.6"><i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i><b style="font-family: var(--font-heading); font-size: 16px; display: block; margin-bottom: 4px">Empty is a designed state</b>No screen ends in a grey sentence. Every empty state gets an illustration or a device, a line of real copy, and one thing to do.</div>
+    <div class="blueprint" style="padding: 16px 18px; font-size: 13.5px; line-height: 1.6"><i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i><b style="font-family: var(--font-heading); font-size: 16px; display: block; margin-bottom: 4px">Serif means human</b>Names, counts, dates and headlines in serif. Labels, buttons, fields, navigation and status in sans. No exceptions in either direction.</div>
+  </div>
+
+  <!-- ══════════════ 07 SHELL PROPOSAL ══════════════ -->
+  <div class="blueprint" style="margin-top: 22px; padding: 22px 24px; border: 1px solid var(--color-accent); background: var(--color-accent-100)">
+    <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+    <div style="font-family: var(--font-heading); font-size: 22px; margin-bottom: 8px">The one structural change I would recommend</div>
+    <p style="margin: 0 0 10px; max-width: 880px; font-size: 14.5px">Three tabs cannot hold four flows, which is why the map and the requester journey are currently text links at the bottom of a scroll. Proposal: <b>four tabs</b> — Home, Requests, Nearby, You — with the requester entry raised to a persistent action rather than a link, and the donor's live state (available / cooldown / unread) visible in the shell on every screen.</p>
+    <p style="margin: 0; max-width: 880px; font-size: 13.5px; opacity: .85">This changes navigation, not data: every destination already exists and every screen already reads its own stream. It is the single change that would do most for the "one coherent product" goal, and it is also the one I least want to make without your approval.</p>
+  </div>
+
+  <!-- ══════════════ 08 PHASING ══════════════ -->
+  <div style="display: flex; align-items: center; gap: 14px; margin: 56px 0 20px">
+    <span style="font-family: var(--font-heading); font-size: 13px; letter-spacing: 0.14em; color: var(--color-accent-700)">07</span>
+    <h2 style="font-size: 30px; margin: 0">Proposed sequence</h2>
+    <span style="flex: 1; height: 1px; background: var(--color-divider)"></span>
+  </div>
+
+  <table class="table" style="width: 100%">
+    <thead>
+      <tr><th style="width: 46px">#</th><th>Phase</th><th>What it covers</th><th style="width: 30%">Why in this order</th></tr>
+    </thead>
+    <tbody>
+      <tr><td style="font-family: var(--font-heading); font-size: 18px">1</td><td><b>Resolve the system</b></td><td>Collapse the two palettes into one warm ramp set, define the seven type steps, three radii and three elevations, and pull all nineteen inline colours into tokens. Presentation only; no screen changes yet.</td><td>Every later phase is cheaper and more consistent once there is one source of truth.</td></tr>
+      <tr><td style="font-family: var(--font-heading); font-size: 18px">2</td><td><b>Finish the component set</b></td><td>Header, grouped rows, card, one impact trail, one question marker, one tracker, one status treatment, real empty and loading states. Replace the hand-built duplicates.</td><td>Removes most of the drift without redesigning a single flow.</td></tr>
+      <tr><td style="font-family: var(--font-heading); font-size: 18px">3</td><td><b>Rebuild the Layer B screens</b></td><td>Requests, Tracking, Settings, Cooldown, OTP, Registration, Consent, Verifying onto the resolved system.</td><td>Brings the flat two-thirds up to the redesigned third — the point at which it reads as one product.</td></tr>
+      <tr><td style="font-family: var(--font-heading); font-size: 18px">4</td><td><b>Close the dead ends</b></td><td>Ship Personal information, Emergency contact and the legal documents; wire the notification card, the contact actions, and persisted privacy state.</td><td>Eight toasts is the most visible polish gap in the build.</td></tr>
+      <tr><td style="font-family: var(--font-heading); font-size: 18px">5</td><td><b>Decide the map</b></td><td>Real tiled map, or an honest proximity list. Needs your call before design work starts.</td><td>The only screen where the picture currently contradicts the data.</td></tr>
+      <tr><td style="font-family: var(--font-heading); font-size: 18px">6</td><td><b>Richness pass</b></td><td>Image language, the four motion moments, the ember-field peaks, and the shell change if approved.</td><td>Last, because it is worth doing only once the foundation underneath is stable.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="blueprint" style="margin-top: 34px; padding: 22px 24px">
+    <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+    <div style="font-family: var(--font-heading); font-size: 22px; margin-bottom: 10px">What I need from you before building anything</div>
+    <ol style="margin: 0; padding-left: 20px; font-size: 14.5px; line-height: 1.8; max-width: 900px">
+      <li>Approval of the warm system as the single direction — cream, crimson, serif-for-human, ember for peaks — with the flat palette retired.</li>
+      <li>The map decision: real tiled map, or proximity list.</li>
+      <li>The tab-bar question: keep three tabs, or move to four.</li>
+      <li>Photography: can you supply real portraits and field imagery, or should the direction be texture and type only?</li>
+      <li>Whether the admin console is in scope for this redesign, or stays as-is.</li>
+      <li>Where you want the first built screens — I would propose Home, Requests and one ember moment as the proof of the system before rolling it wider.</li>
+    </ol>
+  </div>
+
+  <div style="margin-top: 40px; padding-top: 14px; border-top: 1px solid var(--color-text); font-size: 12px; opacity: 0.65; display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between">
+    <span>Audit document — Industry design system. The app's own crimson palette shown above is the proposed product system, not this document's.</span>
+    <span>No repository files modified.</span>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;showFilePaths&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Audit detail&quot;},&quot;showAdmin&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Audit detail&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      showFilePaths: this.props.showFilePaths ?? true,
+      showAdmin: this.props.showAdmin ?? true,
+    };
+  }
+}
+</script>
+</body>
+</html>

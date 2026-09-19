@@ -112,11 +112,12 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
         return;
       }
       final position = await Backend.instance.currentPosition();
+      final label = await Backend.instance.reverseGeocode(position.latitude, position.longitude);
       if (!mounted) return;
       setState(() {
         _selectedLat = position.latitude;
         _selectedLng = position.longitude;
-        _locationController.text = 'Current location';
+        _locationController.text = label ?? 'Current location';
         _locationState = _LocationState.idle;
         _locationEditing = false;
         _suggestions = [];

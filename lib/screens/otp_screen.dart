@@ -9,10 +9,12 @@ import 'registration_screen.dart';
 
 class OtpScreen extends StatefulWidget {
   final String phoneNumber;
+  final String countryCode;
 
   const OtpScreen({
     super.key,
     this.phoneNumber = '9999999999',
+    this.countryCode = '+91',
   });
 
   @override
@@ -39,9 +41,9 @@ class _OtpScreenState extends State<OtpScreen> {
   String _getMaskedNumber() {
     final phone = widget.phoneNumber;
     if (phone.length >= 4) {
-      return '+91 ******${phone.substring(phone.length - 4)}';
+      return '${widget.countryCode} ******${phone.substring(phone.length - 4)}';
     }
-    return '+91 ******$phone';
+    return '${widget.countryCode} ******$phone';
   }
 
   Future<void> _handleVerify() async {
@@ -60,8 +62,10 @@ class _OtpScreenState extends State<OtpScreen> {
 
     try {
       // Demo mode: any 6-digit code is accepted, no SMS actually sent.
-      // Signs in (or creates) a stable account keyed by phone number.
-      await Backend.instance.verifyFakeOtp(widget.phoneNumber);
+      // Signs in (or creates) a stable account keyed by country code +
+      // phone number, so the same person on two different country codes
+      // never collides with someone else's local number.
+      await Backend.instance.verifyFakeOtp('${widget.countryCode}${widget.phoneNumber}');
       final hasProfile = await Backend.instance.hasProfile();
       if (!mounted) return;
 

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import '../services/admin_mock_service.dart';
+import '../services/admin_service.dart';
 import '../theme/app_colors.dart';
 
 class AdminHospitalFormScreen extends StatefulWidget {
@@ -32,7 +32,7 @@ class _AdminHospitalFormScreenState extends State<AdminHospitalFormScreen> {
     setState(() => _nameError = name.isEmpty ? 'Hospital name is required' : null);
     if (name.isEmpty) return;
 
-    final service = AdminMockService.instance;
+    final service = AdminService.instance;
     if (_isEditing) {
       service.updateHospital(widget.hospital!.id, name, address);
     } else {
@@ -42,7 +42,7 @@ class _AdminHospitalFormScreenState extends State<AdminHospitalFormScreen> {
   }
 
   void _delete() {
-    AdminMockService.instance.deleteHospital(widget.hospital!.id);
+    AdminService.instance.deleteHospital(widget.hospital!.id);
     Navigator.pop(context);
   }
 

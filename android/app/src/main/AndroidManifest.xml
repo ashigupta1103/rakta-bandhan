@@ -5,9 +5,6 @@
         android:label="rakta_bandhan"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
-        <meta-data
-            android:name="com.google.android.geo.API_KEY"
-            android:value="AIzaSyAGhMyDd-dRFBo-fcjRxiNHaaKCXlnyNuQ" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

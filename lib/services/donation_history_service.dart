@@ -4,65 +4,69 @@ import 'backend.dart';
 
 @immutable
 class DonationRecord {
-  final String requestId;
   final String hospital;
-  final DateTime? date;
+  final String date;
   final String bloodGroup;
-  final int units;
 
-  const DonationRecord({
-    required this.requestId,
-    required this.hospital,
-    required this.date,
-    required this.bloodGroup,
-    required this.units,
-  });
+  const DonationRecord({required this.hospital, required this.date, required this.bloodGroup});
 }
 
 abstract class DonationHistoryService {
   Future<List<DonationRecord>> fetchHistory();
 }
 
-/// Real per-donation history: every `requests` document this donor
-/// fulfilled, already written by the existing `Backend.markFulfilled()` —
-/// nothing here is mocked.
-///
-/// Sorted client-side rather than via Firestore `orderBy` deliberately: a
-/// two-equality-filter query (`matched_donor_id` + `status`) combined with
-/// `orderBy('fulfilled_at')` needs a composite index, and nothing in this
-/// project's existing patterns (the same two filters back `myDonationCount`
-/// and `DonorFoundScreen`'s fulfilled-count query, both `.count()` only)
-/// establishes one exists. Matching the already-proven filter shape and
-/// sorting after fetch avoids depending on Firestore index config this
-/// phase has no visibility into or permission to change.
+class MockDonationHistoryService implements DonationHistoryService {
+  @override
+  Future<List<DonationRecord>> fetchHistory() async => const [
+        DonationRecord(hospital: 'Fortis Hospital, Cunningham Rd', date: '14 May 2026', bloodGroup: 'O+'),
+        DonationRecord(hospital: "St. John's Medical College", date: '2 Feb 2026', bloodGroup: 'O+'),
+        DonationRecord(hospital: 'Apollo Hospital, Bannerghatta', date: '9 Nov 2025', bloodGroup: 'O+'),
+      ];
+}
+
+const _months = [
+  '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+];
+
+/// Real `donation_history` query, joined against the matched request for
+/// hospital/blood-group context (donation_history itself only stores
+/// donor_id/request_id — see backend/README.md schema table).
 class FirestoreDonationHistoryService implements DonationHistoryService {
+  final _db = FirebaseFirestore.instance;
+
   @override
   Future<List<DonationRecord>> fetchHistory() async {
     final uid = Backend.instance.currentUser?.uid;
     if (uid == null) return [];
-    final snap = await FirebaseFirestore.instance
-        .collection('requests')
-        .where('matched_donor_id', isEqualTo: uid)
-        .where('status', isEqualTo: 'fulfilled')
+
+    final historySnap = await _db
+        .collection('donation_history')
+        .where('donor_id', isEqualTo: uid)
+        .orderBy('donation_date', descending: true)
         .get();
 
-    final records = snap.docs.map((doc) {
+    final records = <DonationRecord>[];
+    for (final doc in historySnap.docs) {
       final data = doc.data();
-      final label = data['location_label'] as String?;
-      return DonationRecord(
-        requestId: doc.id,
-        hospital: (label?.isNotEmpty ?? false) ? label! : 'Blood donation',
-        date: (data['fulfilled_at'] as Timestamp?)?.toDate(),
-        bloodGroup: data['blood_group'] as String? ?? '',
-        units: (data['units_needed'] as num?)?.toInt() ?? 1,
-      );
-    }).toList()
-      ..sort((a, b) {
-        if (a.date == null && b.date == null) return 0;
-        if (a.date == null) return 1;
-        if (b.date == null) return -1;
-        return b.date!.compareTo(a.date!);
-      });
+      final date = (data['donation_date'] as Timestamp?)?.toDate();
+      final requestId = data['request_id'] as String?;
+      var hospital = 'Blood donation';
+      var bloodGroup = '';
+      if (requestId != null) {
+        final reqSnap = await _db.collection('requests').doc(requestId).get();
+        final req = reqSnap.data();
+        if (req != null) {
+          final label = req['location_label'] as String?;
+          if (label != null && label.isNotEmpty) hospital = label;
+          bloodGroup = req['blood_group'] as String? ?? '';
+        }
+      }
+      records.add(DonationRecord(
+        hospital: hospital,
+        date: date == null ? '' : '${date.day} ${_months[date.month]} ${date.year}',
+        bloodGroup: bloodGroup,
+      ));
+    }
     return records;
   }
 }

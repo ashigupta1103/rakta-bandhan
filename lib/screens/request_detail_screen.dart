@@ -110,6 +110,7 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
             if (data == null) {
               return const Center(child: Text('Request not found.', style: TextStyle(color: AppColors.textSecondary)));
             }
+            Backend.instance.expireIfStale(widget.requestId, data);
             final status = data['status'] as String? ?? 'open';
             final bloodGroup = data['blood_group'] as String? ?? '';
             final urgency = data['urgency'] as String? ?? 'normal';

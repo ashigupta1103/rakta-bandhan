@@ -1,11 +1,20 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../services/backend.dart';
 import '../theme/app_colors.dart';
 import '../widgets/loading_button.dart';
 import 'admin_dashboard_screen.dart';
 
-/// Mock admin sign-in — no real authentication exists. Any well-formed
-/// email + non-empty password "succeeds" after a short simulated delay.
+/// Real Firebase email/password sign-in, then a Firestore check that the
+/// signed-in uid has an `admins/{uid}` doc (see backend/README.md for how
+/// the first admin is bootstrapped — nothing in-app can create one).
+///
+/// Signing in here uses the same FirebaseAuth instance as the donor OTP
+/// flow (Backend._auth) — there's only one signed-in user per app
+/// instance, so this replaces any donor session that was active. That's
+/// an accepted trade-off for a lightweight companion console, not a bug:
+/// sign back in as a donor afterwards if you need both.
 class AdminLoginScreen extends StatefulWidget {
   const AdminLoginScreen({super.key});
 
@@ -39,10 +48,37 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
     if (_emailError != null || _passwordError != null) return;
 
     setState(() => _isSigningIn = true);
-    await Future.delayed(const Duration(milliseconds: 700));
-    if (!mounted) return;
-    setState(() => _isSigningIn = false);
-    Navigator.push(context, MaterialPageRoute(builder: (context) => const AdminDashboardScreen()));
+    try {
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      );
+      final isAdmin = await Backend.instance.isCurrentUserAdmin();
+      if (!isAdmin) {
+        await FirebaseAuth.instance.signOut();
+        if (!mounted) return;
+        setState(() {
+          _isSigningIn = false;
+          _passwordError = 'This account is not an admin.';
+        });
+        return;
+      }
+      if (!mounted) return;
+      setState(() => _isSigningIn = false);
+      Navigator.push(context, MaterialPageRoute(builder: (context) => const AdminDashboardScreen()));
+    } on FirebaseAuthException {
+      if (!mounted) return;
+      setState(() {
+        _isSigningIn = false;
+        _passwordError = 'Incorrect email or password.';
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isSigningIn = false;
+        _passwordError = 'Sign-in failed. Please try again.';
+      });
+    }
   }
 
   @override
