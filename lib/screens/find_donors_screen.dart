@@ -2,10 +2,13 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart' hide Path;
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../services/backend.dart';
 import '../theme/app_colors.dart';
+import '../theme/app_text_styles.dart';
 import '../widgets/blood_group_droplet.dart';
 import '../widgets/filter_chip_row.dart';
 import '../widgets/state_card.dart';
@@ -13,8 +16,45 @@ import 'donor_details_screen.dart';
 
 enum _MapPermissionState { checking, prompt, granted, denied }
 
+/// A warm, cream-toned recolouring of the OpenStreetMap tile plate applied
+/// per-tile via [TileLayer.tileBuilder] — avoids the default blue-water /
+/// green-park palette without needing a paid vendor style or an API key.
+/// See MAP DECISION note in find_donors_screen's class doc for why this
+/// tile source was chosen.
+const _warmTileFilter = ColorFilter.matrix(<double>[
+  0.33, 0.33, 0.33, 0, 34,
+  0.30, 0.30, 0.30, 0, 20,
+  0.27, 0.27, 0.27, 0, 4,
+  0, 0, 0, 1, 0,
+]);
+
+/// Find tab root — a real tiled map with every marker projected from the
+/// donor's own real `lat`/`lng` in `donors_public` (Phase 3, per the final
+/// artifact's "Find — tab root · real map" section: "no marker has a
+/// hard-coded position, and no donor location is fabricated").
+///
+/// MAP DECISION: this project had no map dependency before this phase.
+/// [flutter_map] (BSD-3-Clause, pure Dart, full Flutter Web support) is
+/// added as the one new dependency the final artifact calls for. Tiles come
+/// from the standard keyless OpenStreetMap raster endpoint
+/// (`tile.openstreetmap.org`) — CARTO's basemaps, referenced elsewhere in
+/// this codebase, now require a signup-gated API key as of an August 2026
+/// policy change, so they're not the "no paid tools" fit they used to be.
+/// OSM's tile usage policy requires a descriptive User-Agent (set below) and
+/// visible attribution (rendered as a small corner label) and discourages
+/// heavy production-scale traffic without a dedicated provider — acceptable
+/// for this app's current demo/Spark-plan scale; a self-hosted or paid tile
+/// provider is the natural upgrade path if traffic grows. Tiles are fetched
+/// client-side over plain HTTPS, exactly like the existing Nominatim address
+/// search already in `backend.dart` — no Firebase/Firestore cost, no Cloud
+/// Function, no API key, nothing added to the Spark-plan bill.
 class FindDonorsScreen extends StatefulWidget {
-  const FindDonorsScreen({super.key});
+  /// False when embedded as the Find tab root — there is no route to pop
+  /// back to, so the leading back affordance is omitted rather than left
+  /// wired to a `Navigator.pop` that would close the tab shell itself.
+  final bool showBackButton;
+
+  const FindDonorsScreen({super.key, this.showBackButton = true});
 
   @override
   State<FindDonorsScreen> createState() => _FindDonorsScreenState();
@@ -22,6 +62,7 @@ class FindDonorsScreen extends StatefulWidget {
 
 class _FindDonorsScreenState extends State<FindDonorsScreen> {
   final TextEditingController _searchController = TextEditingController();
+  final MapController _mapController = MapController();
   Position? _position;
   _MapPermissionState _permissionState = _MapPermissionState.checking;
 
@@ -32,6 +73,7 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
 
   String _bloodGroupFilter = 'All';
   String? _highlightedDonorId;
+  String? _sendingDonorId;
   int _retryToken = 0;
 
   static const _bloodGroups = ['All', 'A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
@@ -93,12 +135,14 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
   }
 
   void _pickLocation(Map<String, dynamic> suggestion) {
+    final lat = suggestion['lat'] as double;
+    final lng = suggestion['lng'] as double;
     setState(() {
       _searchController.text = suggestion['label'] as String;
       _searchedLabel = suggestion['label'] as String;
       _position = Position(
-        latitude: suggestion['lat'] as double,
-        longitude: suggestion['lng'] as double,
+        latitude: lat,
+        longitude: lng,
         timestamp: DateTime.now(),
         accuracy: 0,
         altitude: 0,
@@ -110,6 +154,7 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
       );
       _suggestions = [];
     });
+    _mapController.move(LatLng(lat, lng), _mapController.camera.zoom);
   }
 
   void _clearSearch() {
@@ -122,6 +167,9 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
   }
 
   Future<void> _sendRequestTo(Map<String, dynamic> donor) async {
+    final donorId = donor['id'] as String;
+    if (_sendingDonorId != null) return; // guards against a double-tap firing two requests
+    setState(() => _sendingDonorId = donorId);
     final bloodGroup = donor['bloodGroup'] as String;
     try {
       final pos = _position ?? await Backend.instance.currentPosition();
@@ -142,6 +190,8 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Could not send request. Please try again.')),
       );
+    } finally {
+      if (mounted) setState(() => _sendingDonorId = null);
     }
   }
 
@@ -151,10 +201,6 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
       backgroundColor: AppColors.mapBase,
       body: Stack(
         children: [
-          Positioned.fill(
-            child: Container(color: AppColors.mapBase, child: CustomPaint(painter: _MapBasePainter())),
-          ),
-
           if (_permissionState == _MapPermissionState.granted && _position != null)
             StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
               key: ValueKey(_retryToken),
@@ -166,53 +212,67 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
                     .map(_donorCardData)
                     .where((d) => _bloodGroupFilter == 'All' || d['bloodGroup'] == _bloodGroupFilter)
                     .toList()
-                  ..sort((a, b) => (a['distanceKm'] as double).compareTo(b['distanceKm'] as double));
-                final pinDonors = donors.take(2).toList();
-                const positions = [
-                  {'top': 148.0, 'left': 108.0},
-                  {'top': 258.0, 'right': 68.0},
-                ];
-                return Stack(
+                  ..sort((a, b) {
+                    final da = a['distanceKm'] as double?;
+                    final db = b['distanceKm'] as double?;
+                    if (da == null && db == null) return 0;
+                    if (da == null) return 1;
+                    if (db == null) return -1;
+                    return da.compareTo(db);
+                  });
+                final mappable = donors.where((d) => d['lat'] != null && d['lng'] != null).toList();
+
+                return FlutterMap(
+                  mapController: _mapController,
+                  options: MapOptions(
+                    initialCenter: LatLng(_position!.latitude, _position!.longitude),
+                    initialZoom: 13,
+                    interactionOptions: const InteractionOptions(flags: InteractiveFlag.all & ~InteractiveFlag.rotate),
+                  ),
                   children: [
-                    for (var i = 0; i < pinDonors.length; i++)
-                      Positioned(
-                        top: positions[i]['top'] as double,
-                        left: positions[i]['left'],
-                        right: positions[i]['right'],
-                        child: _buildMapPin(pinDonors[i], primary: i == 0),
-                      ),
+                    TileLayer(
+                      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      userAgentPackageName: 'org.raktabandhan.app',
+                      tileBuilder: (context, tileWidget, tile) => ColorFiltered(colorFilter: _warmTileFilter, child: tileWidget),
+                    ),
+                    MarkerLayer(
+                      markers: [
+                        Marker(
+                          point: LatLng(_position!.latitude, _position!.longitude),
+                          width: 26,
+                          height: 26,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: AppColors.primary,
+                              border: Border.all(color: Colors.white, width: 3),
+                              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 6, offset: const Offset(0, 2))],
+                            ),
+                          ),
+                        ),
+                        for (var i = 0; i < mappable.length; i++)
+                          Marker(
+                            point: LatLng(mappable[i]['lat'] as double, mappable[i]['lng'] as double),
+                            width: i == 0 ? 56 : 44,
+                            height: i == 0 ? 70 : 58,
+                            // The marker's pointer tail — not its disc — is
+                            // the true location; anchor the bottom of the
+                            // widget (the tail's tip) to the coordinate, not
+                            // the top, or every pin reads as offset south of
+                            // the donor's real position.
+                            alignment: Alignment.bottomCenter,
+                            child: _buildMapPin(mappable[i], primary: i == 0),
+                          ),
+                      ],
+                    ),
+                    const RichAttributionWidget(
+                      alignment: AttributionAlignment.bottomLeft,
+                      attributions: [TextSourceAttribution('© OpenStreetMap contributors')],
+                    ),
                   ],
                 );
               },
             ),
-
-          Positioned(
-            top: 200,
-            left: 165,
-            child: Container(
-              width: 78,
-              height: 78,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.primary.withValues(alpha: 0.16),
-                border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
-              ),
-            ),
-          ),
-          Positioned(
-            top: 226,
-            left: 191,
-            child: Container(
-              width: 26,
-              height: 26,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.primary,
-                border: Border.all(color: Colors.white, width: 3),
-                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 6, offset: const Offset(0, 2))],
-              ),
-            ),
-          ),
 
           SafeArea(
             child: Padding(
@@ -222,8 +282,10 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
                 children: [
                   Row(
                     children: [
-                      _floatingCircleButton(icon: LucideIcons.arrowLeft, onTap: () => Navigator.pop(context)),
-                      const SizedBox(width: 8),
+                      if (widget.showBackButton) ...[
+                        _floatingCircleButton(icon: LucideIcons.arrowLeft, onTap: () => Navigator.pop(context)),
+                        const SizedBox(width: 8),
+                      ],
                       Expanded(child: _searchBar()),
                     ],
                   ),
@@ -269,95 +331,114 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
             ),
           if (_permissionState == _MapPermissionState.granted && _position == null) const _MapLoadingOverlay(message: 'Finding donors near you…'),
 
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: Container(
-              height: 340,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: const BorderRadius.only(topLeft: Radius.circular(22), topRight: Radius.circular(22)),
-                boxShadow: [BoxShadow(color: AppColors.shadowCard.withValues(alpha: 0.12), blurRadius: 24, offset: const Offset(0, -8))],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 36,
-                      height: 4,
-                      margin: const EdgeInsets.symmetric(vertical: 10),
-                      decoration: BoxDecoration(color: AppColors.cardBorderWarm, borderRadius: BorderRadius.circular(2)),
-                    ),
-                  ),
-                  if (_permissionState != _MapPermissionState.granted || _position == null)
-                    const Expanded(
-                      child: Center(child: Text('Allow location access to see nearby donors.', style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary))),
-                    )
-                  else
-                    Expanded(
-                      child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                        key: ValueKey(_retryToken),
-                        stream: Backend.instance.availableDonorsStream(),
-                        builder: (context, snapshot) {
-                          if (snapshot.hasError) {
-                            return Center(
-                              child: StateCard.error(
-                                title: "Couldn't load donors",
-                                message: 'Check your connection and try again.',
-                                onRetry: () => setState(() => _retryToken++),
-                              ),
-                            );
-                          }
-                          if (!snapshot.hasData) {
-                            return const Center(child: CircularProgressIndicator(strokeWidth: 2));
-                          }
-                          final myUid = Backend.instance.currentUser?.uid;
-                          final donors = snapshot.data!.docs
-                              .where((d) => d.id != myUid)
-                              .map(_donorCardData)
-                              .where((d) => _bloodGroupFilter == 'All' || d['bloodGroup'] == _bloodGroupFilter)
-                              .toList()
-                            ..sort((a, b) => (a['distanceKm'] as double).compareTo(b['distanceKm'] as double));
-
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Padding(
-                                padding: const EdgeInsets.only(left: 20, right: 20, bottom: 8),
-                                child: Row(
-                                  children: [
-                                    const Text('Nearby donors', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
-                                    const SizedBox(width: 6),
-                                    Text('· ${donors.length} within range', style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
-                                  ],
-                                ),
-                              ),
-                              Expanded(
-                                child: donors.isEmpty
-                                    ? Center(
-                                        child: StateCard.empty(
-                                          icon: LucideIcons.mapPin,
-                                          title: 'No available donors nearby yet. Try expanding your search radius.',
-                                        ),
-                                      )
-                                    : ListView.separated(
-                                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                                        itemCount: donors.length,
-                                        separatorBuilder: (context, index) => const SizedBox(height: 12),
-                                        itemBuilder: (context, index) => _buildDonorCard(donors[index]),
-                                      ),
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
+          if (_permissionState == _MapPermissionState.granted && _position != null) _donorSheet(),
         ],
       ),
+    );
+  }
+
+  /// The final artifact's "draggable sheet" — a real [DraggableScrollableSheet]
+  /// rather than a fixed-height panel, so it behaves the way the design note
+  /// ("the sheet actually drags") describes.
+  Widget _donorSheet() {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.42,
+      minChildSize: 0.16,
+      maxChildSize: 0.85,
+      snap: true,
+      snapSizes: const [0.16, 0.42, 0.85],
+      builder: (context, scrollController) {
+        return Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: const BorderRadius.only(topLeft: Radius.circular(22), topRight: Radius.circular(22)),
+            boxShadow: [BoxShadow(color: AppColors.shadowCard.withValues(alpha: 0.12), blurRadius: 24, offset: const Offset(0, -8))],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 38,
+                  height: 4,
+                  margin: const EdgeInsets.symmetric(vertical: 9),
+                  decoration: BoxDecoration(color: AppColors.warmBorder, borderRadius: BorderRadius.circular(2)),
+                ),
+              ),
+              Expanded(
+                child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                  key: ValueKey(_retryToken),
+                  stream: Backend.instance.availableDonorsStream(),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasError) {
+                      return Center(
+                        child: StateCard.error(
+                          title: "Couldn't load donors",
+                          message: 'Check your connection and try again.',
+                          onRetry: () => setState(() => _retryToken++),
+                        ),
+                      );
+                    }
+                    if (!snapshot.hasData) {
+                      return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+                    }
+                    final myUid = Backend.instance.currentUser?.uid;
+                    final donors = snapshot.data!.docs
+                        .where((d) => d.id != myUid)
+                        .map(_donorCardData)
+                        .where((d) => _bloodGroupFilter == 'All' || d['bloodGroup'] == _bloodGroupFilter)
+                        .toList()
+                      ..sort((a, b) {
+                        final da = a['distanceKm'] as double?;
+                        final db = b['distanceKm'] as double?;
+                        if (da == null && db == null) return 0;
+                        if (da == null) return 1;
+                        if (db == null) return -1;
+                        return da.compareTo(db);
+                      });
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(left: 20, right: 20, bottom: 10),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.baseline,
+                            textBaseline: TextBaseline.alphabetic,
+                            children: [
+                              Text('Nearby donors', style: AppTextStyles.display(fontSize: 19, color: AppColors.ink)),
+                              const SizedBox(width: 8),
+                              Text('· ${donors.length} available', style: const TextStyle(fontSize: 12.5, color: AppColors.ink2)),
+                              const Spacer(),
+                              const Text('Nearest', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.red700)),
+                            ],
+                          ),
+                        ),
+                        Expanded(
+                          child: donors.isEmpty
+                              ? Center(
+                                  child: StateCard.empty(
+                                    icon: LucideIcons.mapPin,
+                                    title: 'No available donors nearby yet. Try expanding your search radius.',
+                                  ),
+                                )
+                              : ListView.separated(
+                                  controller: scrollController,
+                                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                                  itemCount: donors.length,
+                                  separatorBuilder: (context, index) => const SizedBox(height: 10),
+                                  itemBuilder: (context, index) => _buildDonorCard(donors[index]),
+                                ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -421,10 +502,10 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
     );
   }
 
-  /// Avatar-disc marker per Visual Richness Proposal #07 ("avatar markers,
-  /// not pins") — the donor's initials disc carries a group droplet badge
-  /// and a small pointer tail, rather than a pill of text. The primary
-  /// (nearest) marker is larger and solid; others sit tinted and smaller.
+  /// Avatar-disc marker per the final artifact ("Markers are the identity
+  /// disc"): the donor's initials disc carries a group droplet badge and a
+  /// small pointer tail. The nearest donor renders solid/larger; the rest
+  /// sit tinted and smaller — the same emphasis falloff as the ring field.
   Widget _buildMapPin(Map<String, dynamic> donor, {required bool primary}) {
     final isHighlighted = _highlightedDonorId == donor['id'];
     final size = primary ? 56.0 : 44.0;
@@ -484,13 +565,14 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
     final bool isAvailable = donor['isAvailable'] as bool;
     final bool isVerified = donor['isVerified'] as bool;
     final isHighlighted = _highlightedDonorId == donor['id'];
+    final distanceKmValue = donor['distanceKm'] as double?;
 
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: isHighlighted ? AppColors.primary : AppColors.cardBorderWarm, width: isHighlighted ? 2 : 1),
+        border: Border.all(color: isHighlighted ? AppColors.primary : AppColors.cardBorderWarm, width: isHighlighted ? 1.5 : 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -501,87 +583,102 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
                 clipBehavior: Clip.none,
                 children: [
                   Container(
-                    width: 40,
-                    height: 40,
+                    width: 44,
+                    height: 44,
                     decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.primaryLightTint),
                     alignment: Alignment.center,
-                    child: Text(donor['initials'] as String, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.primary)),
+                    child: Text(donor['initials'] as String, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.primary)),
                   ),
                   Positioned(
-                    right: -6,
-                    bottom: -4,
+                    right: -5,
+                    bottom: -3,
                     child: BloodGroupDroplet(label: donor['bloodGroup'] as String, size: 20, filled: true, color: AppColors.primary, textColor: const Color(0xFFFBE6E8), fontSize: 7),
                   ),
                 ],
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 13),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        Text(donor['name'] as String, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppColors.textPrimaryWarm)),
+                        Flexible(child: Text(donor['name'] as String, style: AppTextStyles.display(fontSize: 16, color: AppColors.ink), overflow: TextOverflow.ellipsis)),
                         if (isVerified) ...[
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 7),
                           Container(
-                            padding: const EdgeInsets.all(3),
+                            width: 16,
+                            height: 16,
                             decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.warmGreenBg),
-                            child: const Icon(LucideIcons.check, color: AppColors.warmGreenText, size: 10),
+                            alignment: Alignment.center,
+                            child: const Icon(LucideIcons.check, color: AppColors.warmGreenText, size: 9),
                           ),
                         ],
                       ],
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 3),
                     Row(
                       children: [
-                        Text(donor['distance'] as String, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                        const SizedBox(width: 8),
-                        Container(width: 4, height: 4, decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.textMuted)),
-                        const SizedBox(width: 8),
+                        Text(distanceKmValue == null ? 'Distance unknown' : '${distanceKmValue.toStringAsFixed(1)} km', style: const TextStyle(fontSize: 12.5, color: AppColors.ink2)),
+                        const SizedBox(width: 7),
+                        Container(width: 3, height: 3, decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.disabledTint)),
+                        const SizedBox(width: 7),
                         Container(
-                          width: 6,
-                          height: 6,
+                          width: 7,
+                          height: 7,
                           decoration: BoxDecoration(shape: BoxShape.circle, color: isAvailable ? AppColors.warmGreenText : AppColors.textMuted),
                         ),
                         const SizedBox(width: 6),
-                        Text(isAvailable ? 'Available' : 'Unavailable', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                        Text(isAvailable ? 'Available' : 'Unavailable', style: const TextStyle(fontSize: 12.5, color: AppColors.ink2)),
                       ],
                     ),
                   ],
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => DonorDetailsScreen(
-                          name: donor['name'] as String,
-                          initials: donor['initials'] as String,
-                          bloodGroup: donor['bloodGroup'] as String,
-                          isVerified: donor['isVerified'] as bool,
-                          distance: donor['distance'] as String,
-                          isAvailable: donor['isAvailable'] as bool,
-                        ),
-                      ),
-                    );
-                  },
-                  child: const Text('View'),
+              if (isHighlighted)
+                GestureDetector(
+                  onTap: _sendingDonorId == null ? () => _sendRequestTo(donor) : null,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                    decoration: BoxDecoration(
+                      color: _sendingDonorId == null ? AppColors.brandRed : AppColors.disabledTint,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: _sendingDonorId == donor['id']
+                        ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : const Text('Request', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.whiteTextOnPrimary)),
+                  ),
+                )
+              else
+                GestureDetector(
+                  onTap: () => setState(() => _highlightedDonorId = donor['id'] as String),
+                  child: const Icon(LucideIcons.chevronRight, size: 18, color: AppColors.disabledTint),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton(onPressed: () => _sendRequestTo(donor), child: const Text('Request')),
-              ),
             ],
           ),
+          if (isHighlighted) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => DonorDetailsScreen(
+                      donorId: donor['id'] as String,
+                      name: donor['name'] as String,
+                      initials: donor['initials'] as String,
+                      bloodGroup: donor['bloodGroup'] as String,
+                      isVerified: isVerified,
+                      distanceKm: distanceKmValue,
+                      isAvailable: isAvailable,
+                    ),
+                  ),
+                ),
+                child: const Text('View profile'),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -593,7 +690,7 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
     final initials = name.trim().isEmpty ? '?' : name.trim().split(RegExp(r'\s+')).take(2).map((w) => w[0].toUpperCase()).join();
     final lat = (data['lat'] as num?)?.toDouble();
     final lng = (data['lng'] as num?)?.toDouble();
-    final km = (_position != null && lat != null && lng != null) ? distanceKm(_position!.latitude, _position!.longitude, lat, lng) : 0.0;
+    final km = (_position != null && lat != null && lng != null) ? distanceKm(_position!.latitude, _position!.longitude, lat, lng) : null;
 
     return {
       'id': doc.id,
@@ -602,7 +699,8 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
       'bloodGroup': data['blood_group'] as String? ?? '',
       'isVerified': data['is_verified'] as bool? ?? false,
       'isAvailable': data['is_available'] as bool? ?? false,
-      'distance': '${km.toStringAsFixed(1)} km away',
+      'lat': lat,
+      'lng': lng,
       'distanceKm': km,
     };
   }
@@ -680,32 +778,4 @@ class _MarkerTailPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _MarkerTailPainter oldDelegate) => oldDelegate.color != color;
-}
-
-class _MapBasePainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paintGrid = Paint()
-      ..color = AppColors.mapGridRoads
-      ..strokeWidth = 4
-      ..style = PaintingStyle.stroke;
-
-    final path1 = Path()
-      ..moveTo(0, size.height * 0.15)
-      ..lineTo(size.width, size.height * 0.55);
-    canvas.drawPath(path1, paintGrid);
-
-    final path2 = Path()
-      ..moveTo(size.width * 0.25, 0)
-      ..lineTo(size.width * 0.45, size.height);
-    canvas.drawPath(path2, paintGrid);
-
-    final path3 = Path()
-      ..moveTo(0, size.height * 0.7)
-      ..quadraticBezierTo(size.width * 0.35, size.height * 0.6, size.width, size.height * 0.75);
-    canvas.drawPath(path3, paintGrid);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

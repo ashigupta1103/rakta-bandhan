@@ -1,10 +1,32 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'app_colors.dart';
 
 class AppTheme {
   AppTheme._();
 
+  // Approved final artifact's control/raised radii — 12 for controls,
+  // inputs, chips and tiles; 20 for raised cards/sheets (applied per
+  // component, not globally, since it depends on which plane a surface
+  // sits on).
+  static const double controlRadius = 12;
+
   static ThemeData get lightTheme {
+    // Barlow carries every structural surface — labels, buttons, nav,
+    // controls, metadata — per the final artifact's two-voice type system.
+    // Newsreader (already wired via AppTextStyles.display) stays reserved
+    // for names, counts, headlines and stories, so it is deliberately left
+    // out of this default text theme.
+    final barlowTextTheme = GoogleFonts.barlowTextTheme(
+      const TextTheme(
+        titleLarge: TextStyle(fontSize: 20, fontWeight: FontWeight.w500, color: AppColors.textPrimary),
+        titleSmall: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.textSecondary),
+        bodyLarge: TextStyle(fontSize: 14, fontWeight: FontWeight.w400, color: AppColors.textPrimary),
+        bodyMedium: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppColors.textPrimary),
+        bodySmall: TextStyle(fontSize: 12, fontWeight: FontWeight.w400, color: AppColors.textSecondary),
+      ),
+    );
+
     return ThemeData(
       useMaterial3: true,
       scaffoldBackgroundColor: AppColors.pageBackground,
@@ -15,46 +37,14 @@ class AppTheme {
         onSurface: AppColors.textPrimary,
         outline: AppColors.border,
       ),
-      
+
       // Default Icon Style
       iconTheme: const IconThemeData(
         size: 16,
         color: AppColors.textSecondary,
       ),
 
-      // Text Theme
-      textTheme: const TextTheme(
-        // Screen Title (20px, 500)
-        titleLarge: TextStyle(
-          fontSize: 20,
-          fontWeight: FontWeight.w500,
-          color: AppColors.textPrimary,
-        ),
-        // Section Label / Field Label (13px, 500)
-        titleSmall: TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w500,
-          color: AppColors.textSecondary,
-        ),
-        // Body / Input Text (14px, 400-500)
-        bodyLarge: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w400,
-          color: AppColors.textPrimary,
-        ),
-        // Name / Card Bold Text (14px, 500)
-        bodyMedium: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w500,
-          color: AppColors.textPrimary,
-        ),
-        // Supporting Text (12px, 400)
-        bodySmall: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w400,
-          color: AppColors.textSecondary,
-        ),
-      ),
+      textTheme: barlowTextTheme,
 
       // Outlined and ElevatedButton themes
       elevatedButtonTheme: ElevatedButtonThemeData(
@@ -63,28 +53,29 @@ class AppTheme {
           foregroundColor: AppColors.whiteTextOnPrimary,
           elevation: 0,
           padding: const EdgeInsets.symmetric(vertical: 13),
-          textStyle: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-          ),
+          textStyle: GoogleFonts.barlow(fontSize: 15, fontWeight: FontWeight.w600),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(controlRadius),
           ),
         ),
       ),
-      
+
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.primary,
           side: const BorderSide(color: AppColors.border, width: 1),
           padding: const EdgeInsets.symmetric(vertical: 13),
-          textStyle: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-          ),
+          textStyle: GoogleFonts.barlow(fontSize: 15, fontWeight: FontWeight.w500),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(controlRadius),
           ),
+        ),
+      ),
+
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: AppColors.red700,
+          textStyle: GoogleFonts.barlow(fontSize: 14, fontWeight: FontWeight.w600),
         ),
       ),
 
@@ -93,27 +84,19 @@ class AppTheme {
         filled: true,
         fillColor: AppColors.surface,
         contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
-        labelStyle: const TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w500,
-          color: AppColors.textSecondary,
-        ),
-        hintStyle: const TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w400,
-          color: AppColors.textMuted,
-        ),
+        labelStyle: GoogleFonts.barlow(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.textSecondary),
+        hintStyle: GoogleFonts.barlow(fontSize: 14, fontWeight: FontWeight.w400, color: AppColors.textMuted),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(controlRadius),
           borderSide: const BorderSide(color: AppColors.border, width: 1),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(controlRadius),
           borderSide: const BorderSide(color: AppColors.border, width: 1),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.primary, width: 1),
+          borderRadius: BorderRadius.circular(controlRadius),
+          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
         ),
       ),
 
@@ -122,7 +105,7 @@ class AppTheme {
         backgroundColor: AppColors.surface,
         elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
       ),
     );

@@ -9,6 +9,7 @@ class StatusBadge extends StatelessWidget {
   final Color textColor;
   final double fontSize;
   final FontWeight fontWeight;
+  final double radius;
 
   const StatusBadge({
     super.key,
@@ -17,6 +18,7 @@ class StatusBadge extends StatelessWidget {
     required this.textColor,
     this.fontSize = 12,
     this.fontWeight = FontWeight.w500,
+    this.radius = 8,
   });
 
   factory StatusBadge.bloodGroup(String group) => StatusBadge(
@@ -27,11 +29,25 @@ class StatusBadge extends StatelessWidget {
         fontWeight: FontWeight.w600,
       );
 
+  /// The full-radius status pill from the final artifact's component
+  /// specimens ("Status, pulse, connector") — the five states a request or
+  /// donor card carries: critical / urgent / normal / matched / pending.
+  factory StatusBadge.pill(String state) {
+    final (bg, fg, label) = switch (state) {
+      'critical' => (AppColors.red100, AppColors.red700, 'Critical'),
+      'urgent' => (AppColors.orangeTint, AppColors.orangeDeep, 'Urgent'),
+      'matched' => (AppColors.successBg, AppColors.successText, 'Matched'),
+      'pending' => (AppColors.goldTint, AppColors.goldDeep, 'Pending'),
+      _ => (AppColors.sand, AppColors.ink2, 'Normal'),
+    };
+    return StatusBadge(label: label, background: bg, textColor: fg, fontSize: 12, fontWeight: FontWeight.w600, radius: 999);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(color: background, borderRadius: BorderRadius.circular(8)),
+      decoration: BoxDecoration(color: background, borderRadius: BorderRadius.circular(radius)),
       child: Text(label, style: TextStyle(fontSize: fontSize, fontWeight: fontWeight, color: textColor)),
     );
   }

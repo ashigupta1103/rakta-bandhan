@@ -1,9 +1,11 @@
+import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
-import '../widgets/brand_mark.dart';
 import 'otp_screen.dart';
+import 'preview_gallery_screen.dart';
+import 'preview_ui_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -53,9 +55,58 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 32),
-              const Center(child: BrandMark(progress: 1, size: 84)),
+              // Frontend-only entry point for internal testing — gated out
+              // of release builds entirely (kReleaseMode is a compile-time
+              // constant, so this branch and everything it references is
+              // dead-code-eliminated from `flutter build --release`; real
+              // users never see it). Still fully reachable in debug/profile
+              // builds (`flutter run`) regardless of whether real
+              // registration is working. See preview_gallery_screen.dart's
+              // own header comment for the "why" of this whole mechanism.
+              if (!kReleaseMode) ...[
+                const SizedBox(height: 16),
+                GestureDetector(
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const PreviewGalleryScreen())),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: AppColors.goldTint,
+                      border: Border.all(color: AppColors.gold, width: 1.4),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(LucideIcons.eye, size: 18, color: AppColors.goldDeep),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Preview UI — All Screens', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.goldDeepest)),
+                              const Text('No sign-in, no backend — sample data only', style: TextStyle(fontSize: 11.5, color: AppColors.goldDeep)),
+                            ],
+                          ),
+                        ),
+                        const Icon(LucideIcons.chevronRight, size: 18, color: AppColors.goldDeep),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Center(
+                  child: Text('DEV BUILD ONLY — hidden in production', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, letterSpacing: 0.4, color: AppColors.disabledTint)),
+                ),
+              ],
               const SizedBox(height: 20),
+              Center(
+                child: Image.asset(
+                  'assets/branding/final-logo-transparent.png',
+                  width: 148,
+                  fit: BoxFit.contain,
+                ),
+              ),
+              const SizedBox(height: 12),
               // Header
               Text(
                 'Welcome to Rakta Bandhan',
@@ -147,6 +198,20 @@ class _LoginScreenState extends State<LoginScreen> {
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 12, color: AppColors.textMutedWarm),
               ),
+
+              // Secondary, lighter preview entry (4 tabs only) — same
+              // release-mode gate as the primary banner above. Remove this
+              // block (and preview_ui_screen.dart) once the preview is no
+              // longer needed.
+              if (!kReleaseMode) ...[
+                const SizedBox(height: 20),
+                Center(
+                  child: TextButton(
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const PreviewUiScreen())),
+                    child: const Text('Preview UI — 4 main tabs only (no backend)', style: TextStyle(fontSize: 12, color: AppColors.disabledTint)),
+                  ),
+                ),
+              ],
             ],
           ),
         ),

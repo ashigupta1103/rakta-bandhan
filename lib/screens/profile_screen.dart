@@ -4,10 +4,16 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../services/backend.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
+import '../widgets/app_header.dart';
 import '../widgets/blood_group_droplet.dart';
+import '../widgets/impact_trail.dart';
 import '../widgets/pulsing_dot.dart';
+import 'cooldown_screen.dart';
 import 'donation_history_screen.dart';
+import 'emergency_contact_screen.dart';
 import 'login_screen.dart';
+import 'notifications_screen.dart';
+import 'personal_information_screen.dart';
 import 'settings_screen.dart';
 
 /// Profile — rebuilt per Visual Richness Proposal #08: "the red hero band
@@ -54,6 +60,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.warmPageBackground,
+      appBar: AppHeader(
+        title: 'My page',
+        onNotificationTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const NotificationsScreen())),
+      ),
       body: SafeArea(
         child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
           stream: Backend.instance.myDonorDocStream(),
@@ -176,43 +186,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       const SizedBox(height: 26),
                       const Text('YOUR IMPACT', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 1.3, color: AppColors.textSecondary)),
                       const SizedBox(height: 14),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text('$donationCount', style: AppTextStyles.display(fontSize: 48, color: AppColors.textPrimaryWarm, height: 0.9)),
-                          const SizedBox(width: 14),
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 6),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                      ImpactTrail(
+                        count: donationCount,
+                        caption: '${donationCount == 1 ? '1 donation' : '$donationCount donations'} · $donationCount ${donationCount == 1 ? 'life' : 'lives'} helped',
+                      ),
+                      if (donationCount > 0) ...[
+                        const SizedBox(height: 14),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(color: AppColors.goldTint, borderRadius: BorderRadius.circular(999)),
+                          child: const Text('Lifesaver', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.goldDeep)),
+                        ),
+                      ],
+                      if (reactivateAt != null && !isAvailable) ...[
+                        const SizedBox(height: 16),
+                        InkWell(
+                          borderRadius: BorderRadius.circular(14),
+                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const CooldownScreen())),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            decoration: BoxDecoration(color: Colors.white, border: Border.all(color: AppColors.cardBorderWarm), borderRadius: BorderRadius.circular(14)),
+                            child: Row(
                               children: [
-                                Row(
-                                  children: [
-                                    for (var i = 0; i < 4; i++) ...[
-                                      if (i > 0) const SizedBox(width: 5),
-                                      BloodGroupDroplet(label: '', size: 18, filled: i < donationCount, color: i < donationCount ? AppColors.primary : AppColors.dividerWarm),
-                                    ],
-                                  ],
+                                const Icon(LucideIcons.clock, size: 15, color: AppColors.goldDeep),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text('On cooldown · eligible again in ${_eligibleInDays(reactivateAt)} days', style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
                                 ),
-                                const SizedBox(height: 6),
-                                Text('${donationCount == 1 ? '1 donation' : '$donationCount donations'} · $donationCount ${donationCount == 1 ? 'life' : 'lives'} helped', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                                const Icon(LucideIcons.chevronRight, size: 15, color: AppColors.chevronMuted),
                               ],
                             ),
                           ),
-                        ],
-                      ),
-                      if (reactivateAt != null && !isAvailable) ...[
-                        const SizedBox(height: 18),
-                        Row(
-                          children: [
-                            for (var i = 0; i < 11; i++) ...[
-                              if (i > 0) const SizedBox(width: 4),
-                              Expanded(child: Container(height: 3, decoration: BoxDecoration(borderRadius: BorderRadius.circular(2), color: i < 2 ? AppColors.primary : AppColors.dividerWarm))),
-                            ],
-                          ],
                         ),
-                        const SizedBox(height: 9),
-                        Text('Eligible again in ${_eligibleInDays(reactivateAt)} days', style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary)),
                       ],
                       const SizedBox(height: 8),
                       Container(height: 1, color: AppColors.dividerWarm, margin: const EdgeInsets.symmetric(vertical: 18)),
@@ -229,7 +234,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             _menuRow(
                               icon: LucideIcons.user,
                               label: 'Personal information',
-                              onTap: () => _showSnackBar('$name · $bloodGroup · ${data['phone'] ?? ''}'),
+                              iconBg: AppColors.primaryLightTint,
+                              iconColor: AppColors.primary,
+                              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const PersonalInformationScreen())),
                               showDivider: true,
                             ),
                             _menuRow(
@@ -243,7 +250,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             _menuRow(
                               icon: LucideIcons.phone,
                               label: 'Emergency contact',
-                              onTap: () => _showSnackBar('Opening Emergency contact...'),
+                              iconBg: AppColors.primaryLightTint,
+                              iconColor: AppColors.primary,
+                              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const EmergencyContactScreen())),
                               showDivider: true,
                             ),
                             _menuRow(

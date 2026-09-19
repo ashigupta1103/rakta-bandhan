@@ -127,6 +127,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> with SingleTickerPr
   Widget build(BuildContext context) {
     final onDark = _isDark;
     return Scaffold(
+      backgroundColor: AppColors.warmPageBackground,
       body: AnimatedContainer(
         duration: const Duration(milliseconds: 450),
         curve: Curves.easeOutCubic,
@@ -400,9 +401,10 @@ class _OnboardingPageView extends StatelessWidget {
           ),
         ),
       ),
-      // The mark itself — real asset, cropped in slightly to trim the
-      // baked-in white margin, no plate/card behind it. Fades in on its
-      // own once decoded rather than popping in or showing empty space.
+      // The mark itself, seated on a white rounded-square card so the
+      // asset's own baked-in white margin reads as the card's surface
+      // rather than a stray rectangle. Fades in on its own once decoded
+      // rather than popping in or showing empty space.
       Positioned(
         left: center.dx,
         top: center.dy,
@@ -412,15 +414,19 @@ class _OnboardingPageView extends StatelessWidget {
             opacity: logoReady ? 1 : 0,
             duration: const Duration(milliseconds: 450),
             curve: Curves.easeOutCubic,
-            child: SizedBox(
-              width: 218 * px,
-              height: 218 * px,
-              child: ClipRect(
-                child: Transform.scale(
-                  scale: 1.22,
-                  child: logoReady ? const Image(image: _logoImage, fit: BoxFit.contain) : const SizedBox.shrink(),
-                ),
+            child: Container(
+              width: 132 * px,
+              height: 132 * px,
+              padding: EdgeInsets.all(18 * px),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(28 * px),
+                boxShadow: [
+                  BoxShadow(color: AppColors.primaryLightTint.withValues(alpha: 0.55), blurRadius: 34 * px, spreadRadius: 2 * px),
+                  const BoxShadow(color: AppColors.shadowCard, blurRadius: 16, offset: Offset(0, 8)),
+                ],
               ),
+              child: logoReady ? const Image(image: _logoImage, fit: BoxFit.contain) : const SizedBox.shrink(),
             ),
           ),
         ),

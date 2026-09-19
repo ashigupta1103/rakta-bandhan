@@ -1,8 +1,13 @@
+import 'dart:math' as math;
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../services/backend.dart';
 import '../theme/app_colors.dart';
+import '../theme/app_text_styles.dart';
+import 'community_screen.dart';
+import 'tic_tac_toe_screen.dart';
 
 /// Real cooldown status — `donors/{uid}`'s `last_donation_date` and
 /// `reactivation_scheduled_at` are already written by the existing
@@ -19,12 +24,18 @@ class CooldownScreen extends StatelessWidget {
           children: [
             SizedBox(
               height: 52,
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: IconButton(
-                  icon: const Icon(LucideIcons.arrowLeft, color: AppColors.textPrimaryWarm),
-                  onPressed: () => Navigator.of(context).popUntil((route) => route.isFirst),
-                ),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: IconButton(
+                      icon: const Icon(LucideIcons.arrowLeft, color: AppColors.textPrimaryWarm),
+                      onPressed: () => Navigator.of(context).maybePop(),
+                    ),
+                  ),
+                  const Text('Your recovery', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
+                ],
               ),
             ),
             Expanded(
@@ -49,53 +60,139 @@ class CooldownScreen extends StatelessWidget {
                   final elapsedDays = lastDonation == null ? 0 : DateTime.now().difference(lastDonation).inDays;
                   final progress = (elapsedDays / totalDays).clamp(0.0, 1.0);
 
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                  final eligibleOn = _formatDate(reactivateAt);
+
+                  return SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
                     child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(LucideIcons.clock, size: 30, color: AppColors.statusPendingText),
-                        const SizedBox(height: 12),
-                        const Text('On cooldown', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w500, color: AppColors.textPrimaryWarm)),
-                        const SizedBox(height: 8),
-                        const Text(
-                          "Your body needs time to recover. You'll be marked available again automatically.",
-                          textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 13.5, color: AppColors.textSecondary, height: 1.5),
-                        ),
-                        const SizedBox(height: 24),
                         Container(
                           width: double.infinity,
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(color: Colors.white, border: Border.all(color: AppColors.cardBorderWarm), borderRadius: BorderRadius.circular(16)),
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [BoxShadow(color: AppColors.shadowHero, blurRadius: 22, offset: const Offset(0, 8))],
+                          ),
                           child: Column(
                             children: [
-                              Text(
-                                remainingDays == 1 ? '1 day' : '$remainingDays days',
-                                style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w500, color: AppColors.primary),
-                              ),
-                              const SizedBox(height: 4),
-                              const Text("until you're eligible again", style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary)),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            for (var i = 0; i < 18; i++) ...[
-                              if (i > 0) const SizedBox(width: 4),
-                              Expanded(
-                                child: Container(
-                                  height: 3,
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(2),
-                                    color: i / 18 < progress ? AppColors.primary : AppColors.dividerWarm,
+                              SizedBox(
+                                width: 176,
+                                height: 176,
+                                child: CustomPaint(
+                                  painter: _CooldownRingPainter(progress: progress),
+                                  child: Center(
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text('$remainingDays', style: AppTextStyles.display(fontSize: 44, color: AppColors.textPrimaryWarm, height: 1)),
+                                        const SizedBox(height: 2),
+                                        Text(remainingDays == 1 ? 'day to go' : 'days to go', style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary)),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ),
+                              const SizedBox(height: 20),
+                              Text(
+                                "You've already helped.\nNow let your body recover.",
+                                textAlign: TextAlign.center,
+                                style: AppTextStyles.display(fontSize: 21, height: 1.25, color: AppColors.textPrimaryWarm),
+                              ),
+                              const SizedBox(height: 10),
+                              const Text(
+                                "We'll turn your availability back on automatically and let you know — you don't have to remember.",
+                                textAlign: TextAlign.center,
+                                style: TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.5),
+                              ),
+                              Container(height: 1, color: AppColors.warmDivider, margin: const EdgeInsets.symmetric(vertical: 16)),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(LucideIcons.clock, size: 14, color: AppColors.goldDeep),
+                                  const SizedBox(width: 8),
+                                  Text.rich(
+                                    TextSpan(
+                                      style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                                      children: [
+                                        const TextSpan(text: 'Eligible again on '),
+                                        TextSpan(text: eligibleOn, style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.textPrimaryWarm)),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ],
-                          ],
+                          ),
                         ),
+                        const SizedBox(height: 22),
+                        const Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text('WHILE YOU WAIT', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 1.2, color: AppColors.textSecondary)),
+                        ),
+                        const SizedBox(height: 10),
+                        InkWell(
+                          borderRadius: BorderRadius.circular(12),
+                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const TicTacToeScreen())),
+                          child: Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(color: Colors.white, border: Border.all(color: AppColors.warmBorder), borderRadius: BorderRadius.circular(12)),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 42,
+                                  height: 42,
+                                  decoration: BoxDecoration(color: AppColors.goldTint, borderRadius: BorderRadius.circular(12)),
+                                  alignment: Alignment.center,
+                                  child: const Icon(LucideIcons.grid3x3, size: 19, color: AppColors.goldDeep),
+                                ),
+                                const SizedBox(width: 13),
+                                const Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text('Play a round of XO', style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
+                                      Text('A small thing to pass the time. Nothing to win.', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                                    ],
+                                  ),
+                                ),
+                                const Icon(LucideIcons.chevronRight, size: 16, color: AppColors.chevronMuted),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        InkWell(
+                          borderRadius: BorderRadius.circular(12),
+                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const CommunityScreen())),
+                          child: Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(color: Colors.white, border: Border.all(color: AppColors.warmBorder), borderRadius: BorderRadius.circular(12)),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 42,
+                                  height: 42,
+                                  decoration: BoxDecoration(color: AppColors.red100, borderRadius: BorderRadius.circular(12)),
+                                  alignment: Alignment.center,
+                                  child: const Icon(LucideIcons.heartHandshake, size: 19, color: AppColors.brandRed),
+                                ),
+                                const SizedBox(width: 13),
+                                const Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text('Read community stories', style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
+                                      Text('See what other donors have shared', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                                    ],
+                                  ),
+                                ),
+                                const Icon(LucideIcons.chevronRight, size: 16, color: AppColors.chevronMuted),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
                       ],
                     ),
                   );
@@ -107,6 +204,13 @@ class CooldownScreen extends StatelessWidget {
       ),
     );
   }
+
+  static const _months = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
+  ];
+
+  String _formatDate(DateTime d) => '${d.day} ${_months[d.month - 1]}';
 
   Widget _eligibleState() {
     return Padding(
@@ -133,4 +237,38 @@ class CooldownScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The single "90-day arc" ring component the final artifact calls for,
+/// replacing the three separate progress systems that previously existed
+/// across Cooldown, My Page and Donation history — this is the only one
+/// left, drawn with a conic sweep matching the design's ring token.
+class _CooldownRingPainter extends CustomPainter {
+  final double progress;
+
+  const _CooldownRingPainter({required this.progress});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2;
+    final trackPaint = Paint()
+      ..color = AppColors.dividerWarm
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 13
+      ..strokeCap = StrokeCap.round;
+    canvas.drawCircle(center, radius - 6.5, trackPaint);
+
+    final progressPaint = Paint()
+      ..color = AppColors.vermilion
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 13
+      ..strokeCap = StrokeCap.round;
+    const startAngle = -math.pi / 2;
+    final sweepAngle = 2 * math.pi * progress.clamp(0.0, 1.0);
+    canvas.drawArc(Rect.fromCircle(center: center, radius: radius - 6.5), startAngle, sweepAngle, false, progressPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _CooldownRingPainter oldDelegate) => oldDelegate.progress != progress;
 }

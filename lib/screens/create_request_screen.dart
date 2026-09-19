@@ -260,6 +260,11 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
                         value: '${_urgencyOptions.firstWhere((u) => u.id == _urgency).label} · ${_urgencyOptions.firstWhere((u) => u.id == _urgency).desc}',
                       ),
 
+                    if (_urgency == 'critical') ...[
+                      const SizedBox(height: 14),
+                      _criticalConsentNote(),
+                    ],
+
                     // ---- Q3: location — same always-visible treatment.
                     _questionDivider(),
                     _locationSection(live: locationIsLive),
@@ -344,6 +349,38 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
     );
   }
 
+  /// Informational only — matches the final artifact's copy exactly, but
+  /// there is nowhere in the current Firestore schema to persist a
+  /// per-request consent flag, and backend.dart/the schema stay untouched
+  /// in this phase. The actual gate before a phone number is ever shown
+  /// lives where the number is revealed (MatchContactScreen), not here.
+  Widget _criticalConsentNote() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(color: AppColors.red100, borderRadius: BorderRadius.circular(12)),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(LucideIcons.alertCircle, size: 15, color: AppColors.red700),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Critical requests can share your number', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.red700)),
+                const SizedBox(height: 2),
+                Text(
+                  'A donor who accepts will be asked before they can call you directly.',
+                  style: TextStyle(fontSize: 11.5, color: AppColors.red800, height: 1.4),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _unitsStepper() {
     return Row(
       children: [
@@ -390,6 +427,7 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
   }
 
   Widget _urgencyRow(({String id, String label, String desc, int bars}) option) {
+    final accent = option.id == 'critical' ? AppColors.brandRed : (option.id == 'urgent' ? AppColors.orange : AppColors.borderStrong);
     return GestureDetector(
       onTap: () => setState(() => _urgency = option.id),
       child: Container(
@@ -407,6 +445,23 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
                   Text(option.desc, style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary)),
                 ],
               ),
+            ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (var bar = 0; bar < 3; bar++) ...[
+                  if (bar > 0) const SizedBox(width: 2),
+                  Container(
+                    width: 4,
+                    height: 6.0 + bar * 4.5,
+                    decoration: BoxDecoration(
+                      color: bar < option.bars ? accent : AppColors.dividerWarm,
+                      borderRadius: BorderRadius.circular(1),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ],
         ),

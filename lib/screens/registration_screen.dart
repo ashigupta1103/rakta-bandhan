@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:firebase_core/firebase_core.dart' show FirebaseException;
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../services/backend.dart';
@@ -123,9 +124,21 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       if (!mounted) return;
       setState(() => _isSubmitting = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Registration failed. Please try again.')),
+        SnackBar(content: Text('Registration failed. ${_diagnosticSuffix(e)}Please try again.')),
       );
     }
+  }
+
+  /// A short, safe diagnostic fragment appended to the failure message —
+  /// this is a frontend-visibility improvement only (so a screenshot or a
+  /// teammate reading over your shoulder can see *what kind* of failure
+  /// this is without a dev console), not a fix to whatever the underlying
+  /// cause turns out to be. Never echoes raw exception text — only the
+  /// stable `code`/`type` fields exceptions expose for exactly this
+  /// purpose.
+  String _diagnosticSuffix(Object e) {
+    if (e is FirebaseException) return '(${e.plugin}/${e.code}) ';
+    return '(${e.runtimeType}) ';
   }
 
   @override
