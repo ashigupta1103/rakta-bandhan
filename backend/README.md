@@ -30,10 +30,12 @@ worth keeping distinct, since only the first one is a hard wall:
 | Scheduled functions (auto-expire, 90-day reactivation) | Lazy checks on read (`Backend.expireIfStale`, `Backend.maybeReactivate`) |
 | MSG91 SMS fallback | Not built — no fallback channel if push/in-app is missed |
 
+**Spark-compatible, built:**
+- Donor ID proof (`Backend.uploadIdProof`, reviewed from `AdminDonorDetailScreen`) — base64-encoded straight onto `donors/{uid}.id_proof_base64`, not Cloud Storage. Storage now requires a Blaze billing account (Google policy change as of Sep 2026, no more free Spark bucket); this keeps the feature genuinely free by staying inside Firestore's own free tier. Caller-side resolution/quality caps (`maxWidth: 1280, imageQuality: 70`) keep the encoded string well under Firestore's 1MiB document limit.
+- A real web admin dashboard via Firebase Hosting (`admin/frontend`, reads Firestore directly)
+- Firebase Analytics (`Backend._logEvent` — `donor_registered`, `request_created`, `request_matched`, `donation_fulfilled`)
+
 **Spark-compatible, just not built yet — no Blaze needed if you want these later:**
-- Firebase Storage for donor ID proof / hospital verification docs (Storage has a free Spark tier)
-- A real web admin dashboard via Firebase Hosting (Hosting is also free-tier; could be the same Flutter app built for web, since `firebase_options.dart` already has a `web` config)
-- Firebase Analytics (not wired in at all)
 - Real geohash *range* queries (Geoflutterfire-style `where(geohash, >=, ...)`) instead of the current full-scan-then-Haversine-filter — fine at demo scale, would matter at real scale
 
 **Matches the HLD as-is, different mechanism, same result:**
@@ -101,7 +103,7 @@ would normally be a Cloud Function (`setAdminRole`). Do it once by hand:
 
 | Collection | Written by | Notes |
 |---|---|---|
-| `donors/{uid}` | owner (client), admin | private: name, phone, exact location, `is_verified`/`is_banned` are admin-only fields |
+| `donors/{uid}` | owner (client), admin | private: name, phone, exact location, `id_proof_base64`; `is_verified`/`is_banned` are admin-only fields |
 | `donors_public/{uid}` | owner (client) | map-safe mirror, no phone, ever |
 | `requests/{id}` | owner creates; owner/matched-donor/admin transition it | denormalizes `requester_name`/`requester_phone` and `matched_donor_name`/`matched_donor_phone` at creation/accept time so contact reveal never needs a second cross-user read |
 | `donation_history/{id}` | donor (self-report) or admin | immutable |

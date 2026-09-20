@@ -20,16 +20,6 @@ class CertificateScreen extends StatelessWidget {
 
   const CertificateScreen({super.key, required this.record, required this.donationNumber});
 
-  static const _months = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December',
-  ];
-
-  String _formatDate(DateTime? d) {
-    if (d == null) return 'an unrecorded date';
-    return '${d.day} ${_months[d.month - 1]} ${d.year}';
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -141,7 +131,7 @@ class CertificateScreen extends StatelessWidget {
                   children: [
                     const TextSpan(text: 'donated one unit of '),
                     TextSpan(text: record.bloodGroup, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w700)),
-                    TextSpan(text: ' blood\nat ${record.hospital}\non ${_formatDate(record.date)}'),
+                    TextSpan(text: ' blood\nat ${record.hospital}\non ${record.date.isEmpty ? 'an unrecorded date' : record.date}'),
                   ],
                 ),
               ),

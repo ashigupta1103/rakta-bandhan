@@ -2,9 +2,11 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart' show XFile;
 
 /// Recipient blood group -> donor groups that can give to it.
 const bloodCompatibility = <String, List<String>>{
@@ -20,11 +22,6 @@ const bloodCompatibility = <String, List<String>>{
 
 const donorCooldownDays = 90;
 const requestExpiryHours = 6;
-
-/// Mapbox public token for street-level address search (searchAddress
-/// below). Get one free at mapbox.com -> Account -> Tokens (no card
-/// needed) and paste it here.
-const mapboxAccessToken = 'PASTE_MAPBOX_PUBLIC_TOKEN_HERE';
 
 const _base32 = '0123456789bcdefghjkmnpqrstuvwxyz';
 
@@ -109,6 +106,13 @@ class Backend {
 
   final _auth = FirebaseAuth.instance;
   final _db = FirebaseFirestore.instance;
+  final _analytics = FirebaseAnalytics.instance;
+
+  /// Best-effort — a broken/offline Analytics call must never break the
+  /// funnel step it's reporting on.
+  void _logEvent(String name, [Map<String, Object>? parameters]) {
+    _analytics.logEvent(name: name, parameters: parameters).catchError((_) {});
+  }
 
   static const _fakeAuthPassword = 'RaktaBandhan#2026Demo';
   static const _fakeAuthEmailDomain = 'phone.raktabandhan.local';
@@ -199,6 +203,23 @@ class Backend {
         'updated_at': now,
       });
     });
+    _logEvent('donor_registered', {'blood_group': bloodGroup});
+  }
+
+  /// Base64-encodes the donor's picked ID proof photo directly onto their
+  /// private `donors/{uid}` doc (never `donors_public` — same visibility
+  /// tier as phone). Cloud Storage now requires a Blaze billing account
+  /// (Google policy change, no more free Spark bucket) — this stays on the
+  /// free Firestore-only path instead. Caller (personal_information_
+  /// screen.dart) constrains the picked image's resolution/quality so the
+  /// encoded string comfortably fits Firestore's 1MiB document limit.
+  /// Admins view it from AdminDonorDetailScreen before verifying.
+  Future<void> uploadIdProof(XFile file) async {
+    final bytes = await file.readAsBytes();
+    await _db.collection('donors').doc(_uid).update({
+      'id_proof_base64': base64Encode(bytes),
+      'id_proof_content_type': file.mimeType ?? 'image/jpeg',
+    });
   }
 
   Future<void> setAvailability(bool available) async {
@@ -276,6 +297,7 @@ class Backend {
         DateTime.now().add(const Duration(hours: requestExpiryHours)),
       ),
     });
+    _logEvent('request_created', {'blood_group': bloodGroup, 'urgency': urgency});
     return ref.id;
   }
 
@@ -339,6 +361,7 @@ class Backend {
       });
       tx.update(donorRef, {'active_request_id': requestId});
     });
+    _logEvent('request_matched', {'request_id': requestId});
   }
 
   /// Matched donor self-reports the donation done, writes the immutable
@@ -371,6 +394,7 @@ class Backend {
         'confirmed_by': 'self',
       });
     });
+    _logEvent('donation_fulfilled', {'request_id': requestId});
   }
 
   Future<int> myDonationCount() async {
@@ -478,6 +502,11 @@ class Backend {
   /// city) if the browser/device denies location — never blocks the flow.
   Future<Position> currentPosition() async {
     try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        return _fallbackPosition();
+      }
+
       var permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
@@ -486,46 +515,37 @@ class Backend {
           permission == LocationPermission.deniedForever) {
         return _fallbackPosition();
       }
-      return await Geolocator.getCurrentPosition();
+      return await Geolocator.getCurrentPosition(
+        timeLimit: const Duration(seconds: 5),
+      );
     } catch (_) {
       return _fallbackPosition();
     }
   }
 
-  /// Mapbox Geocoding API (free up to 100k requests/month, no billing card).
-  /// `types=address` + `autocomplete=true` gets street/house-number-level
-  /// matches as the user types; `proximity` biases results toward wherever
-  /// the device currently is so "Main St" resolves to the nearby one first.
+  /// OpenStreetMap Nominatim Geocoding API (free, no API key required).
   /// Converts a typed address into a pickable list of {label, lat, lng}.
   Future<List<Map<String, dynamic>>> searchAddress(String query) async {
     if (query.trim().length < 3) return [];
-    final params = {
-      'access_token': mapboxAccessToken,
-      'autocomplete': 'true',
-      'types': 'address,place,poi',
-      'limit': '5',
-    };
     try {
-      final proximity = await currentPosition();
-      params['proximity'] = '${proximity.longitude},${proximity.latitude}';
-    } catch (_) {
-      // No fix yet — plain (non-biased) search still works fine.
-    }
-    final uri = Uri.https(
-      'api.mapbox.com',
-      '/geocoding/v5/mapbox.places/${Uri.encodeComponent(query)}.json',
-      params,
-    );
-    try {
-      final response = await http.get(uri);
+      final uri = Uri.https(
+        'nominatim.openstreetmap.org',
+        '/search',
+        {
+          'q': query,
+          'format': 'json',
+          'limit': '5',
+          'addressdetails': '1'
+        },
+      );
+      final response = await http.get(uri, headers: {'User-Agent': 'RaktaBandhan/1.0'});
       if (response.statusCode != 200) return [];
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
-      final results = body['features'] as List;
+      final List results = jsonDecode(response.body);
       return results
           .map((r) => {
-                'label': r['place_name'] as String,
-                'lat': ((r['center'] as List)[1] as num).toDouble(),
-                'lng': ((r['center'] as List)[0] as num).toDouble(),
+                'label': r['display_name'] as String,
+                'lat': double.parse(r['lat'].toString()),
+                'lng': double.parse(r['lon'].toString()),
               })
           .toList();
     } catch (_) {
@@ -533,24 +553,25 @@ class Backend {
     }
   }
 
-  /// Mapbox reverse geocoding — turns a GPS fix into a real street-level
-  /// address label (e.g. "MG Road, Kochi") instead of a generic "Current
-  /// location" placeholder, matching the Uber/Rapido pattern of showing
-  /// your actual detected address by default. Returns null (caller falls
-  /// back to a generic label) if the lookup fails or the token isn't set.
+  /// OpenStreetMap Nominatim reverse geocoding — turns a GPS fix into a real
+  /// street-level address label (e.g. "MG Road, Kochi") instead of a generic
+  /// "Current location" placeholder. Returns null (caller falls back to a 
+  /// generic label) if the lookup fails.
   Future<String?> reverseGeocode(double lat, double lng) async {
-    final uri = Uri.https(
-      'api.mapbox.com',
-      '/geocoding/v5/mapbox.places/$lng,$lat.json',
-      {'access_token': mapboxAccessToken, 'types': 'address,place'},
-    );
     try {
-      final response = await http.get(uri);
+      final uri = Uri.https(
+        'nominatim.openstreetmap.org',
+        '/reverse',
+        {
+          'lat': lat.toString(),
+          'lon': lng.toString(),
+          'format': 'json',
+        },
+      );
+      final response = await http.get(uri, headers: {'User-Agent': 'RaktaBandhan/1.0'});
       if (response.statusCode != 200) return null;
       final body = jsonDecode(response.body) as Map<String, dynamic>;
-      final results = body['features'] as List;
-      if (results.isEmpty) return null;
-      return results.first['place_name'] as String;
+      return body['display_name'] as String?;
     } catch (_) {
       return null;
     }

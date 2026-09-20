@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
-import 'verifying_screen.dart';
+import 'location_permission_screen.dart';
 
 class ConsentScreen extends StatefulWidget {
   const ConsentScreen({super.key});
@@ -16,7 +16,7 @@ class _ConsentScreenState extends State<ConsentScreen> {
 
   void _accept() {
     if (!_agreed) return;
-    Navigator.push(context, MaterialPageRoute(builder: (context) => const VerifyingScreen()));
+    Navigator.push(context, MaterialPageRoute(builder: (context) => const LocationPermissionScreen()));
   }
 
   @override

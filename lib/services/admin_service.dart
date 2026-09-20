@@ -13,6 +13,7 @@ class AdminDonorEntry {
   final bool available;
   final String location;
   final String joinedOn;
+  final String? idProofBase64;
 
   const AdminDonorEntry({
     required this.id,
@@ -23,6 +24,7 @@ class AdminDonorEntry {
     required this.available,
     required this.location,
     required this.joinedOn,
+    this.idProofBase64,
   });
 }
 
@@ -169,6 +171,7 @@ class AdminService extends ChangeNotifier {
       available: d['is_available'] as bool? ?? false,
       location: (d['location_label'] as String?)?.isNotEmpty == true ? d['location_label'] as String : '—',
       joinedOn: _timeAgo((d['created_at'] as Timestamp?)?.toDate()),
+      idProofBase64: d['id_proof_base64'] as String?,
     );
   }
 
