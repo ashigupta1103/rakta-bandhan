@@ -63,8 +63,11 @@ class FindDonorsScreen extends StatefulWidget {
 class _FindDonorsScreenState extends State<FindDonorsScreen> {
   final TextEditingController _searchController = TextEditingController();
   final MapController _mapController = MapController();
+  final DraggableScrollableController _sheetController = DraggableScrollableController();
   Position? _position;
   _MapPermissionState _permissionState = _MapPermissionState.checking;
+  double _sheetExtent = 0.42;
+  bool _recentering = false;
 
   List<Map<String, dynamic>> _suggestions = [];
   String? _searchedLabel;
@@ -82,12 +85,16 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
   void initState() {
     super.initState();
     _checkPermission();
+    _sheetController.addListener(() {
+      if (_sheetController.isAttached) setState(() => _sheetExtent = _sheetController.size);
+    });
   }
 
   @override
   void dispose() {
     _debounce?.cancel();
     _searchController.dispose();
+    _sheetController.dispose();
     super.dispose();
   }
 
@@ -115,6 +122,26 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
   Future<void> _loadPosition() async {
     final p = await Backend.instance.currentPosition();
     if (mounted) setState(() => _position = p);
+  }
+
+  /// Google Maps-style recenter: re-fetches a fresh GPS fix (not the last
+  /// cached one, which may be a search result the donor picked) and pans
+  /// the map back to it.
+  Future<void> _recenter() async {
+    if (_recentering) return;
+    setState(() => _recentering = true);
+    try {
+      final p = await Backend.instance.currentPosition();
+      if (!mounted) return;
+      setState(() {
+        _position = p;
+        _searchController.clear();
+        _searchedLabel = null;
+      });
+      _mapController.move(LatLng(p.latitude, p.longitude), 15);
+    } finally {
+      if (mounted) setState(() => _recentering = false);
+    }
   }
 
   void _onSearchChanged(String value) {
@@ -331,8 +358,37 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
             ),
           if (_permissionState == _MapPermissionState.granted && _position == null) const _MapLoadingOverlay(message: 'Finding donors near you…'),
 
-          if (_permissionState == _MapPermissionState.granted && _position != null) _donorSheet(),
+          if (_permissionState == _MapPermissionState.granted && _position != null) ...[
+            Positioned(
+              right: 16,
+              bottom: MediaQuery.of(context).size.height * _sheetExtent + 16,
+              child: _myLocationButton(),
+            ),
+            _donorSheet(),
+          ],
         ],
+      ),
+    );
+  }
+
+  /// The floating recenter control every map app trains users to expect
+  /// (Google Maps' bottom-right "my location" button) — tracks the sheet's
+  /// drag extent so it never sits underneath it.
+  Widget _myLocationButton() {
+    return GestureDetector(
+      onTap: _recenter,
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          shape: BoxShape.circle,
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 10, offset: const Offset(0, 3))],
+        ),
+        alignment: Alignment.center,
+        child: _recentering
+            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary))
+            : const Icon(LucideIcons.locateFixed, size: 20, color: AppColors.primary),
       ),
     );
   }
@@ -342,6 +398,7 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
   /// ("the sheet actually drags") describes.
   Widget _donorSheet() {
     return DraggableScrollableSheet(
+      controller: _sheetController,
       initialChildSize: 0.42,
       minChildSize: 0.16,
       maxChildSize: 0.85,

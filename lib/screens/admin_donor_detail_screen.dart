@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../services/admin_service.dart';
@@ -35,6 +37,7 @@ class AdminDonorDetailScreen extends StatelessWidget {
             final donor = service.donors.firstWhere((d) => d.id == donorId);
             final (statusBg, statusText, statusLabel) = _statusStyle(donor.status);
             final initials = donor.name.trim().split(RegExp(r'\s+')).take(2).map((w) => w[0].toUpperCase()).join();
+            final idProofBytes = donor.idProofBase64 == null ? null : base64Decode(donor.idProofBase64!);
 
             return SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -85,6 +88,27 @@ class AdminDonorDetailScreen extends StatelessWidget {
                       ],
                     ),
                   ),
+                  const SizedBox(height: 20),
+                  Text('ID proof', style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
+                  const SizedBox(height: 8),
+                  idProofBytes == null
+                      ? Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(color: AppColors.dividerWarm, borderRadius: BorderRadius.circular(14)),
+                          child: const Text('Not uploaded yet.', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                        )
+                      : GestureDetector(
+                          onTap: () => showDialog(
+                            context: context,
+                            builder: (context) => Dialog(
+                              child: InteractiveViewer(child: Image.memory(idProofBytes)),
+                            ),
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(14),
+                            child: Image.memory(idProofBytes, height: 180, width: double.infinity, fit: BoxFit.cover),
+                          ),
+                        ),
                   const SizedBox(height: 20),
                   Row(
                     children: [

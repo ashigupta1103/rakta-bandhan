@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../services/backend.dart';
 import '../theme/app_colors.dart';
@@ -13,14 +14,23 @@ import '../widgets/blood_group_droplet.dart';
 /// registerDonor() and setAvailability() only, with no profile-update
 /// method, and inventing one would mean writing Firestore fields the
 /// backend contract does not define. The footer states this plainly rather
-/// than showing a disabled Edit button that implies otherwise.
-class PersonalInformationScreen extends StatelessWidget {
+/// than showing a disabled Edit button that implies otherwise. ID proof
+/// upload (below) is a distinct, additive verification action, not an edit
+/// of an existing field, so it doesn't conflict with that stance.
+class PersonalInformationScreen extends StatefulWidget {
   const PersonalInformationScreen({super.key});
 
+  @override
+  State<PersonalInformationScreen> createState() => _PersonalInformationScreenState();
+}
+
+class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
   static const _months = [
     'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
   ];
+
+  bool _uploading = false;
 
   String _formatDate(DateTime d) => '${d.day} ${_months[d.month - 1]} ${d.year}';
 
@@ -28,6 +38,42 @@ class PersonalInformationScreen extends StatelessWidget {
     final trimmed = name.trim();
     if (trimmed.isEmpty) return '?';
     return trimmed.split(RegExp(r'\s+')).take(2).map((w) => w[0].toUpperCase()).join();
+  }
+
+  Future<void> _uploadIdProof() async {
+    final picked = await showModalBottomSheet<XFile?>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(LucideIcons.camera),
+              title: const Text('Take a photo'),
+              onTap: () async => Navigator.pop(context, await ImagePicker().pickImage(source: ImageSource.camera, maxWidth: 1280, imageQuality: 70)),
+            ),
+            ListTile(
+              leading: const Icon(LucideIcons.image),
+              title: const Text('Choose from gallery'),
+              onTap: () async => Navigator.pop(context, await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 1280, imageQuality: 70)),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (picked == null || !mounted) return;
+    setState(() => _uploading = true);
+    try {
+      await Backend.instance.uploadIdProof(picked);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not upload ID proof. Please try again.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
   }
 
   @override
@@ -68,6 +114,7 @@ class PersonalInformationScreen extends StatelessWidget {
                   final phone = data['phone'] as String? ?? '—';
                   final bloodGroup = data['blood_group'] as String? ?? '—';
                   final isVerified = data['is_verified'] as bool? ?? false;
+                  final idProofBase64 = data['id_proof_base64'] as String?;
                   final createdAt = data['created_at'] as Timestamp?;
                   final lat = data['lat'] as num?;
                   final lng = data['lng'] as num?;
@@ -131,8 +178,25 @@ class PersonalInformationScreen extends StatelessWidget {
                             valueColor: isVerified ? AppColors.warmGreenText : AppColors.warmAmberText,
                             iconBg: isVerified ? AppColors.warmGreenBg : AppColors.warmAmberBg,
                             iconColor: isVerified ? AppColors.warmGreenText : AppColors.warmAmberText,
-                            isLast: true,
+                            isLast: idProofBase64 != null,
                           ),
+                          if (idProofBase64 == null)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                              child: Row(
+                                children: [
+                                  const Expanded(
+                                    child: Text('No ID proof uploaded — speeds up review', style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary)),
+                                  ),
+                                  TextButton(
+                                    onPressed: _uploading ? null : _uploadIdProof,
+                                    child: _uploading
+                                        ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                                        : const Text('Upload'),
+                                  ),
+                                ],
+                              ),
+                            ),
                         ]),
                         const SizedBox(height: 18),
                         _sectionLabel('Location'),

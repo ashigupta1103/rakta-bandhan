@@ -101,7 +101,7 @@ class PreviewGalleryScreen extends StatelessWidget {
                   _category(context, 'My Page', [
                     _entry('Personal information', () => const _PreviewFrame(title: 'Personal information', child: _PersonalInfoPreview())),
                     _entry('Donation history', () => const DonationHistoryScreen()),
-                    _entry('Certificate', () => CertificateScreen(record: DonationRecord(requestId: 'preview', hospital: 'Sample Hospital', date: DateTime.now(), bloodGroup: 'AB+', units: 1), donationNumber: 1)),
+                    _entry('Certificate', () => CertificateScreen(record: const DonationRecord(hospital: 'Sample Hospital', date: '20 Sep 2026', bloodGroup: 'AB+'), donationNumber: 1)),
                     _entry('Cooldown', () => const _PreviewFrame(title: 'Cooldown', child: _CooldownPreview())),
                     _entry('Emergency contact', () => const EmergencyContactScreen()),
                     _entry('Settings & privacy', () => const SettingsScreen()),

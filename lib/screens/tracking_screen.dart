@@ -70,7 +70,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
             if (data == null) {
               return const Center(child: Text('Request not found.', style: TextStyle(color: AppColors.textSecondary)));
             }
-            Backend.instance.expireIfStale(requestId, data);
+            Backend.instance.expireIfStale(widget.requestId, data);
             final status = data['status'] as String? ?? 'open';
             final bloodGroup = data['blood_group'] as String? ?? '';
             final units = data['units_needed'] ?? 1;
