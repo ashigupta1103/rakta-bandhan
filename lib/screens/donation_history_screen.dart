@@ -80,51 +80,60 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
                   final milestone = 10;
                   final toMilestone = (milestone - count).clamp(0, milestone);
 
-                  return SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(24, 6, 24, 24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.end,
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 6, 24, 0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('$count', style: AppTextStyles.display(fontSize: 44, color: AppColors.textPrimaryWarm, height: 0.88)),
-                            const SizedBox(width: 14),
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 4),
-                              child: Text(
-                                '${count == 1 ? 'unit given' : 'units given'} ·\n${count == 1 ? '1 person' : '$count people'} helped',
-                                style: const TextStyle(fontSize: 13.5, color: AppColors.textSecondary, height: 1.4),
-                              ),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text('$count', style: AppTextStyles.display(fontSize: 44, color: AppColors.textPrimaryWarm, height: 0.88)),
+                                const SizedBox(width: 14),
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 4),
+                                  child: Text(
+                                    '${count == 1 ? 'unit given' : 'units given'} ·\n${count == 1 ? '1 person' : '$count people'} helped',
+                                    style: const TextStyle(fontSize: 13.5, color: AppColors.textSecondary, height: 1.4),
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            for (var i = 0; i < milestone; i++) ...[
-                              if (i > 0) const SizedBox(width: 6),
-                              BloodGroupDroplet(label: '', size: 22, filled: i < count, color: i < count ? AppColors.primary : AppColors.dividerWarm),
+                            const SizedBox(height: 16),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                for (var i = 0; i < milestone; i++)
+                                  BloodGroupDroplet(label: '', size: 22, filled: i < count, color: i < count ? AppColors.primary : AppColors.dividerWarm),
+                              ],
+                            ),
+                            if (toMilestone > 0) ...[
+                              const SizedBox(height: 10),
+                              Text(
+                                '$toMilestone more and you reach the $milestone-unit mark',
+                                style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                              ),
                             ],
+                            Container(height: 1, color: AppColors.dividerWarm, margin: const EdgeInsets.symmetric(vertical: 22)),
                           ],
                         ),
-                        if (toMilestone > 0) ...[
-                          const SizedBox(height: 10),
-                          Text(
-                            '$toMilestone more and you reach the $milestone-unit mark',
-                            style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
-                          ),
-                        ],
-                        Container(height: 1, color: AppColors.dividerWarm, margin: const EdgeInsets.symmetric(vertical: 22)),
-                        if (history.isEmpty)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 30),
-                            child: StateCard.empty(icon: LucideIcons.history, title: 'No donations recorded yet.'),
-                          )
-                        else
-                          for (var i = 0; i < history.length; i++) _timelineRow(history[i], isLast: i == history.length - 1),
-                      ],
-                    ),
+                      ),
+                      Expanded(
+                        child: history.isEmpty
+                            ? Center(child: StateCard.empty(icon: LucideIcons.history, title: 'No donations recorded yet.'))
+                            : SingleChildScrollView(
+                                padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                                child: Column(
+                                  children: [
+                                    for (var i = 0; i < history.length; i++) _timelineRow(history[i], isLast: i == history.length - 1),
+                                  ],
+                                ),
+                              ),
+                      ),
+                    ],
                   );
                 },
               ),

@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/backend.dart';
-import '../services/onboarding_service.dart';
 import '../theme/app_colors.dart';
 import 'login_screen.dart';
 import 'main_navigation_screen.dart';
-import 'onboarding_screen.dart';
 
 /// Branded launch — a deliberate brand reveal, not a loading screen.
 ///
@@ -22,10 +20,13 @@ import 'onboarding_screen.dart';
 /// sits in the image cache *before* the reveal Column is even built — the
 /// animation only ever plays over pixels that are already there.
 ///
-/// Routing precedence (unchanged):
-///   has donor profile        -> MainNavigationScreen
-///   no profile, seen intro   -> LoginScreen
-///   no profile, first run    -> OnboardingScreen
+/// Routing precedence — the ring-carousel onboarding step is retired (not
+/// in the approved entry flow: Splash -> Login -> OTP -> Registration, per
+/// design_updated/Rakta Bandhan Redesign.dc.html's "Entry" section). The
+/// screen and its OnboardingService are left in place, still reachable from
+/// Preview Gallery for inspection, just no longer routed to for real users:
+///   has donor profile -> MainNavigationScreen
+///   no profile         -> LoginScreen
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -89,10 +90,7 @@ class _SplashScreenState extends State<SplashScreen>
   Future<Widget> _resolveDestination() async {
     final user = Backend.instance.currentUser;
     final hasProfile = user != null && await Backend.instance.hasProfile();
-    final seenOnboarding = await OnboardingService.instance.hasSeenOnboarding();
-    return hasProfile
-        ? const MainNavigationScreen()
-        : (seenOnboarding ? const LoginScreen() : const OnboardingScreen());
+    return hasProfile ? const MainNavigationScreen() : const LoginScreen();
   }
 
   @override

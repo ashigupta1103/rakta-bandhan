@@ -138,18 +138,20 @@ class AppStateStrip extends StatelessWidget {
 }
 
 /// The header's "More" sheet — About / Testimonials / Corporate / Help /
-/// Privacy / Terms. Phase 1 establishes the sheet and its six destinations;
-/// the destination pages themselves are a later batch, so each row surfaces
-/// a "coming soon" notice rather than a dead toast with no follow-through.
+/// Privacy / Terms, all six wired to their real destination screens.
 void showMoreSheet(BuildContext context) {
   showModalBottomSheet(
     context: context,
     backgroundColor: AppColors.warmGround,
     shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
     builder: (sheetContext) {
-      return SafeArea(
+      // Bottom inset applied explicitly here (not via SafeArea) so it's
+      // never silently doubled up; scroll view is the fallback for short
+      // screens or larger system text scale.
+      final bottomInset = MediaQuery.of(sheetContext).padding.bottom;
+      return SingleChildScrollView(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(0, 10, 0, 12),
+          padding: EdgeInsets.fromLTRB(0, 10, 0, 12 + bottomInset),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [

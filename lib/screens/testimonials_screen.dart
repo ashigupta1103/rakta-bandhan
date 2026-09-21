@@ -6,7 +6,9 @@ import '../theme/app_text_styles.dart';
 /// Testimonials — curated and verified by Rakta Bandhan, distinct from the
 /// anonymous-handle Community stories feed. Every quote and name here is an
 /// explicit placeholder per the design ("Real testimonial copy has not
-/// been supplied and has deliberately not been written").
+/// been supplied and has deliberately not been written"). Each card carries
+/// an "Awaiting content" badge instead of a status pill — a "Verified" tag
+/// on placeholder copy would misrepresent it as real, approved testimony.
 class TestimonialsScreen extends StatelessWidget {
   const TestimonialsScreen({super.key});
 
@@ -35,7 +37,16 @@ class TestimonialsScreen extends StatelessWidget {
                     Text('Stories we\'ve been given permission to tell', style: AppTextStyles.display(fontSize: 25, color: AppColors.ink, height: 1.25)),
                     const SizedBox(height: 8),
                     const Text('Curated and verified by Rakta Bandhan. Member stories live in Community.', style: TextStyle(fontSize: 13, color: AppColors.ink2)),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                      decoration: BoxDecoration(color: AppColors.goldTint, border: const Border(left: BorderSide(color: AppColors.gold, width: 3)), borderRadius: const BorderRadius.horizontal(right: Radius.circular(12))),
+                      child: const Text(
+                        'Every name and quote below is a placeholder awaiting real testimonials from the Rakta Bandhan team. None of it is a real donor, recipient or partner.',
+                        style: TextStyle(fontSize: 12.5, color: AppColors.goldDeepest, height: 1.5),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
                     _featuredQuote(),
                     const SizedBox(height: 14),
                     _quoteCard(
@@ -98,8 +109,8 @@ class TestimonialsScreen extends StatelessWidget {
                   ),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-                    decoration: BoxDecoration(color: AppColors.successBg, borderRadius: BorderRadius.circular(999)),
-                    child: const Text('Verified', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.successText)),
+                    decoration: BoxDecoration(color: AppColors.warmBorder, borderRadius: BorderRadius.circular(999)),
+                    child: const Text('Awaiting content', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.ink2)),
                   ),
                 ],
               ),
@@ -134,6 +145,12 @@ class TestimonialsScreen extends StatelessWidget {
                     Text(subtitle, style: const TextStyle(fontSize: 11.5, color: AppColors.ink2)),
                   ],
                 ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(color: AppColors.warmBorder, borderRadius: BorderRadius.circular(999)),
+                child: const Text('Awaiting content', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.ink2)),
               ),
             ],
           ),

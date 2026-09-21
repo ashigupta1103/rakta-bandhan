@@ -7,6 +7,7 @@ import '../widgets/blood_group_droplet.dart';
 import '../widgets/state_card.dart';
 import '../widgets/status_badge.dart';
 import 'cancel_confirm_screen.dart';
+import 'create_request_screen.dart';
 import 'match_contact_screen.dart';
 import 'request_detail_screen.dart';
 import 'tracking_screen.dart';
@@ -142,59 +143,64 @@ class _RequestsScreenState extends State<RequestsScreen> {
     final compatible = Backend.instance.compatibleRecipientGroups(_myBloodGroup!);
     final myUid = Backend.instance.currentUser?.uid;
 
-    return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      children: [
-        StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-          stream: Backend.instance.openRequestsStream(),
-          builder: (context, snapshot) {
-            if (!snapshot.hasData) {
-              return const Padding(
-                padding: EdgeInsets.symmetric(vertical: 24),
-                child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-              );
-            }
-            final docs = snapshot.data!.docs
-                .where((d) => d.data()['requester_uid'] != myUid && compatible.contains(d.data()['blood_group']))
-                .toList();
-            if (docs.isEmpty) return const SizedBox.shrink();
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _sectionLabel('Open requests you can fulfil'),
-                const SizedBox(height: 10),
-                for (final doc in docs) ...[
-                  _requestCard(doc.id, doc.data(), primaryAction: _CardAction.viewDetail),
-                  const SizedBox(height: 12),
-                ],
-              ],
-            );
-          },
-        ),
-        StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: Backend.instance.openRequestsStream(),
+      builder: (context, openSnapshot) {
+        return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
           stream: FirebaseFirestore.instance
               .collection('requests')
               .where('matched_donor_id', isEqualTo: myUid)
               .where('status', isEqualTo: 'matched')
               .snapshots(),
-          builder: (context, snapshot) {
-            final docs = snapshot.data?.docs ?? [];
-            if (docs.isEmpty) return const SizedBox.shrink();
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+          builder: (context, matchedSnapshot) {
+            if (!openSnapshot.hasData || !matchedSnapshot.hasData) {
+              return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+            }
+            final openDocs = openSnapshot.data!.docs
+                .where((d) => d.data()['requester_uid'] != myUid && compatible.contains(d.data()['blood_group']))
+                .toList();
+            final matchedDocs = matchedSnapshot.data!.docs;
+
+            if (openDocs.isEmpty && matchedDocs.isEmpty) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: StateCard(
+                    icon: LucideIcons.inbox,
+                    iconBackground: AppColors.statusAvailableBg,
+                    iconColor: AppColors.statusAvailableText,
+                    title: 'No blood requests right now.',
+                    message: 'When someone nearby needs your blood group, their request will appear here.',
+                  ),
+                ),
+              );
+            }
+
+            return ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
               children: [
-                const SizedBox(height: 16),
-                _sectionLabel("You've accepted"),
-                const SizedBox(height: 10),
-                for (final doc in docs) ...[
-                  _requestCard(doc.id, doc.data(), primaryAction: _CardAction.viewContact),
-                  const SizedBox(height: 12),
+                if (openDocs.isNotEmpty) ...[
+                  _sectionLabel('Open requests you can fulfil'),
+                  const SizedBox(height: 10),
+                  for (final doc in openDocs) ...[
+                    _requestCard(doc.id, doc.data(), primaryAction: _CardAction.viewDetail),
+                    const SizedBox(height: 12),
+                  ],
+                ],
+                if (matchedDocs.isNotEmpty) ...[
+                  if (openDocs.isNotEmpty) const SizedBox(height: 6),
+                  _sectionLabel("You've accepted"),
+                  const SizedBox(height: 10),
+                  for (final doc in matchedDocs) ...[
+                    _requestCard(doc.id, doc.data(), primaryAction: _CardAction.viewContact),
+                    const SizedBox(height: 12),
+                  ],
                 ],
               ],
             );
           },
-        ),
-      ],
+        );
+      },
     );
   }
 
@@ -207,7 +213,25 @@ class _RequestsScreenState extends State<RequestsScreen> {
         }
         final docs = snapshot.data!.docs;
         if (docs.isEmpty) {
-          return Center(child: StateCard.empty(title: "You haven't sent any requests yet.", icon: LucideIcons.clipboardList));
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  StateCard.empty(title: "You haven't sent any requests yet.", icon: LucideIcons.clipboardList),
+                  const SizedBox(height: 4),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const CreateRequestScreen())),
+                      child: const Text('Create a blood request'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
         }
         return ListView.separated(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),

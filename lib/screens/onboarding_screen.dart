@@ -260,7 +260,11 @@ class _OnboardingPageView extends StatelessWidget {
         final px = constraints.maxWidth / _kFrameWidth;
         final py = constraints.maxHeight / _kContentHeight;
         Offset at(double designX, double designY) => Offset(designX * px, designY * py);
-        final ringCenter = at(_kRingCenterX, _kRingCenterY);
+        // Page 1 is the logo/brand hero with no headline below it competing
+        // for space, so it sits at the true centre of the available content
+        // area rather than the off-centre point the other pages use to
+        // leave room for their headline+body block.
+        final ringCenter = index == 0 ? at(_kFrameWidth / 2, _kContentHeight / 2) : at(_kRingCenterX, _kRingCenterY);
 
         return _parallax(
           child: Stack(
@@ -655,7 +659,9 @@ class _ConnectionStubsPainter extends CustomPainter {
       oldDelegate.center != center || oldDelegate.stubs != stubs;
 }
 
-/// Circular next action with a restrained press response (0.94 scale).
+/// Circular next action — a restrained press response (0.94 scale) plus a
+/// standard Material ripple, so it reads as a real tappable control rather
+/// than a static icon with no feedback.
 class _PressableCircle extends StatefulWidget {
   final VoidCallback onTap;
   final Color background;
@@ -672,25 +678,27 @@ class _PressableCircleState extends State<_PressableCircle> {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: (_) => setState(() => _down = true),
-      onTapUp: (_) => setState(() => _down = false),
-      onTapCancel: () => setState(() => _down = false),
-      onTap: widget.onTap,
-      child: AnimatedScale(
-        scale: _down ? 0.94 : 1,
-        duration: const Duration(milliseconds: 130),
-        curve: Curves.easeOutCubic,
-        child: Container(
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            color: widget.background,
-            shape: BoxShape.circle,
-            boxShadow: const [BoxShadow(color: AppColors.shadowButton, blurRadius: 18, offset: Offset(0, 8))],
+    return AnimatedScale(
+      scale: _down ? 0.94 : 1,
+      duration: const Duration(milliseconds: 130),
+      curve: Curves.easeOutCubic,
+      child: Container(
+        width: 56,
+        height: 56,
+        decoration: BoxDecoration(
+          color: widget.background,
+          shape: BoxShape.circle,
+          boxShadow: const [BoxShadow(color: AppColors.shadowButton, blurRadius: 18, offset: Offset(0, 8))],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          shape: const CircleBorder(),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: widget.onTap,
+            onHighlightChanged: (down) => setState(() => _down = down),
+            child: Center(child: widget.child),
           ),
-          alignment: Alignment.center,
-          child: widget.child,
         ),
       ),
     );

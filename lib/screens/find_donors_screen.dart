@@ -481,7 +481,7 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
                                 )
                               : ListView.separated(
                                   controller: scrollController,
-                                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                                  padding: EdgeInsets.fromLTRB(20, 8, 20, 8 + MediaQuery.of(context).padding.bottom),
                                   itemCount: donors.length,
                                   separatorBuilder: (context, index) => const SizedBox(height: 10),
                                   itemBuilder: (context, index) => _buildDonorCard(donors[index]),

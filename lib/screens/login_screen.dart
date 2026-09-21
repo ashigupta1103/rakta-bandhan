@@ -8,6 +8,16 @@ import 'otp_screen.dart';
 import 'preview_gallery_screen.dart';
 import 'preview_ui_screen.dart';
 
+/// Preview UI visibility. Defaults to the old behaviour — on for any
+/// non-release build (`flutter run`), compiled out of a plain
+/// `flutter build apk`/`--release` — but can be overridden independently of
+/// build mode: `flutter build apk --release --dart-define=ENABLE_PREVIEW_UI=true`
+/// produces a release-performance APK with Preview UI intentionally left in,
+/// for internal frontend inspection on a device, without touching
+/// FirebaseAuth or the real login flow. Never set for a production/Play
+/// Store build.
+const kEnablePreviewUi = bool.fromEnvironment('ENABLE_PREVIEW_UI', defaultValue: !kReleaseMode);
+
 class _Country {
   final String name;
   final String short;
@@ -166,15 +176,12 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Frontend-only entry point for internal testing — gated out
-              // of release builds entirely (kReleaseMode is a compile-time
-              // constant, so this branch and everything it references is
-              // dead-code-eliminated from `flutter build --release`; real
-              // users never see it). Still fully reachable in debug/profile
-              // builds (`flutter run`) regardless of whether real
-              // registration is working. See preview_gallery_screen.dart's
-              // own header comment for the "why" of this whole mechanism.
-              if (!kReleaseMode) ...[
+              // Frontend-only entry point for internal testing — gated by
+              // kEnablePreviewUi (see definition above), off in any normal
+              // release build so real users never see it. See
+              // preview_gallery_screen.dart's own header comment for the
+              // "why" of this whole mechanism.
+              if (kEnablePreviewUi) ...[
                 const SizedBox(height: 16),
                 GestureDetector(
                   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const PreviewGalleryScreen())),
@@ -206,7 +213,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 4),
                 const Center(
-                  child: Text('DEV BUILD ONLY — hidden in production', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, letterSpacing: 0.4, color: AppColors.disabledTint)),
+                  child: Text('PREVIEW MODE — hidden in normal production builds', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, letterSpacing: 0.4, color: AppColors.disabledTint)),
                 ),
               ],
               const SizedBox(height: 20),
@@ -232,13 +239,16 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 40),
 
-              // Country Code & Phone Input — single pill, flag + code +
-              // divider + plain field (matches the reference design).
+              // Country Code & Phone Input — flag + code + divider + plain
+              // field. Radius matches the system's 12px control per the
+              // design doc's own note on this screen: "The current 30px
+              // pill becomes the system's 12px control, so Login stops
+              // being the one screen with its own radius."
               Container(
                 decoration: BoxDecoration(
                   color: Colors.white,
                   border: Border.all(color: AppColors.cardBorderWarm, width: 1),
-                  borderRadius: BorderRadius.circular(30),
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
                 child: Row(
@@ -337,7 +347,44 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
 
-              const SizedBox(height: 24),
+              const SizedBox(height: 22),
+
+              // OTP-only reassurance — per the approved design doc
+              // (design_updated/Rakta Bandhan Redesign.dc.html, Login
+              // frame): "The unavailable illustration is not replaced; the
+              // space it occupied becomes the OTP-only reassurance, which
+              // is more useful anyway." Replaces the hands-and-heart image
+              // that used to sit below the consent text and add a full
+              // extra screen of scrolling for no functional reason.
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                decoration: BoxDecoration(
+                  color: AppColors.goldTint,
+                  border: Border.all(color: AppColors.warmBorder),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(LucideIcons.shieldCheck, size: 16, color: AppColors.goldDeep),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text.rich(
+                        TextSpan(
+                          style: TextStyle(fontSize: 12.5, color: AppColors.goldDeepest, height: 1.5),
+                          children: [
+                            TextSpan(text: 'We verify donors by '),
+                            TextSpan(text: 'one-time code only', style: TextStyle(fontWeight: FontWeight.w700)),
+                            TextSpan(text: '. No documents, no ID upload — ever.'),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 20),
 
               // Consent Text
               const Text(
@@ -346,14 +393,11 @@ class _LoginScreenState extends State<LoginScreen> {
                 style: TextStyle(fontSize: 12, color: AppColors.textMutedWarm),
               ),
 
-              const SizedBox(height: 32),
-              Image.asset('assets/illustrations/hands_heart.png', fit: BoxFit.contain),
-
               // Secondary, lighter preview entry (4 tabs only) — same
-              // release-mode gate as the primary banner above. Remove this
-              // block (and preview_ui_screen.dart) once the preview is no
-              // longer needed.
-              if (!kReleaseMode) ...[
+              // kEnablePreviewUi gate as the primary banner above. Remove
+              // this block (and preview_ui_screen.dart) once the preview is
+              // no longer needed.
+              if (kEnablePreviewUi) ...[
                 const SizedBox(height: 20),
                 Center(
                   child: TextButton(

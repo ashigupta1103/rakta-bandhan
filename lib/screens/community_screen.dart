@@ -97,7 +97,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
     return GestureDetector(
       onTap: () => setState(() => _tab = tab),
       child: Container(
-        padding: const EdgeInsets.only(bottom: 9),
+        padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(border: Border(bottom: BorderSide(color: isActive ? AppColors.brandRed : Colors.transparent, width: 2))),
         child: Text(label, style: TextStyle(fontSize: 14.5, fontWeight: isActive ? FontWeight.w600 : FontWeight.w400, color: isActive ? AppColors.ink : AppColors.ink2)),
       ),
@@ -215,14 +215,11 @@ class _CommunityScreenState extends State<CommunityScreen> {
             future: _impactFuture,
             builder: (context, snapshot) {
               if (snapshot.hasError) {
-                return SizedBox(
-                  height: 160,
-                  child: Center(
-                    child: StateCard.error(
-                      title: "Couldn't load this month's impact",
-                      message: 'Check your connection and try again.',
-                      onRetry: () => setState(() => _impactFuture = _donationsThisMonth()),
-                    ),
+                return Center(
+                  child: StateCard.error(
+                    title: "Couldn't load this month's impact",
+                    message: 'Check your connection and try again.',
+                    onRetry: () => setState(() => _impactFuture = _donationsThisMonth()),
                   ),
                 );
               }
