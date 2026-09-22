@@ -7,11 +7,11 @@ import '../theme/app_text_styles.dart';
 import '../widgets/app_header.dart';
 import '../widgets/blood_group_droplet.dart';
 import '../widgets/impact_trail.dart';
+import '../widgets/logout_flow.dart';
 import '../widgets/pulsing_dot.dart';
 import 'cooldown_screen.dart';
 import 'donation_history_screen.dart';
 import 'emergency_contact_screen.dart';
-import 'login_screen.dart';
 import 'notifications_screen.dart';
 import 'personal_information_screen.dart';
 import 'settings_screen.dart';
@@ -40,15 +40,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
-  Future<void> _logOut() async {
-    await Backend.instance.signOut();
-    if (!mounted) return;
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (context) => const LoginScreen()),
-      (route) => false,
-    );
-  }
+  bool _loggingOut = false;
+
+  Future<void> _logOut() => confirmAndLogOut(
+        context,
+        isLoading: _loggingOut,
+        setLoading: (v) => setState(() => _loggingOut = v),
+      );
 
   String _initials(String name) {
     final trimmed = name.trim();
@@ -265,14 +263,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ),
                       GestureDetector(
-                        onTap: _logOut,
+                        onTap: _loggingOut ? null : _logOut,
                         child: Padding(
                           padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 4),
                           child: Row(
                             children: [
-                              const Icon(LucideIcons.logOut, color: AppColors.textMuted, size: 17),
+                              if (_loggingOut)
+                                const SizedBox(width: 17, height: 17, child: CircularProgressIndicator(strokeWidth: 2))
+                              else
+                                const Icon(LucideIcons.logOut, color: AppColors.textMuted, size: 17),
                               const SizedBox(width: 10),
-                              Text('Log out', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.textMuted)),
+                              Text(_loggingOut ? 'Logging out…' : 'Log out', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.textMuted)),
                             ],
                           ),
                         ),

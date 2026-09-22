@@ -3,11 +3,13 @@ import 'dart:async';
 import 'package:firebase_core/firebase_core.dart' show FirebaseException;
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+
 import '../services/backend.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/blood_group_droplet.dart';
 import 'consent_screen.dart';
+import 'login_screen.dart';
 
 class RegistrationScreen extends StatefulWidget {
   final String phoneNumber;
@@ -38,8 +40,14 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   Timer? _addressDebounce;
 
   final List<String> _bloodGroups = [
-    'A+', 'A-', 'B+', 'B-',
-    'O+', 'O-', 'AB+', 'AB-'
+    'A+',
+    'A-',
+    'B+',
+    'B-',
+    'O+',
+    'O-',
+    'AB+',
+    'AB-',
   ];
 
   @override
@@ -56,7 +64,10 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     if (!silent) setState(() => _locatingCurrent = true);
     try {
       final position = await Backend.instance.currentPosition();
-      final label = await Backend.instance.reverseGeocode(position.latitude, position.longitude);
+      final label = await Backend.instance.reverseGeocode(
+        position.latitude,
+        position.longitude,
+      );
       if (!mounted) return;
       setState(() {
         _selectedLat = position.latitude;
@@ -114,7 +125,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     setState(() {
       _nameError = name.isEmpty ? 'Name is required' : null;
       _whatsappError = whatsapp.isEmpty ? 'WhatsApp number is required' : null;
-      _bloodGroupError = _selectedBloodGroup == null ? 'Please select a blood group' : null;
+      _bloodGroupError = _selectedBloodGroup == null
+          ? 'Please select a blood group'
+          : null;
     });
 
     if (name.isEmpty || whatsapp.isEmpty || _selectedBloodGroup == null) return;
@@ -148,7 +161,11 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       if (!mounted) return;
       setState(() => _isSubmitting = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Registration failed. ${_diagnosticSuffix(e)}Please try again.')),
+        SnackBar(
+          content: Text(
+            'Registration failed. ${_diagnosticSuffix(e)}Please try again.',
+          ),
+        ),
       );
     }
   }
@@ -165,229 +182,306 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     return '(${e.runtimeType}) ';
   }
 
+  // This screen is always reached via Navigator.pushAndRemoveUntil right
+  // after OTP verification (see otp_screen.dart) — it is the new stack
+  // root with nothing beneath it, not a normal pushed route. A plain
+  // Navigator.pop() here empties the Navigator and leaves a black screen.
+  // Splash already sends an authenticated-but-incomplete-profile user to
+  // LoginScreen (see splash_screen.dart's _resolveDestination), so backing
+  // out here does the same thing directly instead of popping into nothing.
+  bool _backHandled = false;
+  void _handleBack() {
+    if (_backHandled) return;
+    if (Navigator.canPop(context)) {
+      Navigator.pop(context);
+      return;
+    }
+    _backHandled = true;
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => const LoginScreen()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.warmPageBackground,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(
-            LucideIcons.arrowLeft,
-            color: AppColors.textPrimaryWarm,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) {
+          return;
+        }
+        _handleBack();
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.warmPageBackground,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(
+              LucideIcons.arrowLeft,
+              color: AppColors.textPrimaryWarm,
+            ),
+            onPressed: _handleBack,
           ),
-          onPressed: () => Navigator.pop(context),
         ),
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Header
-              Text(
-                'Complete registration',
-                textAlign: TextAlign.center,
-                style: AppTextStyles.display(fontSize: 22, color: AppColors.textPrimaryWarm),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Provide details to complete your profile.',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-              ),
-              const SizedBox(height: 32),
-
-              // Name Field
-              const Text(
-                'Full name',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _nameController,
-                style: Theme.of(context).textTheme.bodyLarge,
-                onChanged: (_) {
-                  if (_nameError != null) setState(() => _nameError = null);
-                },
-                decoration: const InputDecoration(
-                  hintText: 'Enter your name',
-                ),
-              ),
-              if (_nameError != null) ...[
-                const SizedBox(height: 6),
+        body: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 20.0,
+              vertical: 8.0,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Header
                 Text(
-                  _nameError!,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.primary,
-                      ),
-                ),
-              ],
-              const SizedBox(height: 24),
-
-              // WhatsApp Field
-              const Text(
-                'WhatsApp number',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _whatsappController,
-                keyboardType: TextInputType.phone,
-                style: Theme.of(context).textTheme.bodyLarge,
-                onChanged: (_) {
-                  if (_whatsappError != null) setState(() => _whatsappError = null);
-                },
-                decoration: const InputDecoration(
-                  hintText: 'Enter WhatsApp number',
-                ),
-              ),
-              if (_whatsappError != null) ...[
-                const SizedBox(height: 6),
-                Text(
-                  _whatsappError!,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.primary,
-                      ),
-                ),
-              ],
-              const SizedBox(height: 24),
-
-              // Location Field
-              const Text(
-                'Location',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _locationController,
-                style: Theme.of(context).textTheme.bodyLarge,
-                onChanged: _onLocationChanged,
-                decoration: InputDecoration(
-                  hintText: 'Search city or area',
-                  suffixIcon: (_searchingAddress || _locatingCurrent)
-                      ? const Padding(
-                          padding: EdgeInsets.all(14),
-                          child: SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
-                        )
-                      : const Icon(LucideIcons.mapPin),
-                ),
-              ),
-              if (_addressSuggestions.isNotEmpty)
-                Container(
-                  margin: const EdgeInsets.only(top: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    border: Border.all(color: AppColors.cardBorderWarm),
-                    borderRadius: BorderRadius.circular(14),
+                  'Complete registration',
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.display(
+                    fontSize: 22,
+                    color: AppColors.textPrimaryWarm,
                   ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      for (final suggestion in _addressSuggestions)
-                        ListTile(
-                          dense: true,
-                          leading: const Icon(LucideIcons.mapPin, size: 16, color: AppColors.textSecondary),
-                          title: Text(
-                            suggestion['label'] as String,
-                            style: Theme.of(context).textTheme.bodySmall,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          onTap: () => _pickAddress(suggestion),
-                        ),
-                    ],
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Provide details to complete your profile.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
                   ),
-                )
-              else
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: GestureDetector(
-                    onTap: _locatingCurrent ? null : () => _useCurrentLocation(),
-                    child: Row(
+                ),
+                const SizedBox(height: 32),
+
+                // Name Field
+                const Text(
+                  'Full name',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimaryWarm,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _nameController,
+                  style: Theme.of(context).textTheme.bodyLarge,
+                  onChanged: (_) {
+                    if (_nameError != null) setState(() => _nameError = null);
+                  },
+                  decoration: const InputDecoration(
+                    hintText: 'Enter your name',
+                  ),
+                ),
+                if (_nameError != null) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    _nameError!,
+                    style: Theme.of(context).textTheme.bodySmall
+                        ?.copyWith(color: AppColors.primary),
+                  ),
+                ],
+                const SizedBox(height: 24),
+
+                // WhatsApp Field
+                const Text(
+                  'WhatsApp number',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimaryWarm,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _whatsappController,
+                  keyboardType: TextInputType.phone,
+                  style: Theme.of(context).textTheme.bodyLarge,
+                  onChanged: (_) {
+                    if (_whatsappError != null) {
+                      setState(() => _whatsappError = null);
+                    }
+                  },
+                  decoration: const InputDecoration(
+                    hintText: 'Enter WhatsApp number',
+                  ),
+                ),
+                if (_whatsappError != null) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    _whatsappError!,
+                    style: Theme.of(context).textTheme.bodySmall
+                        ?.copyWith(color: AppColors.primary),
+                  ),
+                ],
+                const SizedBox(height: 24),
+
+                // Location Field
+                const Text(
+                  'Location',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimaryWarm,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _locationController,
+                  style: Theme.of(context).textTheme.bodyLarge,
+                  onChanged: _onLocationChanged,
+                  decoration: InputDecoration(
+                    hintText: 'Search city or area',
+                    suffixIcon: (_searchingAddress || _locatingCurrent)
+                        ? const Padding(
+                            padding: EdgeInsets.all(14),
+                            child: SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          )
+                        : const Icon(LucideIcons.mapPin),
+                  ),
+                ),
+                if (_addressSuggestions.isNotEmpty)
+                  Container(
+                    margin: const EdgeInsets.only(top: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border.all(color: AppColors.cardBorderWarm),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(LucideIcons.mapPin, size: 13, color: AppColors.primary),
-                        const SizedBox(width: 6),
-                        Text(
-                          _selectedLat != null ? 'Location pinned · use current location again' : 'Use current location',
-                          style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.primary),
-                        ),
+                        for (final suggestion in _addressSuggestions)
+                          ListTile(
+                            dense: true,
+                            leading: const Icon(
+                              LucideIcons.mapPin,
+                              size: 16,
+                              color: AppColors.textSecondary,
+                            ),
+                            title: Text(
+                              suggestion['label'] as String,
+                              style: Theme.of(context).textTheme.bodySmall,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            onTap: () => _pickAddress(suggestion),
+                          ),
                       ],
                     ),
-                  ),
-                ),
-              const SizedBox(height: 24),
-
-              // Blood Group Grid
-              const Text(
-                'Blood group',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm),
-              ),
-              const SizedBox(height: 8),
-              
-              // Blood group grid — droplet token, matching Create Request.
-              GridView.count(
-                crossAxisCount: 4,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                mainAxisSpacing: 8,
-                crossAxisSpacing: 8,
-                childAspectRatio: 0.82,
-                children: [
-                  for (final group in _bloodGroups)
-                    GestureDetector(
-                      onTap: () => setState(() {
-                        _selectedBloodGroup = group;
-                        _bloodGroupError = null;
-                      }),
-                      child: Center(
-                        child: BloodGroupDroplet(
-                          label: group,
-                          size: 40,
-                          filled: true,
-                          color: _selectedBloodGroup == group ? AppColors.primary : AppColors.dividerWarm,
-                          textColor: _selectedBloodGroup == group ? const Color(0xFFFBE6E8) : AppColors.textSecondary,
-                          fontSize: 12,
-                          serif: _selectedBloodGroup == group,
-                        ),
+                  )
+                else
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: GestureDetector(
+                      onTap: _locatingCurrent
+                          ? null
+                          : () => _useCurrentLocation(),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            LucideIcons.mapPin,
+                            size: 13,
+                            color: AppColors.primary,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            _selectedLat != null
+                                ? 'Location pinned · use current location again'
+                                : 'Use current location',
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                ],
-              ),
-              if (_bloodGroupError != null) ...[
-                const SizedBox(height: 8),
-                Text(
-                  _bloodGroupError!,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.primary,
-                      ),
-                ),
-              ],
-              const SizedBox(height: 40),
+                  ),
+                const SizedBox(height: 24),
 
-              // Complete Button
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _isSubmitting ? null : _handleRegister,
-                  child: _isSubmitting
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.whiteTextOnPrimary),
-                        )
-                      : const Text('Complete registration'),
+                // Blood Group Grid
+                const Text(
+                  'Blood group',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimaryWarm,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 20),
-            ],
+                const SizedBox(height: 8),
+
+                // Blood group grid — droplet token, matching Create Request.
+                GridView.count(
+                  crossAxisCount: 4,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  mainAxisSpacing: 8,
+                  crossAxisSpacing: 8,
+                  childAspectRatio: 0.82,
+                  children: [
+                    for (final group in _bloodGroups)
+                      GestureDetector(
+                        onTap: () => setState(() {
+                          _selectedBloodGroup = group;
+                          _bloodGroupError = null;
+                        }),
+                        child: Center(
+                          child: BloodGroupDroplet(
+                            label: group,
+                            size: 40,
+                            filled: true,
+                            color: _selectedBloodGroup == group
+                                ? AppColors.primary
+                                : AppColors.dividerWarm,
+                            textColor: _selectedBloodGroup == group
+                                ? const Color(0xFFFBE6E8)
+                                : AppColors.textSecondary,
+                            fontSize: 12,
+                            serif: _selectedBloodGroup == group,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                if (_bloodGroupError != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    _bloodGroupError!,
+                    style: Theme.of(context).textTheme.bodySmall
+                        ?.copyWith(color: AppColors.primary),
+                  ),
+                ],
+                const SizedBox(height: 40),
+
+                // Complete Button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _isSubmitting ? null : _handleRegister,
+                    child: _isSubmitting
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppColors.whiteTextOnPrimary,
+                            ),
+                          )
+                        : const Text('Complete registration'),
+                  ),
+                ),
+                const SizedBox(height: 20),
+              ],
+            ),
           ),
         ),
       ),

@@ -121,8 +121,8 @@ class PreviewGalleryScreen extends StatelessWidget {
                     _entry('Testimonials', () => const TestimonialsScreen()),
                     _entry('Corporate partnerships', () => const CorporatePartnershipsScreen()),
                     _entry('Help & support', () => const HelpSupportScreen()),
-                    _entry('Privacy policy', () => const LegalReaderScreen(title: 'Privacy policy', sections: kPrivacyPolicySections)),
-                    _entry('Terms of use', () => const LegalReaderScreen(title: 'Terms of use', sections: kTermsOfUseSections)),
+                    _entry('Privacy policy', () => const LegalReaderScreen(title: 'Privacy policy')),
+                    _entry('Terms of use', () => const LegalReaderScreen(title: 'Terms of use')),
                   ]),
 
                   _category(context, 'Not included', [

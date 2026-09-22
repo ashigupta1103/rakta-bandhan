@@ -9,6 +9,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../services/backend.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
+import '../theme/app_theme.dart';
 import '../widgets/blood_group_droplet.dart';
 import '../widgets/filter_chip_row.dart';
 import '../widgets/state_card.dart';
@@ -520,28 +521,34 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
+        borderRadius: BorderRadius.circular(AppTheme.controlRadius),
         border: Border.all(color: AppColors.cardBorderWarm),
         boxShadow: [BoxShadow(color: AppColors.shadowCard, blurRadius: 12, offset: const Offset(0, 4))],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          TextField(
-            controller: _searchController,
-            onChanged: _onSearchChanged,
-            decoration: InputDecoration(
-              hintText: 'Search location',
-              prefixIcon: const Icon(LucideIcons.search, color: AppColors.textSecondary),
-              suffixIcon: _searching
-                  ? const Padding(padding: EdgeInsets.all(14), child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)))
-                  : (_searchedLabel != null
-                      ? IconButton(icon: const Icon(LucideIcons.x, size: 18, color: AppColors.textSecondary), onPressed: _clearSearch)
-                      : null),
-              border: InputBorder.none,
-              enabledBorder: InputBorder.none,
-              focusedBorder: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(vertical: 12),
+          SizedBox(
+            height: 48,
+            child: TextField(
+              controller: _searchController,
+              onChanged: _onSearchChanged,
+              style: const TextStyle(fontSize: 14),
+              decoration: InputDecoration(
+                hintText: 'Search location',
+                prefixIcon: const Icon(LucideIcons.search, size: 19, color: AppColors.textSecondary),
+                suffixIcon: _searching
+                    ? const Padding(padding: EdgeInsets.all(14), child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)))
+                    : (_searchedLabel != null
+                        ? IconButton(icon: const Icon(LucideIcons.x, size: 18, color: AppColors.textSecondary), onPressed: _clearSearch)
+                        : null),
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                filled: false,
+                isCollapsed: true,
+                contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+              ),
             ),
           ),
           if (_suggestions.isNotEmpty) ...[

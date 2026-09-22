@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../preview_mode.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 
@@ -21,11 +22,15 @@ class AboutScreen extends StatelessWidget {
           children: [
             SizedBox(
               height: 48,
-              child: Row(
-                children: [
-                  IconButton(icon: const Icon(LucideIcons.arrowLeft, color: AppColors.textPrimaryWarm), onPressed: () => Navigator.pop(context)),
-                  const Text('About', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
-                ],
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Row(
+                  children: [
+                    IconButton(icon: const Icon(LucideIcons.arrowLeft, color: AppColors.textPrimaryWarm), onPressed: () => Navigator.pop(context)),
+                    const SizedBox(width: 4),
+                    const Text('About', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
+                  ],
+                ),
               ),
             ),
             Expanded(
@@ -65,12 +70,47 @@ class AboutScreen extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('OUR MISSION', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 1.2, color: AppColors.ink2)),
-                          const SizedBox(height: 10),
-                          Text(
-                            'Placeholder — the mission statement is to be supplied by the Rakta Bandhan team. It is deliberately not written here.',
-                            style: AppTextStyles.display(fontSize: 17, color: AppColors.ink, height: 1.6),
-                          ),
+                          if (kEnablePreviewUi) ...[
+                            Row(
+                              children: [
+                                const Icon(LucideIcons.eye, size: 13, color: AppColors.goldDeep),
+                                const SizedBox(width: 6),
+                                const Text('PREVIEW DATA — SAMPLE COPY, NOT APPROVED', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: AppColors.goldDeep)),
+                              ],
+                            ),
+                            const SizedBox(height: 14),
+                            _textBlock(
+                              label: 'OUR MISSION',
+                              body: 'To make it faster and simpler for someone who urgently needs blood to reach a willing, compatible donor nearby — replacing word-of-mouth and cold calls with one request that reaches the right people.',
+                            ),
+                            const SizedBox(height: 20),
+                            _textBlock(
+                              label: 'OUR VISION',
+                              body: 'A community where no one waits helplessly for blood because a compatible donor was simply out of reach — every donor and every request connected within minutes, not days.',
+                            ),
+                            const SizedBox(height: 20),
+                            _textBlock(
+                              label: 'HOW RAKTA BANDHAN HELPS',
+                              body: 'Donors register once with their blood group and general location. When someone raises a request, the app finds compatible, available donors nearby and lets them accept directly — no public posting of anyone’s phone number or address.',
+                            ),
+                          ] else
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(color: Colors.white, border: Border.all(color: AppColors.warmBorder), borderRadius: BorderRadius.circular(12)),
+                              child: const Row(
+                                children: [
+                                  Icon(LucideIcons.clock, size: 16, color: AppColors.ink2),
+                                  SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      'Mission, vision and programme details will appear here once approved by the Rakta Bandhan / Rotary Club team.',
+                                      style: TextStyle(fontSize: 13, color: AppColors.ink2, height: 1.5),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           const SizedBox(height: 20),
                           Row(
                             children: [
@@ -84,7 +124,17 @@ class AboutScreen extends StatelessWidget {
                           const SizedBox(height: 8),
                           const Text('Figures read from existing records once confirmed — none invented', textAlign: TextAlign.center, style: TextStyle(fontSize: 11, color: AppColors.disabledTint)),
                           const SizedBox(height: 24),
-                          const Text('THE TEAM', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 1.2, color: AppColors.ink2)),
+                          Row(
+                            children: [
+                              const Text('THE TEAM', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 1.2, color: AppColors.ink2)),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                decoration: BoxDecoration(color: AppColors.sand, borderRadius: BorderRadius.circular(999)),
+                                child: const Text('INFO PENDING', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: AppColors.ink2)),
+                              ),
+                            ],
+                          ),
                           const SizedBox(height: 10),
                           Container(
                             decoration: BoxDecoration(color: Colors.white, border: Border.all(color: AppColors.warmBorder), borderRadius: BorderRadius.circular(12)),
@@ -96,15 +146,8 @@ class AboutScreen extends StatelessWidget {
                               ],
                             ),
                           ),
-                          const SizedBox(height: 14),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-                            decoration: BoxDecoration(color: AppColors.goldTint, border: const Border(left: BorderSide(color: AppColors.gold, width: 3)), borderRadius: const BorderRadius.horizontal(right: Radius.circular(12))),
-                            child: const Text(
-                              'No biography, title or credential has been written for anyone. Photographs use the empty-frame treatment until real ones are supplied.',
-                              style: TextStyle(fontSize: 12.5, color: AppColors.goldDeepest, height: 1.5),
-                            ),
-                          ),
+                          const SizedBox(height: 8),
+                          const Text('Role, biography and photograph pending confirmation from the team.', style: TextStyle(fontSize: 11.5, color: AppColors.disabledTint)),
                         ],
                       ),
                     ),
@@ -115,6 +158,17 @@ class AboutScreen extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _textBlock({required String label, required String body}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 1.2, color: AppColors.ink2)),
+        const SizedBox(height: 10),
+        Text(body, style: AppTextStyles.display(fontSize: 16, color: AppColors.ink, height: 1.6)),
+      ],
     );
   }
 

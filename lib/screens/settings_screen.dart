@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../services/backend.dart';
 import '../theme/app_colors.dart';
-import 'admin_login_screen.dart';
-import 'login_screen.dart';
+import '../widgets/logout_flow.dart';
 
 /// Settings & privacy — the final artifact's "persisted, grouped, one
 /// destructive treatment" section. The exact-address toggle previously
@@ -31,6 +29,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   bool _loaded = false;
   bool _showExactAddress = false;
+  bool _loggingOut = false;
 
   @override
   void initState() {
@@ -57,15 +56,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$label — coming soon.')));
   }
 
-  Future<void> _logOutEverywhere() async {
-    await Backend.instance.signOut();
-    if (!mounted) return;
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (context) => const LoginScreen()),
-      (route) => false,
-    );
-  }
+  Future<void> _confirmLogOut() => confirmAndLogOut(
+        context,
+        isLoading: _loggingOut,
+        setLoading: (v) => setState(() => _loggingOut = v),
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -112,9 +107,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           _sectionLabel('Your data'),
                           _card([
                             _actionRow('Download my data', onTap: () => _comingSoon('Data export')),
-                            _actionRow('Log out', onTap: _logOutEverywhere, isLast: true),
+                            _actionRow('Log out', onTap: _confirmLogOut, isLast: true, trailing: _loggingOut ? _smallSpinner() : null),
                           ]),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 24),
                           const Text('DANGER ZONE', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 1.2, color: AppColors.ink2)),
                           const SizedBox(height: 10),
                           InkWell(
@@ -131,11 +126,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               ),
                             ),
                           ),
-                          const SizedBox(height: 24),
-                          _sectionLabel('Admin'),
-                          _card([
-                            _actionRow('Admin console', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const AdminLoginScreen())), isLast: true),
-                          ]),
                         ],
                       ),
                     ),
@@ -181,19 +171,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _actionRow(String label, {required VoidCallback onTap, bool isLast = false}) {
+  Widget _actionRow(String label, {required VoidCallback onTap, bool isLast = false, Widget? trailing}) {
     return InkWell(
-      onTap: onTap,
+      onTap: trailing != null ? null : onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         decoration: BoxDecoration(border: isLast ? null : const Border(bottom: BorderSide(color: AppColors.warmDivider))),
         child: Row(
           children: [
             Expanded(child: Text(label, style: const TextStyle(fontSize: 14.5, color: AppColors.textPrimaryWarm))),
-            const Icon(LucideIcons.chevronRight, size: 16, color: AppColors.chevronMuted),
+            trailing ?? const Icon(LucideIcons.chevronRight, size: 16, color: AppColors.chevronMuted),
           ],
         ),
       ),
     );
   }
+
+  Widget _smallSpinner() => const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2));
 }

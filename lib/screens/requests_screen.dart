@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../services/backend.dart';
 import '../theme/app_colors.dart';
+import '../theme/app_text_styles.dart';
 import '../widgets/blood_group_droplet.dart';
+import '../widgets/dashed_border.dart';
 import '../widgets/state_card.dart';
 import '../widgets/status_badge.dart';
 import 'cancel_confirm_screen.dart';
@@ -20,7 +22,7 @@ class RequestsScreen extends StatefulWidget {
 }
 
 class _RequestsScreenState extends State<RequestsScreen> {
-  String _activeTab = 'Received';
+  String _activeTab = 'My requests';
   String? _myBloodGroup;
 
   @override
@@ -87,10 +89,7 @@ class _RequestsScreenState extends State<RequestsScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(LucideIcons.arrowLeft, color: AppColors.textPrimaryWarm),
-          onPressed: () => Navigator.pop(context),
-        ),
+        automaticallyImplyLeading: false,
         title: const Text('Blood requests', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500, color: AppColors.textPrimaryWarm)),
         centerTitle: true,
       ),
@@ -104,10 +103,14 @@ class _RequestsScreenState extends State<RequestsScreen> {
               decoration: BoxDecoration(color: AppColors.tabTrackBackground, borderRadius: BorderRadius.circular(24)),
               child: Row(
                 children: [
-                  Expanded(child: _tabButton('Received')),
                   Expanded(child: _tabButton('My requests')),
+                  Expanded(child: _tabButton('Received')),
                 ],
               ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+              child: _createRequestCta(),
             ),
             Expanded(child: _activeTab == 'Received' ? _receivedList() : _myRequestsList()),
           ],
@@ -216,20 +219,7 @@ class _RequestsScreenState extends State<RequestsScreen> {
           return Center(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  StateCard.empty(title: "You haven't sent any requests yet.", icon: LucideIcons.clipboardList),
-                  const SizedBox(height: 4),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const CreateRequestScreen())),
-                      child: const Text('Create a blood request'),
-                    ),
-                  ),
-                ],
-              ),
+              child: StateCard.empty(title: "You haven't sent any requests yet.", icon: LucideIcons.clipboardList),
             ),
           );
         }
@@ -240,6 +230,46 @@ class _RequestsScreenState extends State<RequestsScreen> {
           itemBuilder: (context, index) => _requestCard(docs[index].id, docs[index].data(), primaryAction: _CardAction.track),
         );
       },
+    );
+  }
+
+  Widget _createRequestCta() {
+    return GestureDetector(
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const CreateRequestScreen())),
+      child: CustomPaint(
+        painter: const DashedRRectPainter(color: AppColors.cardBorderWarm, radius: 20),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+          child: Row(
+            children: [
+              Transform.rotate(
+                angle: -0.785398,
+                child: Container(
+                  width: 42,
+                  height: 42,
+                  decoration: const BoxDecoration(
+                    color: AppColors.red100,
+                    borderRadius: BorderRadius.only(topLeft: Radius.circular(21), topRight: Radius.circular(21), bottomRight: Radius.circular(21)),
+                  ),
+                  alignment: Alignment.center,
+                  child: Transform.rotate(angle: 0.785398, child: const Icon(LucideIcons.plus, size: 18, color: AppColors.brandRed)),
+                ),
+              ),
+              const SizedBox(width: 13),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Need blood yourself?', style: AppTextStyles.display(fontSize: 17, color: AppColors.textPrimaryWarm)),
+                    const SizedBox(height: 2),
+                    const Text('Alert nearby compatible donors in under a minute', style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 

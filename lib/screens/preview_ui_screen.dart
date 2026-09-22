@@ -366,7 +366,7 @@ class _PreviewCommunityTabState extends State<_PreviewCommunityTab> {
           onTap: () => onAction('Share an experience'),
           child: Row(
             children: [
-              Container(width: 38, height: 38, decoration: const BoxDecoration(color: AppColors.goldTint, shape: BoxShape.circle), alignment: Alignment.center, child: const Icon(LucideIcons.sparkles, size: 16, color: AppColors.goldDeep)),
+              Container(width: 38, height: 38, decoration: const BoxDecoration(color: AppColors.goldTint, shape: BoxShape.circle), alignment: Alignment.center, child: const Icon(LucideIcons.penLine, size: 16, color: AppColors.goldDeep)),
               const SizedBox(width: 11),
               Expanded(
                 child: Container(

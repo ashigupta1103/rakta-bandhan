@@ -31,8 +31,15 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
     this.stateStrip,
   });
 
+  // 20px vertical padding (10+10) plus a bare IconButton's Material default
+  // minimum tap target (48px) needs 68px before the 1px divider even fits --
+  // 56 clips it. Caught by a widget test, not eyeballed: a bare
+  // MaterialApp(theme: AppTheme.lightTheme) render of this header overflows
+  // its own preferredSize by ~13px on every screen that uses it (Community,
+  // Profile), because nothing in AppTheme shrinks IconButton's default
+  // minimum size.
   @override
-  Size get preferredSize => Size.fromHeight(stateStrip == null ? 56 : 92);
+  Size get preferredSize => Size.fromHeight(stateStrip == null ? 72 : 108);
 
   @override
   Widget build(BuildContext context) {
@@ -164,15 +171,15 @@ void showMoreSheet(BuildContext context) {
                 ),
               ),
               _moreGroup(sheetContext, [
-                (LucideIcons.sparkles, AppColors.goldTint, AppColors.goldDeep, 'About Rakta Bandhan', (ctx) => const AboutScreen()),
+                (LucideIcons.handHeart, AppColors.goldTint, AppColors.goldDeep, 'About Rakta Bandhan', (ctx) => const AboutScreen()),
                 (LucideIcons.quote, AppColors.red100, AppColors.brandRed, 'Testimonials', (ctx) => const TestimonialsScreen()),
                 (LucideIcons.building2, AppColors.orangeTint, AppColors.orangeDeep, 'Corporate partnerships', (ctx) => const CorporatePartnershipsScreen()),
               ]),
               const SizedBox(height: 10),
               _moreGroup(sheetContext, [
                 (LucideIcons.circleHelp, AppColors.warmBorder, AppColors.ink2, 'Help & support', (ctx) => const HelpSupportScreen()),
-                (LucideIcons.shield, AppColors.warmBorder, AppColors.ink2, 'Privacy policy', (ctx) => const LegalReaderScreen(title: 'Privacy policy', sections: kPrivacyPolicySections)),
-                (LucideIcons.fileText, AppColors.warmBorder, AppColors.ink2, 'Terms of use', (ctx) => const LegalReaderScreen(title: 'Terms of use', sections: kTermsOfUseSections)),
+                (LucideIcons.shield, AppColors.warmBorder, AppColors.ink2, 'Privacy policy', (ctx) => const LegalReaderScreen(title: 'Privacy policy')),
+                (LucideIcons.fileText, AppColors.warmBorder, AppColors.ink2, 'Terms of use', (ctx) => const LegalReaderScreen(title: 'Terms of use')),
               ]),
               const SizedBox(height: 16),
               const Text('Rakta Bandhan · version placeholder', textAlign: TextAlign.center, style: TextStyle(fontSize: 11.5, color: AppColors.disabledTint)),
@@ -200,7 +207,11 @@ Widget _moreGroup(BuildContext context, List<(IconData, Color, Color, String, Wi
           for (var i = 0; i < rows.length; i++)
             InkWell(
               onTap: () {
-                Navigator.pop(context);
+                // Deliberately not popping the sheet first: pushing the
+                // destination on top of the still-open modal route means
+                // back from the destination lands on the options menu
+                // (not straight past it to the tab root) — the sheet's own
+                // back/scrim dismissal still closes it from there.
                 Navigator.push(context, MaterialPageRoute(builder: rows[i].$5));
               },
               child: Container(

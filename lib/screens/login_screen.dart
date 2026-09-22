@@ -1,22 +1,12 @@
 import 'package:country_flags/country_flags.dart';
-import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../preview_mode.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import 'otp_screen.dart';
 import 'preview_gallery_screen.dart';
 import 'preview_ui_screen.dart';
-
-/// Preview UI visibility. Defaults to the old behaviour — on for any
-/// non-release build (`flutter run`), compiled out of a plain
-/// `flutter build apk`/`--release` — but can be overridden independently of
-/// build mode: `flutter build apk --release --dart-define=ENABLE_PREVIEW_UI=true`
-/// produces a release-performance APK with Preview UI intentionally left in,
-/// for internal frontend inspection on a device, without touching
-/// FirebaseAuth or the real login flow. Never set for a production/Play
-/// Store build.
-const kEnablePreviewUi = bool.fromEnvironment('ENABLE_PREVIEW_UI', defaultValue: !kReleaseMode);
 
 class _Country {
   final String name;
@@ -373,9 +363,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         TextSpan(
                           style: TextStyle(fontSize: 12.5, color: AppColors.goldDeepest, height: 1.5),
                           children: [
-                            TextSpan(text: 'We verify donors by '),
-                            TextSpan(text: 'one-time code only', style: TextStyle(fontWeight: FontWeight.w700)),
-                            TextSpan(text: '. No documents, no ID upload — ever.'),
+                            TextSpan(text: 'We verify your phone with '),
+                            TextSpan(text: 'a one-time code', style: TextStyle(fontWeight: FontWeight.w700)),
+                            TextSpan(text: '. No password is required.'),
                           ],
                         ),
                       ),

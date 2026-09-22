@@ -41,10 +41,15 @@ class _MatchingScreenState extends State<MatchingScreen> {
   int? _compatibleAvailableCount;
   bool _navigated = false;
   bool _cancelling = false;
+  bool _searchPhaseOver = false;
+  Timer? _searchPhaseTimer;
 
   @override
   void initState() {
     super.initState();
+    _searchPhaseTimer = Timer(const Duration(seconds: 15), () {
+      if (mounted) setState(() => _searchPhaseOver = true);
+    });
     _requestSub = FirebaseFirestore.instance.collection('requests').doc(widget.requestId).snapshots().listen(_onRequestUpdate);
 
     final compatibleGroups = bloodCompatibility[widget.bloodGroup] ?? const <String>[];
@@ -118,6 +123,7 @@ class _MatchingScreenState extends State<MatchingScreen> {
     _requestSub?.cancel();
     _donorSub?.cancel();
     _tick?.cancel();
+    _searchPhaseTimer?.cancel();
     super.dispose();
   }
 
@@ -167,12 +173,12 @@ class _MatchingScreenState extends State<MatchingScreen> {
                         ),
                       ),
                       const SizedBox(height: 22),
-                      const Text('SEARCHING', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 1.3, color: Color(0xFFE0A8AF))),
+                      Text(_searchPhaseOver ? 'STILL WAITING' : 'SEARCHING', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 1.3, color: Color(0xFFE0A8AF))),
                       const SizedBox(height: 10),
-                      const Text(
-                        'Notifying compatible donors near you',
+                      Text(
+                        _searchPhaseOver ? "No match confirmed yet — this screen updates the moment a donor accepts" : 'Visible now to compatible donors nearby',
                         textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Color(0xFFFFF9F5), height: 1.35),
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Color(0xFFFFF9F5), height: 1.35),
                       ),
                       const SizedBox(height: 8),
                       Text(
@@ -194,7 +200,7 @@ class _MatchingScreenState extends State<MatchingScreen> {
                         child: Column(
                           children: [
                             _stageRow('Request submitted', done: true, showDivider: true),
-                            _stageRow('Waiting for a donor to accept', done: false, showDivider: false),
+                            _stageRow('Waiting for a donor to accept', done: false, showSpinner: !_searchPhaseOver, showDivider: false),
                           ],
                         ),
                       ),
@@ -244,7 +250,7 @@ class _MatchingScreenState extends State<MatchingScreen> {
     ];
   }
 
-  Widget _stageRow(String label, {required bool done, required bool showDivider}) {
+  Widget _stageRow(String label, {required bool done, required bool showDivider, bool showSpinner = true}) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10),
       decoration: BoxDecoration(border: showDivider ? Border(bottom: BorderSide(color: Colors.white.withValues(alpha: 0.06))) : null),
@@ -258,8 +264,10 @@ class _MatchingScreenState extends State<MatchingScreen> {
               alignment: Alignment.center,
               child: const Icon(Icons.check, size: 12, color: Color(0xFF7FCB8E)),
             )
+          else if (showSpinner)
+            const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFEDA5AC)))
           else
-            const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFEDA5AC))),
+            const Icon(Icons.schedule, size: 20, color: Color(0xFFEDA5AC)),
           const SizedBox(width: 10),
           Text(label, style: TextStyle(fontSize: 13, color: Colors.white.withValues(alpha: 0.85))),
         ],

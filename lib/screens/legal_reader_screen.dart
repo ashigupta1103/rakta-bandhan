@@ -4,14 +4,15 @@ import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 
 /// One reader component for every legal document — Privacy policy and
-/// Terms of use both use this same screen with different content, per the
-/// final artifact ("One component, two documents"). Clause text is an
-/// explicit placeholder; real legal copy must be supplied and approved.
+/// Terms of use both use this same screen. No clause text is drafted here:
+/// real legal copy must be supplied and approved by the Rotary
+/// Club/Rakta Bandhan team, so this shows one polished pending-content
+/// state rather than placeholder clauses that could be mistaken for a
+/// thin real policy.
 class LegalReaderScreen extends StatelessWidget {
   final String title;
-  final List<(String heading, String body)> sections;
 
-  const LegalReaderScreen({super.key, required this.title, required this.sections});
+  const LegalReaderScreen({super.key, required this.title});
 
   @override
   Widget build(BuildContext context) {
@@ -22,32 +23,46 @@ class LegalReaderScreen extends StatelessWidget {
           children: [
             SizedBox(
               height: 48,
-              child: Row(
-                children: [
-                  IconButton(icon: const Icon(LucideIcons.arrowLeft, color: AppColors.textPrimaryWarm), onPressed: () => Navigator.pop(context)),
-                  Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
-                ],
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Row(
+                  children: [
+                    IconButton(icon: const Icon(LucideIcons.arrowLeft, color: AppColors.textPrimaryWarm), onPressed: () => Navigator.pop(context)),
+                    const SizedBox(width: 4),
+                    Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
+                  ],
+                ),
               ),
             ),
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(20, 6, 20, 24),
                 child: Container(
-                  padding: const EdgeInsets.all(18),
+                  padding: const EdgeInsets.fromLTRB(20, 28, 20, 28),
                   decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: AppColors.shadowCard, blurRadius: 20, offset: const Offset(0, 6))]),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(title, style: AppTextStyles.display(fontSize: 21, color: AppColors.ink, height: 1.2)),
-                      const SizedBox(height: 4),
-                      const Text('Last updated — to be supplied', style: TextStyle(fontSize: 11.5, color: AppColors.disabledTint)),
-                      Container(height: 1, color: AppColors.warmDivider, margin: const EdgeInsets.symmetric(vertical: 14)),
-                      for (var i = 0; i < sections.length; i++) ...[
-                        if (i > 0) const SizedBox(height: 16),
-                        Text('${i + 1} · ${sections[i].$1}', style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, letterSpacing: 1, color: AppColors.goldDeep)),
-                        const SizedBox(height: 7),
-                        Text(sections[i].$2, style: AppTextStyles.display(fontSize: 15.5, color: const Color(0xFF3D2523), height: 1.65)),
-                      ],
+                      Container(
+                        width: 52,
+                        height: 52,
+                        decoration: const BoxDecoration(color: AppColors.goldTint, shape: BoxShape.circle),
+                        alignment: Alignment.center,
+                        child: const Icon(LucideIcons.fileClock, size: 22, color: AppColors.goldDeep),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(title, textAlign: TextAlign.center, style: AppTextStyles.display(fontSize: 21, color: AppColors.ink, height: 1.2)),
+                      const SizedBox(height: 10),
+                      const Text(
+                        'This document is awaiting approved content.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600, color: AppColors.ink),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'The final wording must be reviewed and approved by the Rotary Club/Rakta Bandhan team before production release — nothing shown here yet is real legal text.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 13, color: AppColors.ink2, height: 1.5),
+                      ),
                     ],
                   ),
                 ),
@@ -59,13 +74,3 @@ class LegalReaderScreen extends StatelessWidget {
     );
   }
 }
-
-const kPrivacyPolicySections = <(String, String)>[
-  ('WHAT WE COLLECT', 'Placeholder clause text. Legal copy must be supplied and approved — none is drafted here.'),
-  ('HOW WE USE IT', 'Placeholder clause text.'),
-];
-
-const kTermsOfUseSections = <(String, String)>[
-  ('ACCEPTANCE OF TERMS', 'Placeholder clause text. Legal copy must be supplied and approved — none is drafted here.'),
-  ('USE OF THE SERVICE', 'Placeholder clause text.'),
-];
