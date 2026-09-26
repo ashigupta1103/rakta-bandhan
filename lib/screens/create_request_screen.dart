@@ -9,6 +9,7 @@ import '../theme/app_text_styles.dart';
 import '../widgets/blood_group_droplet.dart';
 import '../widgets/loading_button.dart';
 import 'matching_screen.dart';
+import 'location_picker_screen.dart';
 
 enum _LocationState { idle, checking, denied, error }
 
@@ -111,7 +112,11 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
         if (mounted) setState(() => _locationState = _LocationState.denied);
         return;
       }
-      final position = await Backend.instance.currentPosition();
+      final position = await Backend.instance.preciseLocation();
+      if (position == null) {
+        if (mounted && !silent) setState(() => _locationState = _LocationState.error);
+        return;
+      }
       final label = await Backend.instance.reverseGeocode(position.latitude, position.longitude);
       if (!mounted) return;
       setState(() {
@@ -129,6 +134,27 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
     }
   }
 
+  /// Exact hospital/bed location — donors navigate here, so the pin matters
+  /// more than the address text.
+  Future<void> _pinOnMap() async {
+    final picked = await LocationPickerScreen.open(
+      context,
+      title: 'Where is the blood needed?',
+      confirmLabel: 'Use this location',
+      initialLat: _selectedLat,
+      initialLng: _selectedLng,
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _selectedLat = picked.lat;
+      _selectedLng = picked.lng;
+      _locationController.text = picked.label;
+      _suggestions = [];
+      _locationState = _LocationState.idle;
+      _locationEditing = false;
+    });
+  }
+
   bool get _locationResolved => _selectedLat != null && _selectedLng != null;
   bool get _canSubmit => _bloodGroup != null && _urgency != null && _locationController.text.trim().isNotEmpty;
 
@@ -141,7 +167,13 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
         lat = _selectedLat!;
         lng = _selectedLng!;
       } else {
-        final position = await Backend.instance.currentPosition();
+        final position = await Backend.instance.preciseLocation();
+        if (position == null) {
+          if (!mounted) return;
+          setState(() => _isSubmitting = false);
+          await _pinOnMap();
+          return;
+        }
         lat = position.latitude;
         lng = position.longitude;
       }
@@ -575,20 +607,36 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
                 ],
               ),
             ),
-          if (_locationState != _LocationState.denied && _locationState != _LocationState.error) ...[
-            const SizedBox(height: 10),
-            GestureDetector(
-              onTap: () => _useCurrentLocation(),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(LucideIcons.mapPin, size: 13, color: AppColors.primary),
-                  SizedBox(width: 6),
-                  Text('Use current location', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.primary)),
-                ],
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 16,
+            runSpacing: 6,
+            children: [
+              if (_locationState != _LocationState.denied && _locationState != _LocationState.error)
+                GestureDetector(
+                  onTap: () => _useCurrentLocation(),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(LucideIcons.locateFixed, size: 13, color: AppColors.primary),
+                      SizedBox(width: 6),
+                      Text('Use current location', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.primary)),
+                    ],
+                  ),
+                ),
+              GestureDetector(
+                onTap: _pinOnMap,
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(LucideIcons.mapPin, size: 13, color: AppColors.primary),
+                    SizedBox(width: 6),
+                    Text('Pin exact spot on map', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.primary)),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
           if (_locationState == _LocationState.denied) ...[
             const SizedBox(height: 4),
             GestureDetector(

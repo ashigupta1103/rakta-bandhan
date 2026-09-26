@@ -8,10 +8,10 @@ Legend: ✅ done in the repo · ⬜ someone must do it (needs an account, a deci
 
 ## Blockers — the stores will reject, or the app is unsafe, without these
 
-- ⬜ **Real OTP.** Today any 6-digit code signs in, and every account shares one hardcoded password (`Backend.verifyFakeOtp`). Anyone who knows a phone number can take over that account.
-  - Needs Blaze.
-  - Recommended: a small Cloud Function that sends OTP via an Indian DLT SMS or WhatsApp provider and returns a Firebase custom token. That's about 25× cheaper than Firebase Phone Auth at this volume; see `cost-estimate.md`.
-  - Firebase Phone Auth also works, with no function, but costs $0.07 per SMS.
+- ⬜ **Real phone verification.** Today any 6-digit code signs in, and every account shares one hardcoded password (`Backend.verifyFakeOtp`). Anyone who knows a phone number can take over that account.
+  - Plan: Truecaller one-tap (Android), then "reverse WhatsApp" (free, all platforms), then a paid SMS OTP as a rare fallback.
+  - Runs on **your existing server**, which mints a Firebase custom token with the Admin SDK. No Cloud Functions needed.
+  - Do **not** use Firebase Phone Auth SMS at this volume (≈ ₹6.5 lakh a year). See `cost-estimate.md`.
 - ⬜ **Firebase for iOS.** `lib/firebase_options.dart` has no iOS config, so the app crashes on launch on iPhone.
   - Run `flutterfire configure --project=<id> --platforms=android,ios,web`.
   - This regenerates `firebase_options.dart` and adds `ios/Runner/GoogleService-Info.plist`.
@@ -20,9 +20,9 @@ Legend: ✅ done in the repo · ⬜ someone must do it (needs an account, a deci
   - Have counsel review `lib/legal/legal_documents.dart`, then set `kLegalApproved = true`.
   - Re-run `python tool/export_legal_html.py`.
   - The App Store requires a working support URL and contact.
-- ⬜ **Map tiles and geocoding provider.** The OpenStreetMap public servers' usage policies forbid production-app load and Nominatim autocomplete.
-  - Swap the tile URL in `find_donors_screen.dart`.
-  - Swap the search in `Backend.searchAddress` / `reverseGeocode`.
+- ⬜ **Map tiles and geocoding keys.** Both providers are set in one file, `lib/services/geo_config.dart`.
+  - **Tiles:** create a free MapTiler key and paste the URL shown there. CARTO's keyless tiles were checked on 26 Sep 2026 and now return "API KEY REQUIRED".
+  - **Geocoding:** create a free LocationIQ key and set `kLocationIqKey`. The public OpenStreetMap servers are fine for development only.
 - ⬜ **Rotary mark.** The full logo includes the Rotary International wheel, a registered trademark. Confirm the club's use in a public app follows Rotary's brand guidelines (Apple guideline 5.2.1). The app icon deliberately uses only the droplet-and-heart mark.
 
 ## Done in this branch
@@ -52,14 +52,14 @@ Legend: ✅ done in the repo · ⬜ someone must do it (needs an account, a deci
 5. Build the admin dashboard, then deploy: `cd admin/frontend && npm run build && cd ../.. && firebase deploy --only hosting`
 6. Open `/legal/privacy.html`, `/legal/terms.html` and `/legal/delete-account.html` on the hosted domain. These are the store URLs.
 
-### 2. Server-side (Cloud Functions), kept minimal on purpose
-Everything else stays client-side under Firestore rules. The functions to add, in priority order:
+### 2. Server-side jobs (on your existing server, not Cloud Functions)
+Everything else stays client-side under Firestore rules. Your server uses the Firebase Admin SDK with a service-account key (kept as a server secret). FCM sending and custom tokens are free from any server. The jobs to add, in priority order:
 1. **OTP send/verify** → custom token (replaces the fake OTP).
-2. **Push on new message**: `requests/{id}/messages/{mid}` onCreate → FCM to the other participant.
-3. **Push on incoming call**: `requests/{id}/calls/{cid}` onCreate.
+2. **Push on new message**: the app calls your server's `/notify` endpoint after sending, with its Firebase ID token. Alternatively, the server keeps an Admin SDK listener on new messages. Either way, the server sends FCM to the other participant.
+3. **Push on incoming call**: same pattern, for `requests/{id}/calls/{cid}`.
    - Android: an FCM high-priority data message, shown as a calling notification (a genuine calling use case).
    - iOS: PushKit VoIP → CallKit. Add the `voip` background mode **only** together with CallKit.
-4. **Urgent-alert fan-out**: `requests/{id}` onCreate where urgency ∈ {urgent, critical}.
+4. **Urgent-alert fan-out**: a new request where urgency ∈ {urgent, critical}.
    - Query nearby opted-in donors (`urgent_alerts == true`, geohash range) and FCM them.
    - Donors' tokens are already saved at `donors/{uid}.fcm_token`.
 5. Optional: a scheduled expiry of stale requests, which replaces the lazy client-side expiry.

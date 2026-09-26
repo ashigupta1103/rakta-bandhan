@@ -129,7 +129,11 @@ class _ChatScreenState extends State<ChatScreen> {
       if (choice == 'hospital') {
         await ChatService.instance.sendLocation(widget.requestId, lat: hospitalLat!, lng: hospitalLng!, label: hospitalLabel, amRequester: _amRequester);
       } else {
-        final pos = await Backend.instance.currentPosition();
+        final pos = await Backend.instance.preciseLocation();
+        if (pos == null) {
+          messenger.showSnackBar(const SnackBar(content: Text('Couldn’t get your GPS location. Turn on location and try again.')));
+          return;
+        }
         final label = await Backend.instance.reverseGeocode(pos.latitude, pos.longitude) ?? 'My current location';
         await ChatService.instance.sendLocation(widget.requestId, lat: pos.latitude, lng: pos.longitude, label: label, amRequester: _amRequester);
       }

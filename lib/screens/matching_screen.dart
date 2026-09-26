@@ -36,8 +36,8 @@ class MatchingScreen extends StatefulWidget {
 
 class _MatchingScreenState extends State<MatchingScreen> {
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _requestSub;
-  StreamSubscription<List<QueryDocumentSnapshot<Map<String, dynamic>>>>? _donorSub;
-  NearbyDonors? _nearby;
+  Timer? _countTimer;
+  bool _countStarted = false;
   Timer? _tick;
 
   DateTime? _createdAt;
@@ -77,15 +77,20 @@ class _MatchingScreenState extends State<MatchingScreen> {
     // query (NearbyDonors), started once the request doc gives us a point.
     final lat = (data['lat'] as num?)?.toDouble();
     final lng = (data['lng'] as num?)?.toDouble();
-    if (_nearby == null && lat != null && lng != null) {
+    if (!_countStarted && lat != null && lng != null) {
+      _countStarted = true;
       final compatibleGroups = bloodCompatibility[widget.bloodGroup] ?? const <String>[];
-      _nearby = NearbyDonors(lat, lng);
-      _donorSub = _nearby!.stream.listen((docs) {
-        if (!mounted) return;
-        setState(() {
-          _compatibleAvailableCount = docs.where((d) => compatibleGroups.contains(d.data()['blood_group'])).length;
-        });
-      }, onError: (_) {});
+      Future<void> refresh() async {
+        try {
+          final n = await NearbyDonors.countCompatible(lat, lng, compatibleGroups);
+          if (mounted) setState(() => _compatibleAvailableCount = n);
+        } catch (_) {}
+      }
+      refresh();
+      // A count, not a live listener: refreshed once a minute is plenty for
+      // "N donors nearby", and costs ~9 reads a minute instead of re-billing
+      // every donor document that changes.
+      _countTimer = Timer.periodic(const Duration(minutes: 1), (_) => refresh());
     }
     final status = data['status'] as String? ?? 'open';
     if (status == 'matched') {
@@ -150,8 +155,7 @@ class _MatchingScreenState extends State<MatchingScreen> {
   @override
   void dispose() {
     _requestSub?.cancel();
-    _donorSub?.cancel();
-    _nearby?.dispose();
+    _countTimer?.cancel();
     _tick?.cancel();
     _searchPhaseTimer?.cancel();
     super.dispose();

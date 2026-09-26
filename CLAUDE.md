@@ -42,6 +42,8 @@ Firebase **Spark (free) plan** — no Cloud Functions, no Cloud Storage, no serv
 - Location/geocoding is OpenStreetMap Nominatim (no API key); donor search is a full scan + Haversine filter (demo scale). Map is `flutter_map`.
 - Blood compatibility table (`bloodCompatibility`) is keyed **recipient → donor groups**.
 - `donors_public` coordinates are coarsened to ~1 km (`Backend._coarse`); exact lat/lng only live on private `donors/{uid}`.
+- **Location:** anything *stored* (registration area, request location, chat location) must come from `Backend.preciseLocation()` (nullable — real GPS or nothing), a search result, or `LocationPickerScreen` (Rapido-style fixed-centre pin). `currentPosition()` falls back to a demo city and is for centring a map only; check `Backend.isFallback`. Map tiles and geocoding providers/keys live in `lib/services/geo_config.dart`; all maps use `appMapBase()` from `widgets/map_tiles.dart`.
+- Counting donors: use `NearbyDonors.countCompatible` (Firestore `count()` aggregation), not a document listener.
 - **Never scan `donors_public`** from user-facing screens — use `NearbyDonors` (geohash precision-5 cell + 8 neighbours, `limit(100)` per cell; needs the `(is_available, geohash)` index). `Backend.availableDonorsStream()` is a whole-collection scan kept only for admin paths.
 - The ID-proof image lives at `donors/{uid}/private/id_proof` (owner/admin); the profile only has `has_id_proof`. Don't put large blobs on docs that are read often.
 

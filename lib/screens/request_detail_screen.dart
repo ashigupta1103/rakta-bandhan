@@ -36,7 +36,8 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
   @override
   void initState() {
     super.initState();
-    Backend.instance.currentPosition().then((p) {
+    // Distance only when we truly know where the donor is.
+    Backend.instance.preciseLocation().then((p) {
       if (mounted) setState(() => _position = p);
     });
   }

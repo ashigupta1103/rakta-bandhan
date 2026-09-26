@@ -24,10 +24,34 @@ class NearbyDonors {
 
   static String cellOf(double lat, double lng) => encodeGeohash(lat, lng, precision: 5);
 
-  /// Hard ceiling on cost per map open: at most 9 × 100 donor reads, even
-  /// in the densest neighbourhood. More pins than this aren't readable on
-  /// a phone map anyway.
-  static const perCellLimit = 100;
+  /// Hard ceiling on cost per map open: at most 9 × 30 = 270 donor reads,
+  /// even in the densest neighbourhood. More pins than this aren't readable
+  /// on a phone map, and the list is sorted by distance anyway.
+  static const perCellLimit = 30;
+
+  /// How many available donors of [groups] are within the same ~15 km
+  /// square — using Firestore count() aggregation, billed at one read per
+  /// 1,000 matching index entries. So this costs ~9 reads however many
+  /// donors there are, versus downloading every donor document to count
+  /// them. Needs the (is_available, blood_group, geohash) index.
+  static Future<int> countCompatible(double lat, double lng, List<String> groups) async {
+    if (groups.isEmpty) return 0;
+    final cells = <String>{
+      for (final dy in const [-1, 0, 1])
+        for (final dx in const [-1, 0, 1]) cellOf(lat + dy * _cellDegrees, lng + dx * _cellDegrees),
+    };
+    final db = FirebaseFirestore.instance;
+    final counts = await Future.wait(cells.map((cell) => db
+        .collection('donors_public')
+        .where('is_available', isEqualTo: true)
+        .where('blood_group', whereIn: groups)
+        .where('geohash', isGreaterThanOrEqualTo: cell)
+        .where('geohash', isLessThan: '$cell~')
+        .count()
+        .get()
+        .then((agg) => agg.count ?? 0)));
+    return counts.fold<int>(0, (a, b) => a + b);
+  }
 
   final _updates = StreamController<List<QueryDocumentSnapshot<Map<String, dynamic>>>>.broadcast();
   final _byCell = <String, List<QueryDocumentSnapshot<Map<String, dynamic>>>>{};

@@ -13,43 +13,23 @@ import '../theme/app_text_styles.dart';
 import '../theme/app_theme.dart';
 import '../widgets/blood_group_droplet.dart';
 import '../widgets/filter_chip_row.dart';
+import '../widgets/map_tiles.dart';
 import '../widgets/state_card.dart';
 import 'donor_details_screen.dart';
+import 'location_picker_screen.dart';
 
 enum _MapPermissionState { checking, prompt, granted, denied }
-
-/// A warm, cream-toned recolouring of the OpenStreetMap tile plate applied
-/// per-tile via [TileLayer.tileBuilder] — avoids the default blue-water /
-/// green-park palette without needing a paid vendor style or an API key.
-/// See MAP DECISION note in find_donors_screen's class doc for why this
-/// tile source was chosen.
-const _warmTileFilter = ColorFilter.matrix(<double>[
-  0.33, 0.33, 0.33, 0, 34,
-  0.30, 0.30, 0.30, 0, 20,
-  0.27, 0.27, 0.27, 0, 4,
-  0, 0, 0, 1, 0,
-]);
 
 /// Find tab root — a real tiled map with every marker projected from the
 /// donor's own real `lat`/`lng` in `donors_public` (Phase 3, per the final
 /// artifact's "Find — tab root · real map" section: "no marker has a
 /// hard-coded position, and no donor location is fabricated").
 ///
-/// MAP DECISION: this project had no map dependency before this phase.
-/// [flutter_map] (BSD-3-Clause, pure Dart, full Flutter Web support) is
-/// added as the one new dependency the final artifact calls for. Tiles come
-/// from the standard keyless OpenStreetMap raster endpoint
-/// (`tile.openstreetmap.org`) — CARTO's basemaps, referenced elsewhere in
-/// this codebase, now require a signup-gated API key as of an August 2026
-/// policy change, so they're not the "no paid tools" fit they used to be.
-/// OSM's tile usage policy requires a descriptive User-Agent (set below) and
-/// visible attribution (rendered as a small corner label) and discourages
-/// heavy production-scale traffic without a dedicated provider — acceptable
-/// for this app's current demo/Spark-plan scale; a self-hosted or paid tile
-/// provider is the natural upgrade path if traffic grows. Tiles are fetched
-/// client-side over plain HTTPS, exactly like the existing Nominatim address
-/// search already in `backend.dart` — no Firebase/Firestore cost, no Cloud
-/// Function, no API key, nothing added to the Spark-plan bill.
+/// MAP: flutter_map with the provider configured in services/geo_config.dart
+/// (shared with the location picker via widgets/map_tiles.dart). Donor pins
+/// use the ~1 km-rounded public coordinates by design; the searching user's
+/// own dot is their real GPS fix. Donors are loaded with NearbyDonors (a
+/// bounded geohash query), never a whole-collection scan.
 class FindDonorsScreen extends StatefulWidget {
   /// False when embedded as the Find tab root — there is no route to pop
   /// back to, so the leading back affordance is omitted rather than left
@@ -143,7 +123,18 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
 
   Future<void> _loadPosition() async {
     final p = await Backend.instance.currentPosition();
-    if (mounted) setState(() => _position = p);
+    if (!mounted) return;
+    setState(() => _position = p);
+    if (Backend.isFallback(p)) _warnFallback();
+  }
+
+  /// The map opened on the default city because there's no GPS fix — say
+  /// so, instead of letting someone read distances from a place they're not.
+  void _warnFallback() {
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      duration: Duration(seconds: 5),
+      content: Text('Couldn’t get your location, so this shows Thiruvananthapuram. Search for your area, or tap locate once GPS is on.'),
+    ));
   }
 
   /// Google Maps-style recenter: re-fetches a fresh GPS fix (not the last
@@ -153,8 +144,12 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
     if (_recentering) return;
     setState(() => _recentering = true);
     try {
-      final p = await Backend.instance.currentPosition();
+      final p = await Backend.instance.preciseLocation();
       if (!mounted) return;
+      if (p == null) {
+        _warnFallback();
+        return;
+      }
       setState(() {
         _position = p;
         _searchController.clear();
@@ -221,7 +216,32 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
     setState(() => _sendingDonorId = donorId);
     final bloodGroup = donor['bloodGroup'] as String;
     try {
-      final pos = _position ?? await Backend.instance.currentPosition();
+      // The search centre is only a valid request location if it's a real
+      // fix or a searched place — never the default-city fallback.
+      var pos = _position;
+      if (pos == null || Backend.isFallback(pos)) {
+        pos = await Backend.instance.preciseLocation();
+      }
+      if (pos == null) {
+        if (!mounted) return;
+        final picked = await LocationPickerScreen.open(context, title: 'Where is the blood needed?', confirmLabel: 'Send request here');
+        if (picked == null) {
+          if (mounted) setState(() => _sendingDonorId = null);
+          return;
+        }
+        pos = Position(
+          latitude: picked.lat,
+          longitude: picked.lng,
+          timestamp: DateTime.now(),
+          accuracy: 1,
+          altitude: 0,
+          altitudeAccuracy: 0,
+          heading: 0,
+          headingAccuracy: 0,
+          speed: 0,
+          speedAccuracy: 0,
+        );
+      }
       await Backend.instance.createRequest(
         bloodGroup: bloodGroup,
         unitsNeeded: 1,
@@ -279,11 +299,8 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
                     interactionOptions: const InteractionOptions(flags: InteractiveFlag.all & ~InteractiveFlag.rotate),
                   ),
                   children: [
-                    TileLayer(
-                      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                      userAgentPackageName: 'org.raktabandhan.app',
-                      tileBuilder: (context, tileWidget, tile) => ColorFiltered(colorFilter: _warmTileFilter, child: tileWidget),
-                    ),
+                    ...appMapBase(),
+                    appMapAttribution(),
                     MarkerLayer(
                       markers: [
                         Marker(

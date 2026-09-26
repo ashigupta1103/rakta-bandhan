@@ -82,6 +82,7 @@ const privacyPolicy = LegalDocument(
     ]),
     LegalSection('retention', 'How long we keep it', [
       '- Your profile is kept for as long as your account exists.',
+      '- An ID photo you submit is deleted as soon as an administrator has checked it; we keep only the fact and date it was checked.',
       '- Requests, chat messages and call records are kept as part of the request’s history so both people have a record of what happened.',
       '- When you delete your account, we delete your profile, your public listing, any ID photo, and every chat message you sent. Requests you raised are cancelled if still open, and your name and phone number are removed from them. If you were matched as a donor on an open request, that request is released back to other donors. A record that a donation happened is kept without anything that identifies you.',
       '- Analytics data is kept according to Firebase Analytics retention settings, up to 14 months.',

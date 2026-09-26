@@ -22,8 +22,9 @@ import {
   updateDoc,
   deleteDoc,
   writeBatch,
+  deleteField,
+  getCountFromServer,
   serverTimestamp,
-  getDocs,
   type DocumentData,
 } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
@@ -393,7 +394,19 @@ export function useAdminActions() {
   const verifyDonor = (donorId: string, isVerified: boolean, donorName?: string) =>
     run(async () => {
       const batch = writeBatch(db);
-      batch.update(doc(db, 'donors', donorId), { is_verified: isVerified });
+      if (isVerified) {
+        // Checked IDs aren't kept — same rule as the app's adminVerifyDonor.
+        batch.delete(doc(db, 'donors', donorId, 'private', 'id_proof'));
+        batch.update(doc(db, 'donors', donorId), {
+          is_verified: true,
+          has_id_proof: false,
+          id_proof_checked_at: serverTimestamp(),
+          id_proof_base64: deleteField(),
+          id_proof_content_type: deleteField(),
+        });
+      } else {
+        batch.update(doc(db, 'donors', donorId), { is_verified: false });
+      }
       batch.update(doc(db, 'donors_public', donorId), {
         is_verified: isVerified,
         updated_at: serverTimestamp(),
@@ -468,8 +481,9 @@ export function useAdminActions() {
       let q = query(collection(db, 'donors_public'));
       if (params.bloodGroup) q = query(q, where('blood_group', '==', params.bloodGroup));
       if (params.availableOnly) q = query(q, where('is_available', '==', true));
-      const snap = await getDocs(q);
-      const targeted = snap.size;
+      // count() aggregation: ~1 read per 1,000 donors instead of downloading
+      // every matching donor document just to count them.
+      const targeted = (await getCountFromServer(q)).data().count;
 
       await logAudit('BROADCAST_NOTIFICATION', { name: params.title }, `${targeted} donor(s) matched`);
 

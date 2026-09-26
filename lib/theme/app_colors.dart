@@ -56,6 +56,14 @@ class AppColors {
   static const Color onEmberOutline = Color(0x8CFBE6E8); // outlined buttons
   static const Color onEmberSuccess = Color(0xFF7FCB8E);
 
+  // Maps. The GPS blue is the one deliberate non-brand hue: "you are here"
+  // is universally read as a blue dot, and a red one would be confused with
+  // the brand's own pins.
+  static const Color gpsDot = Color(0xFF2F6FED);
+  static const Color gpsAccuracyFill = Color(0x1F2F6FED);
+  static const Color gpsAccuracyBorder = Color(0x552F6FED);
+  static const Color mapPinShadow = Color(0x40000000);
+
   // Semantic status.
   static const Color successBg = Color(0xFFE8F0DF);
   static const Color successText = Color(0xFF3F6B34);

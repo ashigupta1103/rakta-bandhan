@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../services/backend.dart';
+import 'location_picker_screen.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/identity_disc.dart';
@@ -48,14 +49,33 @@ class _DonorDetailsScreenState extends State<DonorDetailsScreen> {
   Future<void> _sendRequest() async {
     setState(() => _isSending = true);
     try {
-      final pos = await Backend.instance.currentPosition();
+      // The request's location is where donors will travel — real GPS or
+      // an explicit pin, never a guessed default.
+      final pos = await Backend.instance.preciseLocation();
+      double lat, lng;
+      String label;
+      if (pos != null) {
+        lat = pos.latitude;
+        lng = pos.longitude;
+        label = await Backend.instance.reverseGeocode(lat, lng) ?? 'Requested via ${widget.name}\'s profile';
+      } else {
+        if (!mounted) return;
+        final picked = await LocationPickerScreen.open(context, title: 'Where is the blood needed?', confirmLabel: 'Send request here');
+        if (picked == null) {
+          if (mounted) setState(() => _isSending = false);
+          return;
+        }
+        lat = picked.lat;
+        lng = picked.lng;
+        label = picked.label;
+      }
       await Backend.instance.createRequest(
         bloodGroup: widget.bloodGroup,
         unitsNeeded: 1,
         urgency: 'urgent',
-        lat: pos.latitude,
-        lng: pos.longitude,
-        locationLabel: 'Requested via ${widget.name}\'s profile',
+        lat: lat,
+        lng: lng,
+        locationLabel: label,
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

@@ -33,7 +33,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    Backend.instance.currentPosition().then((p) {
+    Backend.instance.preciseLocation().then((p) {
       if (mounted) setState(() => _position = p);
     });
     Backend.instance.myDonationCount().then((c) {
