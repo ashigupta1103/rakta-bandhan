@@ -1,97 +1,121 @@
-# Running cost: cheapest setup
+# Running cost: year-1 plan (₹40,000 budget)
 
-**Load assumed:** about 50,000 signups at launch, then 2,000–3,000 new signups a month. About 3,000–5,000 monthly active users (MAU) after the launch spike.
-**Exchange rate:** ₹96/$ (25 Sep 2026).
-**Architecture:** almost everything runs on the phone against Firestore, protected by security rules. The few server jobs run on **your existing server**, so no Firebase Cloud Functions are needed:
-1. phone verification;
-2. push notifications;
-3. optionally, a nightly expiry job.
+**Load assumed:** 1,00,000 signups in year 1 (about 50,000 in the launch month, then about 4,500 a month). About 2–4% of registered users open the app on a given day; up to 10,000 a day in the launch weeks.
+**Exchange rate:** ₹96/$ (Sep 2026). **Google Cloud and Meta bills from India carry 18% GST**, which is included below.
+**Architecture:** almost everything runs on the phone against Firestore, protected by security rules. The few server jobs run as **Cloud Functions in the same Firebase project**, with no separate server to maintain:
+1. phone verification (Truecaller check, OTP send/verify, Firebase sign-in token);
+2. push notifications for messages, calls and urgent requests;
+3. call-relay (TURN) credentials;
+4. a nightly job to expire old requests.
 
-## Year 1 (you cover it)
+## Year 1
 
-| Item | Cheapest option | Year 1 |
+| Item | Choice | Year 1 (incl. GST) |
 |---|---|---|
-| Login verification | Truecaller one-tap (Android) + "reverse WhatsApp" (everyone else) + paid OTP only as a rare fallback | **₹0–1,500** |
-| Firestore: reads, writes, storage | Blaze plan, pay only above the free tier (after the optimisations below) | **₹1,500–6,000** |
-| Push notifications | FCM, sent from your server with the Firebase Admin SDK | ₹0 |
-| Server jobs | Your existing server (Railway ≈ $5/month ≈ ₹5,800/year if you ever need a separate one) | ₹0 |
-| In-app calls | Peer-to-peer; TURN relay from Metered's free 500 MB/month, or coturn on your server | ₹0 |
-| Maps | MapTiler free tier (100k tile loads/month, key needed) or OSM during development | ₹0 |
-| Address search | LocationIQ free tier (5,000 requests/day) | ₹0 |
-| Community photos | Cloudflare R2 (10 GB free, free downloads) | ₹0 (≈ ₹1,000/yr on Firebase Storage) |
-| Apple Developer | $99/year (fee waiver possible for nonprofits) | ₹9,500 |
-| Google Play | $25 **one-time** | ₹2,400 |
-| **Total** | | **≈ ₹13,500–19,500** |
+| Apple Developer Program | Organisation account in the club's name, $99/year | ₹9,500 |
+| Google Play | Organisation account, $25 **one-time** | ₹2,500 |
+| Login verification | Truecaller → WhatsApp OTP → SMS OTP (see below) | ₹13,300 |
+| Firestore | Blaze, after the two read fixes below | ₹8,000 |
+| Cloud Functions | 2M invocations/month free; we use about 0.3M. Container storage is the only charge | ₹500 |
+| Push notifications | FCM | ₹0 |
+| Maps on screen | Google Maps SDK for Android/iOS: mobile map loads are free and unlimited | ₹0 |
+| Address lookup | Phone's built-in geocoder (free), LocationIQ free tier (5,000/day) as backup | ₹0 |
+| Call relay (TURN) | Cloudflare Realtime: 1,000 GB/month free, about 0.6 MB per relayed call minute | ₹0 |
+| Hosting (admin panel, legal pages) | Firebase Hosting free tier, on the `.web.app` address | ₹0 |
+| iOS builds without a Mac | Codemagic free tier (500 build minutes/month) | ₹0 |
+| WhatsApp sender number | The club's existing landline or number, not already on WhatsApp | ₹0 (a new SIM kept active ≈ ₹2,000) |
+| **Subtotal** | | **≈ ₹33,800** |
+| Reserve | Launch spike, SMS abuse, card forex fees | ₹6,200 |
+| **Total** | | **₹40,000** |
 
-**Year 2 onwards** (about 30,000 signups a year): **≈ ₹11,000–15,000**. That's Apple ₹9,500 plus Firestore ₹1,500–5,000 plus a small OTP fallback; Google Play isn't charged again.
+**Year 2 onwards** (about 36,000 signups a year): **≈ ₹23,000**.
+- Apple: ₹9,500.
+- OTP: ₹4,800.
+- Firestore: ₹8,300, because the user base is larger.
+- Functions: ₹500.
+- Google Play is not charged again.
 
-## Login verification: from ₹6.5 lakh to about ₹0
+## Login verification
 
-| Method | Cost per login | Year 1 (~97,000 logins) | Notes |
+About **1,25,000 verifications** in year 1: 1,00,000 signups plus about 25% extra for resends, reinstalls and phone changes.
+
+| Method | Price per verification | Share of logins | Year 1 |
 |---|---|---|---|
-| Firebase Phone Auth (SMS) | $0.07 = ₹6.7 | **≈ ₹6,50,000** | Never use at this volume |
-| SMS OTP via an Indian DLT provider | ₹0.12–0.20 | ₹12,000–19,000 | Needs DLT registration (one-time fee) |
-| WhatsApp authentication template | ₹0.136 incl. GST | ≈ ₹13,000 | Needs a Meta Business account |
-| **Truecaller one-tap** | **₹0** | ₹0 | Android only; about half of Indian Android users have Truecaller |
-| **Reverse WhatsApp** (user *sends* a code to you) | **₹0** | ₹0 | Messages users send *to* a business are free on Meta's Cloud API; works on iPhone too |
+| **Truecaller one-tap** (Android, if installed) | ₹0 | ≈ 35% (43,750) | ₹0 |
+| **WhatsApp OTP**: Meta authentication template, Cloud API direct | ₹0.1357 (₹0.115 + GST) | ≈ 58% (73,000) | ₹9,900 |
+| **SMS OTP** without DLT (Fast2SMS / 2Factor), fallback only | ≈ ₹0.41 | ≈ 7% (8,000) | ₹3,300 |
+| **Total** | | | **≈ ₹13,300** |
 
-**How reverse WhatsApp works:**
-1. The app shows "Verify with WhatsApp".
-2. WhatsApp opens with a pre-filled message such as `Verify my Rakta Bandhan number: RB-482913`, addressed to your business number. The user taps send.
-3. Meta forwards the incoming message to your server. Your server checks the code and reads the sender's number; WhatsApp verified that SIM when the user set WhatsApp up.
-4. Your server creates a Firebase login token, and the app signs in. Nothing is sent *to* the user, so nothing is billed.
+For comparison, over the same year:
 
-**Recommended order in the app:**
-1. Truecaller, if it's installed.
-2. Reverse WhatsApp.
-3. SMS OTP, only for the rare user without either. It stays within Firebase's 10 free SMS a day, or costs ₹0.12–0.20 through a DLT provider.
+| Other approach | Year 1 |
+|---|---|
+| WhatsApp + SMS, without Truecaller | ≈ ₹20,400 |
+| SMS through a DLT provider only (₹5,900/year registration + ≈ ₹0.24 each) | ≈ ₹36,000 |
+| Firebase Phone Auth SMS ($0.07 + GST each) | ❌ ≈ ₹9,90,000 |
 
-## Why the database used to cost so much (it wasn't storage)
+**Budget lever:** **"Verify on WhatsApp" (reverse verification)** makes the WhatsApp share free:
+- The user taps a button, WhatsApp opens with a code pre-filled, and they tap send.
+- Messages a user sends *to* a business are free, and are not subject to messaging limits.
+- It saves about ₹9,900 a year. The app can switch to it with one server setting if the budget gets tight.
 
-**Storage is cheap.** 80,000 donor profiles are about 80 MB. Firestore gives 1 GB free, and beyond that it's about ₹17 per GB per month.
+**Launch-day limit.** A new WhatsApp business number may message only 250 people a day. Completing **Meta Business Verification** lifts this to **100,000 a day** immediately, so finish it before launch.
 
-**Firestore bills per document read.** Every time a screen downloads a record, that's one read. It costs $0.06 per 100,000 reads, after 50,000 free reads a day. Three things in the code were downloading far more than needed:
+**Protection against SMS abuse** (the usual way OTP bills blow up):
+- Only the real app can call the OTP function: App Check with Play Integrity or App Attest.
+- +91 numbers only.
+- 30 seconds between resends; at most 5 codes per number, and per device, each day.
+- A code expires after 5 minutes; 5 wrong attempts lock it. Codes are stored hashed.
+- A daily cap on SMS spend inside the function.
 
-| Problem | Reads | Fix (now in the code) | Reads after |
+## Firestore: the two fixes the budget depends on
+
+Firestore bills per document read: $0.06 per 100,000 reads, after 50,000 free reads a day. The earlier fixes bounded the donor map and the counts. Two more places still read data **nationwide**, which is fine now and expensive at 1 lakh users.
+
+| Where | Today | Fix | Reads per app open |
 |---|---|---|---|
-| Find map and searching screen downloaded **every** available donor on each open | 30,000–80,000 per open | Only donors within about 15 km, at most 30 per area (270 per open) | ≤ 270 |
-| Searching screen kept a live download of donors just to show "N donors nearby" | Thousands, plus every change | Firestore **count** query, refreshed once a minute (1 read per 1,000 donors counted) | ≈ 9 a minute |
-| Admin dashboards loaded **every** donor and request (plus their ID photos) on open | 80,000+ per admin visit | Newest 200 donors and 300 requests, and counts instead of downloads | ≤ 500 |
-| The ID photo (~200 KB) sat inside the donor profile, downloaded on nearly every screen | ~10 downloads/user/day × 200 KB | Moved to its own record, and **deleted once an admin has verified it** | ~0 |
+| `Backend.openRequestsStream()`, used by home, Requests and urgent alerts | Every open request in India, live | Only requests within the alert area (geohash cells), newest first, capped | hundreds → ≤ 60 |
+| `community_screen.dart` "this month" figure | Downloads every fulfilled request ever | Count query for this month only | thousands → ≈ 1 |
 
-With these fixes, a busy launch day with 5,000 active users comes to about 700k–1.2M reads. That's about ₹40–70 for the day, and ordinary days are far less.
+| Scenario | Reads per active user per day | Firestore, year 1 incl. GST |
+|---|---|---|
+| With both fixes (target) | ≈ 100–120 | **≈ ₹7,000–9,000** |
+| Without them | ≈ 300–600 | ≈ ₹20,000–35,000 (breaks the budget) |
 
-## Community posts with photos
+Storage isn't the cost:
+- 1 lakh donor profiles plus requests come to well under 1 GB, which is free.
+- The ID photo has already moved out of the profile and is deleted after verification.
 
-The media cost above now covers this. The community feature is currently a design preview with no backend.
+## Community posts with photos (not built yet)
 
-**Assumed usage:** about 5% of active users post one photo a month (≈150–250 posts), and each active user views about 50 posts a month.
+- **Compress on the phone before upload:** a feed image at ~1080 px WebP (≈150 KB) plus a thumbnail at ~320 px (≈20 KB). That keeps storage and downloads inside the free tiers: Firebase Storage's 5 GB, or Cloudflare R2's 10 GB with free downloads.
+- **Keep it to photos.** Video is where the cost would jump.
 
-**Required to keep this near ₹0**
+## Setup, step by step
 
-Compress on the phone before upload:
-- a feed image at ~1080 px WebP, about 120–180 KB;
-- a thumbnail at ~320 px, about 20 KB.
-
-Uncompressed phone photos are 3–6 MB each, 25–40× more data.
-
-**Storage and downloads**
-- **Cloudflare R2:** 10 GB of storage and downloads are free, so this is **₹0**.
-- **Firebase Storage:** about 9 GB of downloads a month × $0.12, so about **₹1,000 a year**.
-
-**Firestore for the feed:** about 150k–250k reads a month, which is inside the free tier.
-
-**Video is where the cost would jump.** Keep v1 to photos only.
-
-## Blaze, step by step
-
-1. **Create the billing account in the Rotary club's name**, not yours, and link it to the Firebase project. Then upgrade to Blaze.
-2. **Budget alerts** (Cloud Console › Billing › Budgets): monthly budget ₹1,500, with alerts at 50%, 90% and 100%. Blaze has no hard cap, so the alerts are the guardrail.
-3. `firebase deploy --only firestore:rules,firestore:indexes`, then wait for all indexes to show "Enabled".
-4. **App Check** on Firestore and Auth, so only the real app can use your quota.
-5. Auth › Settings › **SMS region policy: India only**, if the SMS fallback is used at all.
-6. **Service account** for your server: Project settings › Service accounts › Generate key. Store it as a secret on your server; never put it in the app or the repo.
-7. For the first month, check the **Firestore usage page** twice a week. A sudden jump in reads almost always means a screen is re-downloading in a loop.
+1. **Accounts in the club's name.** Apple (and Google, as good practice) expect a legal entity, not an individual, to publish a health-related app (Apple guideline 5.1.1(ix)).
+   - Get a free **D-U-N-S number** for the club; it takes 1–4 weeks, so start now.
+   - Then open the Apple Developer (organisation) and Google Play (organisation) accounts.
+   - Organisation Play accounts also skip the "12 testers for 14 days" rule that applies to new personal accounts.
+   - Apply for Apple's nonprofit fee waiver; if it's approved, that saves ₹9,500 a year.
+2. **Blaze.** Create the Google Cloud billing account in the club's name, link it and upgrade.
+   - **Budget:** ₹3,000/month, with alerts at 50%, 90% and 100%. Blaze has no hard cap.
+3. **Don't enable "Identity Platform"** in Authentication. The app doesn't need it, and plain Firebase Auth has no per-user charge for custom sign-in.
+4. **Deploy the rules and indexes:** `firebase deploy --only firestore:rules,firestore:indexes`.
+5. **Cloud Functions.**
+   - Deploy in the same region as Firestore.
+   - Accept the **Artifact Registry cleanup policy** when the CLI asks, so old builds don't accumulate storage.
+   - Give the functions' service account the **Service Account Token Creator** role; creating sign-in tokens needs it.
+6. **App Check:** Play Integrity (Android) and App Attest (iOS), enforced on Firestore and the functions.
+   - Play Integrity allows 10,000 checks a day by default. **Request the free quota increase a week before launch.**
+7. **Meta.**
+   - Set up the Business Manager and WhatsApp Cloud API number, and complete **Business Verification**.
+   - Create an authentication template with a copy-code button, and add a payment method.
+8. **Truecaller.** Create a developer account and register the Android package name plus the release SHA-1.
+9. **SMS fallback.** Open a Fast2SMS or 2Factor account and top up ₹1,000.
+10. **Cloudflare.** On a free account, create a Realtime TURN key; the function turns it into short-lived call credentials.
+11. **Google Maps.** Create one Android key and one iOS key, each restricted to the app's package or bundle ID and to the Maps SDK only.
+12. **First month:** check Billing and Firestore usage twice a week. A sudden jump in reads almost always means a screen re-downloading in a loop.
 
 ## Your numbers
 
@@ -99,20 +123,25 @@ Uncompressed phone photos are 3–6 MB each, 25–40× more data.
 |---|---|
 | Year 1 quote | ₹1,00,000 |
 | Interns (2 × ₹5,000) | −₹10,000 |
-| Year-1 running costs (cheapest setup) | −₹13,500 to −₹19,500 |
-| **You keep, year 1** | **≈ ₹70,000–76,500** |
+| Year-1 running costs (this plan, with reserve) | −₹40,000 |
+| **You keep, year 1** | **≈ ₹50,000** (≈ ₹56,000 if the reserve isn't used) |
 | AMC from year 2 | ₹35,000–40,000 |
-| Year-2 running costs, if you pay them | −₹11,000 to −₹15,000 |
-| **You keep, year 2+** | **≈ ₹20,000–29,000** |
+| Year-2 running costs, if you pay them | ≈ −₹23,000 |
+| **You keep, year 2+** | **≈ ₹12,000–17,000** |
 
-**Recommendation:** have the club pay Google Cloud, Apple and Meta directly, on accounts in their name. Your AMC then stays pure service income, and the club legally owns its users' data, which DPDP expects of it as data fiduciary.
+**Recommendation:** from year 2, the club pays Google Cloud, Apple and Meta directly (the accounts are already in its name). Your AMC then stays service income: ≈ ₹35–40k instead of ≈ ₹12–17k.
 
 ## Sources
 - [Firebase pricing](https://firebase.google.com/pricing)
-- [Identity Platform SMS pricing](https://cloud.google.com/identity-platform/pricing)
-- [Cloud Storage for Firebase: billing changes](https://firebase.google.com/docs/storage/faqs-storage-changes-announced-sept-2024)
+- [Cloud Run functions pricing](https://cloud.google.com/functions/pricing-1stgen)
+- [Maps SDK for Android usage and billing](https://developers.google.com/maps/documentation/android-sdk/usage-and-billing)
+- [Google Maps Platform pricing list](https://developers.google.com/maps/billing-and-pricing/pricing)
+- [Cloudflare TURN service](https://developers.cloudflare.com/realtime/turn/)
+- [Identity Platform pricing](https://cloud.google.com/identity-platform/pricing)
+- [Google Cloud taxes in India](https://docs.cloud.google.com/billing/docs/resources/vat-overview)
+- [WhatsApp messaging limits](https://developers.facebook.com/docs/whatsapp/messaging-limits/)
 - [WhatsApp authentication pricing, India 2026](https://richautomate.in/blog/meta-whatsapp-per-template-pricing-2026-india-explained)
-- [SMS OTP pricing, India 2026](https://www.messagecentral.com/en-in/blog/sms-otp-pricing-india)
+- [Fast2SMS OTP without DLT](https://www.fast2sms.com/OTP-SMS-via-API-without-DLT-Registration)
+- [Play Integrity API overview](https://developer.android.com/google/play/integrity/overview)
+- [Apple Developer Program enrollment](https://developer.apple.com/help/account/membership/program-enrollment/)
 - [Truecaller Flutter SDK](https://pub.dev/packages/truecaller_sdk)
-- [Firebase Phone Number Verification](https://firebase.google.com/docs/phone-number-verification)
-- [USD/INR](https://tradingeconomics.com/india/currency)

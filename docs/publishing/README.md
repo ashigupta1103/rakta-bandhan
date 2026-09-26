@@ -9,9 +9,9 @@ Legend: ✅ done in the repo · ⬜ someone must do it (needs an account, a deci
 ## Blockers — the stores will reject, or the app is unsafe, without these
 
 - ⬜ **Real phone verification.** Today any 6-digit code signs in, and every account shares one hardcoded password (`Backend.verifyFakeOtp`). Anyone who knows a phone number can take over that account.
-  - Plan: Truecaller one-tap (Android), then "reverse WhatsApp" (free, all platforms), then a paid SMS OTP as a rare fallback.
-  - Runs on **your existing server**, which mints a Firebase custom token with the Admin SDK. No Cloud Functions needed.
-  - Do **not** use Firebase Phone Auth SMS at this volume (≈ ₹6.5 lakh a year). See `cost-estimate.md`.
+  - Plan: Truecaller one-tap (Android), then a WhatsApp OTP, then an SMS OTP as the fallback. "Verify on WhatsApp" (the user sends the code; free) can be switched on if the budget gets tight.
+  - Runs as **Cloud Functions** in the same Firebase project, which mint a Firebase custom token. No separate server.
+  - Do **not** use Firebase Phone Auth SMS at this volume (≈ ₹9.9 lakh a year). See `cost-estimate.md`.
 - ⬜ **Firebase for iOS.** `lib/firebase_options.dart` has no iOS config, so the app crashes on launch on iPhone.
   - Run `flutterfire configure --project=<id> --platforms=android,ios,web`.
   - This regenerates `firebase_options.dart` and adds `ios/Runner/GoogleService-Info.plist`.
@@ -52,10 +52,10 @@ Legend: ✅ done in the repo · ⬜ someone must do it (needs an account, a deci
 5. Build the admin dashboard, then deploy: `cd admin/frontend && npm run build && cd ../.. && firebase deploy --only hosting`
 6. Open `/legal/privacy.html`, `/legal/terms.html` and `/legal/delete-account.html` on the hosted domain. These are the store URLs.
 
-### 2. Server-side jobs (on your existing server, not Cloud Functions)
-Everything else stays client-side under Firestore rules. Your server uses the Firebase Admin SDK with a service-account key (kept as a server secret). FCM sending and custom tokens are free from any server. The jobs to add, in priority order:
+### 2. Server-side jobs (Cloud Functions, same project)
+Everything else stays client-side under Firestore rules. The functions use the built-in Admin SDK, so there is no key file to manage; the functions' service account needs the **Service Account Token Creator** role to mint sign-in tokens. All of this fits in the free 2M invocations a month. The jobs to add, in priority order:
 1. **OTP send/verify** → custom token (replaces the fake OTP).
-2. **Push on new message**: the app calls your server's `/notify` endpoint after sending, with its Firebase ID token. Alternatively, the server keeps an Admin SDK listener on new messages. Either way, the server sends FCM to the other participant.
+2. **Push on new message**: a Firestore trigger on `requests/{id}/messages/{mid}` sends FCM to the other participant.
 3. **Push on incoming call**: same pattern, for `requests/{id}/calls/{cid}`.
    - Android: an FCM high-priority data message, shown as a calling notification (a genuine calling use case).
    - iOS: PushKit VoIP → CallKit. Add the `voip` background mode **only** together with CallKit.
