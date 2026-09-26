@@ -443,7 +443,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                                 ? AppColors.primary
                                 : AppColors.dividerWarm,
                             textColor: _selectedBloodGroup == group
-                                ? const Color(0xFFFBE6E8)
+                                ? AppColors.onEmber
                                 : AppColors.textSecondary,
                             fontSize: 12,
                             serif: _selectedBloodGroup == group,

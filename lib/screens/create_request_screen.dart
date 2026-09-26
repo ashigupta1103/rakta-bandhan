@@ -209,7 +209,7 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
                     _questionDivider(),
                     if (!groupAnswered)
                       _questionSection(
-                        label: 'BLOOD GROUP',
+                        label: 'Blood group',
                         live: true,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -222,9 +222,9 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
                       )
                     else
                       _answeredRow(
-                        label: 'BLOOD GROUP',
+                        label: 'Blood group',
                         onTap: () => setState(() => _bloodGroup = null),
-                        leading: BloodGroupDroplet(label: _bloodGroup!, size: 34, filled: true, color: AppColors.primary, textColor: const Color(0xFFFBE6E8), fontSize: 13, serif: true),
+                        leading: BloodGroupDroplet(label: _bloodGroup!, size: 34, filled: true, color: AppColors.primary, textColor: AppColors.onEmber, fontSize: 13, serif: true),
                         value: '$_units unit${_units == 1 ? '' : 's'}',
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -242,7 +242,7 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
                     _questionDivider(),
                     if (!urgencyAnswered)
                       _questionSection(
-                        label: 'HOW URGENT',
+                        label: 'How urgent',
                         live: urgencyIsLive,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -256,7 +256,7 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
                       )
                     else
                       _answeredRow(
-                        label: 'HOW URGENT',
+                        label: 'How urgent',
                         onTap: () => setState(() => _urgency = null),
                         value: '${_urgencyOptions.firstWhere((u) => u.id == _urgency).label} · ${_urgencyOptions.firstWhere((u) => u.id == _urgency).desc}',
                       ),
@@ -310,7 +310,7 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
           children: [
             Container(width: 18, height: 18, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: accent, width: 1.5))),
             const SizedBox(width: 11),
-            Text(label, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, letterSpacing: 1.1, color: labelColor)),
+            Text(label, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, letterSpacing: 0.1, color: labelColor)),
           ],
         ),
         const SizedBox(height: 12),
@@ -338,7 +338,7 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, letterSpacing: 1.1, color: AppColors.textSecondary)),
+                Text(label, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, letterSpacing: 0.1, color: AppColors.textSecondary)),
                 const SizedBox(height: 2),
                 Text(value, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
               ],
@@ -473,7 +473,7 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
   Widget _locationSection({required bool live}) {
     if (_locationResolved && !_locationEditing) {
       return _answeredRow(
-        label: 'WHERE',
+        label: 'Where',
         onTap: () => setState(() => _locationEditing = true),
         leading: const Icon(LucideIcons.mapPin, size: 17, color: AppColors.textSecondary),
         value: _locationController.text,
@@ -481,7 +481,7 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
     }
 
     return _questionSection(
-      label: 'WHERE',
+      label: 'Where',
       live: live,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../theme/app_colors.dart';
 
 /// Product-wide ring geometry ("Two corrections carried into the language",
 /// Product Art Direction): three concentric circles at a fixed 216 / 152 /
@@ -45,7 +46,7 @@ class RingField extends StatelessWidget {
     super.key,
     this.scale = 1.0,
     this.referenceWidth = 390,
-    this.color = const Color(0xFFFBE6E8),
+    this.color = AppColors.onEmber,
     this.outerOpacity = 0.55,
     this.middleOpacity = 0.78,
     this.innerOpacity = 1.0,

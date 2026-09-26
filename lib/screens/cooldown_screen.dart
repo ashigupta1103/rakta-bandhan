@@ -128,7 +128,7 @@ class CooldownScreen extends StatelessWidget {
                         const SizedBox(height: 22),
                         const Align(
                           alignment: Alignment.centerLeft,
-                          child: Text('WHILE YOU WAIT', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 1.2, color: AppColors.textSecondary)),
+                          child: Text('While you wait', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.1, color: AppColors.textSecondary)),
                         ),
                         const SizedBox(height: 10),
                         InkWell(

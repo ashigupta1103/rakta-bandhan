@@ -179,7 +179,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> with SingleTickerPr
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     child: Text(
                       'Skip',
-                      style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w500, color: onDark ? const Color(0xFFE9BFC4) : AppColors.textSecondary),
+                      style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w500, color: onDark ? AppColors.onEmberMuted : AppColors.textSecondary),
                     ),
                   ),
                 ),
@@ -199,7 +199,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> with SingleTickerPr
                     height: 6,
                     decoration: BoxDecoration(
                       color: i == _index
-                          ? (onDark ? const Color(0xFFFBE6E8) : AppColors.primary)
+                          ? (onDark ? AppColors.onEmber : AppColors.primary)
                           : (onDark ? const Color(0x40FBE6E8) : AppColors.borderStrong),
                       borderRadius: BorderRadius.circular(3),
                     ),
@@ -304,7 +304,7 @@ class _OnboardingPageView extends StatelessWidget {
                   child: RingField(
                     scale: page.ringScale,
                     referenceWidth: _kFrameWidth,
-                    color: page.dark ? const Color(0xFFFBE6E8) : const Color(0xFFC8B8A0),
+                    color: page.dark ? AppColors.onEmber : const Color(0xFFC8B8A0),
                     innerDashed: index == 3,
                     strokeWidth: 1.4,
                     middleFill: page.dark ? const Color(0x14FBE6E8) : AppColors.primaryLightTint.withValues(alpha: 0.16),
@@ -456,7 +456,7 @@ class _OnboardingPageView extends StatelessWidget {
               size: primary ? 76 * px : 26 * px,
               filled: true,
               color: inert ? AppColors.dividerWarm : (primary ? AppColors.primary : AppColors.primaryLightTint),
-              textColor: inert ? AppColors.textSecondary : (primary ? const Color(0xFFFBE6E8) : AppColors.primary),
+              textColor: inert ? AppColors.textSecondary : (primary ? AppColors.onEmber : AppColors.primary),
               fontSize: primary ? 26 * px : 10 * px,
               serif: primary,
             ),
@@ -478,7 +478,7 @@ class _OnboardingPageView extends StatelessWidget {
             child: const Text(
               '2 UNITS · URGENT',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, letterSpacing: 1.4, color: AppColors.textSecondary),
+              style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, letterSpacing: 0.1, color: AppColors.textSecondary),
             ),
           ),
         ),

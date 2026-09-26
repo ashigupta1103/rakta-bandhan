@@ -75,7 +75,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(_greeting(), style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, letterSpacing: 1.1, color: AppColors.textSecondary)),
+                            Text(_greeting(), style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, letterSpacing: 0.1, color: AppColors.textSecondary)),
                             Text(
                               name.isEmpty ? 'Welcome' : name.split(' ').first,
                               style: AppTextStyles.display(fontSize: 30, color: AppColors.textPrimaryWarm, height: 1.1),
@@ -131,7 +131,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   Container(height: 1, color: AppColors.dividerWarm, margin: const EdgeInsets.only(top: 20)),
                   const SizedBox(height: 20),
-                  const Text('SOMEONE NEEDS YOU', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 1.3, color: AppColors.textSecondary)),
+                  const Text('Someone needs you', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.1, color: AppColors.textSecondary)),
                   const SizedBox(height: 12),
                   StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                     stream: Backend.instance.openRequestsStream(),
@@ -180,7 +180,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   Row(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      BloodGroupDroplet(label: group, size: 52, filled: true, color: AppColors.primary, textColor: const Color(0xFFFBE6E8), fontSize: 20, serif: true),
+                                      BloodGroupDroplet(label: group, size: 52, filled: true, color: AppColors.primary, textColor: AppColors.onEmber, fontSize: 20, serif: true),
                                       const SizedBox(width: 14),
                                       Expanded(
                                         child: Column(
@@ -192,7 +192,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                                 children: [
                                                   const Icon(LucideIcons.flame, size: 13, color: AppColors.primary),
                                                   const SizedBox(width: 6),
-                                                  Text(urgency == 'critical' ? 'CRITICAL' : 'URGENT', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 1.0, color: AppColors.primary)),
+                                                  Text(urgency == 'critical' ? 'Critical' : 'Urgent', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.1, color: AppColors.primary)),
                                                 ],
                                               ),
                                             const SizedBox(height: 5),
@@ -231,7 +231,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 24),
                   Container(height: 1, color: AppColors.dividerWarm),
                   const SizedBox(height: 20),
-                  const Text('YOUR RECORD', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 1.3, color: AppColors.textSecondary)),
+                  const Text('Your record', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.1, color: AppColors.textSecondary)),
                   const SizedBox(height: 12),
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.end,

@@ -31,6 +31,22 @@
         { "fieldPath": "donor_id", "order": "ASCENDING" },
         { "fieldPath": "donation_date", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "donors_public",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "is_available", "order": "ASCENDING" },
+        { "fieldPath": "geohash", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "calls",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "callee_uid", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

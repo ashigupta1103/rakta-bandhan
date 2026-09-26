@@ -212,7 +212,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Critical ${r.bloodGroup} request, no donor matched', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFFFFF9F5))),
+                        Text('Critical ${r.bloodGroup} request, no donor matched', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.onEmberStrong)),
                         const SizedBox(height: 3),
                         Text('${r.location} · ${r.time} — ready for manual broadcast', style: const TextStyle(fontSize: 11.5, color: Color(0xFFD9A5AA))),
                       ],

@@ -7,6 +7,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart' hide Path;
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../services/backend.dart';
+import '../services/nearby_donors.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../theme/app_theme.dart';
@@ -80,6 +81,25 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
   String? _sendingDonorId;
   int _retryToken = 0;
 
+  /// Bounded donor query around the current search centre (see
+  /// NearbyDonors). Rebuilt only when the centre moves to another ~5 km
+  /// cell or the user retries — not on every setState, which used to
+  /// re-subscribe a whole-collection listener on each rebuild.
+  NearbyDonors? _nearby;
+  String? _nearbyKey;
+
+  Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>> get _donorStream {
+    final p = _position;
+    if (p == null) return Stream.value(const []);
+    final key = '${NearbyDonors.cellOf(p.latitude, p.longitude)}#$_retryToken';
+    if (key != _nearbyKey) {
+      _nearby?.dispose();
+      _nearby = NearbyDonors(p.latitude, p.longitude);
+      _nearbyKey = key;
+    }
+    return _nearby!.stream;
+  }
+
   static const _bloodGroups = ['All', 'A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
 
   @override
@@ -96,6 +116,7 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
     _debounce?.cancel();
     _searchController.dispose();
     _sheetController.dispose();
+    _nearby?.dispose();
     super.dispose();
   }
 
@@ -230,12 +251,12 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
       body: Stack(
         children: [
           if (_permissionState == _MapPermissionState.granted && _position != null)
-            StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-              key: ValueKey(_retryToken),
-              stream: Backend.instance.availableDonorsStream(),
+            StreamBuilder<List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
+              key: ValueKey(_nearbyKey),
+              stream: _donorStream,
               builder: (context, snapshot) {
                 final myUid = Backend.instance.currentUser?.uid;
-                final donors = (snapshot.data?.docs ?? [])
+                final donors = (snapshot.data ?? const [])
                     .where((d) => d.id != myUid)
                     .map(_donorCardData)
                     .where((d) => _bloodGroupFilter == 'All' || d['bloodGroup'] == _bloodGroupFilter)
@@ -424,9 +445,9 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
                 ),
               ),
               Expanded(
-                child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                  key: ValueKey(_retryToken),
-                  stream: Backend.instance.availableDonorsStream(),
+                child: StreamBuilder<List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
+                  key: ValueKey('list$_nearbyKey'),
+                  stream: _donorStream,
                   builder: (context, snapshot) {
                     if (snapshot.hasError) {
                       return Center(
@@ -441,7 +462,7 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
                       return const Center(child: CircularProgressIndicator(strokeWidth: 2));
                     }
                     final myUid = Backend.instance.currentUser?.uid;
-                    final donors = snapshot.data!.docs
+                    final donors = snapshot.data!
                         .where((d) => d.id != myUid)
                         .map(_donorCardData)
                         .where((d) => _bloodGroupFilter == 'All' || d['bloodGroup'] == _bloodGroupFilter)
@@ -601,7 +622,7 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
               Positioned(
                 right: -6,
                 top: -6,
-                child: BloodGroupDroplet(label: donor['bloodGroup'] as String, size: primary ? 24 : 20, filled: true, color: AppColors.primary, textColor: const Color(0xFFFBE6E8), fontSize: 8),
+                child: BloodGroupDroplet(label: donor['bloodGroup'] as String, size: primary ? 24 : 20, filled: true, color: AppColors.primary, textColor: AppColors.onEmber, fontSize: 8),
               ),
               if (!primary)
                 Positioned(
@@ -656,7 +677,7 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
                   Positioned(
                     right: -5,
                     bottom: -3,
-                    child: BloodGroupDroplet(label: donor['bloodGroup'] as String, size: 20, filled: true, color: AppColors.primary, textColor: const Color(0xFFFBE6E8), fontSize: 7),
+                    child: BloodGroupDroplet(label: donor['bloodGroup'] as String, size: 20, filled: true, color: AppColors.primary, textColor: AppColors.onEmber, fontSize: 7),
                   ),
                 ],
               ),

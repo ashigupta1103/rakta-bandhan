@@ -41,7 +41,7 @@ class CertificateScreen extends StatelessWidget {
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: IconButton(
-                    icon: const Icon(LucideIcons.x, color: Color(0xFFFBEDE6)),
+                    icon: const Icon(LucideIcons.x, color: AppColors.onEmberWarm),
                     onPressed: () => Navigator.pop(context),
                   ),
                 ),
@@ -51,15 +51,19 @@ class CertificateScreen extends StatelessWidget {
                   padding: const EdgeInsets.fromLTRB(22, 6, 22, 24),
                   child: Column(
                     children: [
-                      const Text(
-                        '✓ DONATION COMPLETE',
-                        style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, letterSpacing: 2, color: Color(0xFF8FCF86)),
+                      const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(LucideIcons.checkCircle, size: 15, color: AppColors.onEmberSuccess),
+                          SizedBox(width: 7),
+                          Text('Donation complete', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.onEmberSuccess)),
+                        ],
                       ),
                       const SizedBox(height: 10),
                       Text(
                         'You helped someone today',
                         textAlign: TextAlign.center,
-                        style: AppTextStyles.display(fontSize: 28, height: 1.2, color: const Color(0xFFFBEDE6)),
+                        style: AppTextStyles.display(fontSize: 28, height: 1.2, color: AppColors.onEmberWarm),
                       ),
                       const SizedBox(height: 22),
                       FutureBuilder<Map<String, dynamic>?>(
@@ -118,7 +122,7 @@ class CertificateScreen extends StatelessWidget {
             children: [
               Image.asset('assets/branding/final-logo-transparent.png', width: 108),
               const SizedBox(height: 10),
-              const Text('CERTIFICATE OF DONATION', style: TextStyle(fontSize: 10, letterSpacing: 2.2, fontWeight: FontWeight.w600, color: AppColors.goldDeep)),
+              const Text('Certificate of donation', style: TextStyle(fontSize: 12, letterSpacing: 0.1, fontWeight: FontWeight.w600, color: AppColors.goldDeep)),
               Container(height: 1, color: const Color(0xFFEFCE8C), margin: const EdgeInsets.symmetric(vertical: 14, horizontal: 24)),
               const Text('This certifies that', style: TextStyle(fontSize: 12, color: AppColors.ink2)),
               const SizedBox(height: 4),
@@ -159,7 +163,7 @@ class CertificateScreen extends StatelessWidget {
                       height: 26,
                       decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.goldTint),
                       alignment: Alignment.center,
-                      child: const Text('✷', style: TextStyle(fontSize: 12, color: AppColors.goldDeep)),
+                      child: const Icon(LucideIcons.award, size: 14, color: AppColors.goldDeep),
                     ),
                     const SizedBox(width: 10),
                     Flexible(

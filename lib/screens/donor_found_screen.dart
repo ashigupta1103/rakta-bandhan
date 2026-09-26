@@ -4,6 +4,7 @@ import '../services/donor_match_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/blood_group_droplet.dart';
+import '../widgets/contact_actions.dart';
 import '../widgets/two_person_connection.dart';
 
 /// Terminal screen of the matching ladder's "donor found" outcome — the
@@ -21,10 +22,6 @@ class DonorFoundScreen extends StatelessWidget {
 
   void _goHome(BuildContext context) {
     Navigator.of(context).popUntil((route) => route.isFirst);
-  }
-
-  void _placeholderAction(BuildContext context, String label) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$label — coming soon.')));
   }
 
   @override
@@ -65,53 +62,36 @@ class DonorFoundScreen extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 28),
                     child: Column(
                       children: [
-                        const Text("YOU'RE CONNECTED", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 1.5, color: Color(0xFFE0A8AF))),
+                        const Text("You're connected", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.onEmberEyebrow)),
                         const SizedBox(height: 12),
                         Text(
                           '${donor.name.split(' ').first} is ready\nto help you',
                           textAlign: TextAlign.center,
-                          style: AppTextStyles.display(fontSize: 28, color: const Color(0xFFFFF9F5), height: 1.2),
+                          style: AppTextStyles.display(fontSize: 28, color: AppColors.onEmberStrong, height: 1.2),
                         ),
                         const SizedBox(height: 12),
                         Text(
-                          '${donor.bloodGroup} · ${donor.distance} · verified donor. Reach out and agree a time.',
+                          '${[donor.bloodGroup, donor.distance, if (donor.isVerified) 'verified donor'].where((p) => p.isNotEmpty).join(' · ')}. Reach out and agree a time.',
                           textAlign: TextAlign.center,
-                          style: const TextStyle(fontSize: 13.5, color: Color(0xFFE9BFC4), height: 1.6),
+                          style: const TextStyle(fontSize: 13.5, color: AppColors.onEmberMuted, height: 1.6),
                         ),
                         const SizedBox(height: 20),
-                        BloodGroupDroplet(label: donor.bloodGroup, size: 34, filled: true, color: AppColors.primary, textColor: const Color(0xFFFBE6E8), fontSize: 12),
+                        BloodGroupDroplet(label: donor.bloodGroup, size: 34, filled: true, color: AppColors.primary, textColor: AppColors.onEmber, fontSize: 12),
                       ],
                     ),
                   ),
                   const SizedBox(height: 24),
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(28, 0, 28, 20),
+                    padding: const EdgeInsets.fromLTRB(28, 0, 28, 16),
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(backgroundColor: AppColors.warmPageBackground, foregroundColor: AppColors.gradientEmberMid),
-                            onPressed: () => _placeholderAction(context, 'Call'),
-                            icon: const Icon(LucideIcons.phone, size: 16),
-                            label: const Text('Call', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton.icon(
-                            style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFFFBE6E8), side: const BorderSide(color: Color(0x8CFBE6E8))),
-                            onPressed: () => _placeholderAction(context, 'WhatsApp'),
-                            icon: const Icon(LucideIcons.messageSquare, size: 15),
-                            label: const Text('WhatsApp'),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        const Text('Mark as donated afterwards', textAlign: TextAlign.center, style: TextStyle(fontSize: 12.5, color: Color(0xFFD9AFB4))),
+                        ContactActions(requestId: requestId, peerUid: donor.uid, peerName: donor.name, peerPhone: donor.phone),
+                        const SizedBox(height: 6),
+                        const Text('They mark it as donated afterwards.', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: AppColors.onEmberFaint)),
                         TextButton(
                           onPressed: () => _goHome(context),
-                          child: const Text('Back to home', style: TextStyle(fontSize: 13, color: Color(0xFFE9BFC4))),
+                          child: const Text('Back to home', style: TextStyle(fontSize: 13, color: AppColors.onEmberMuted)),
                         ),
                       ],
                     ),

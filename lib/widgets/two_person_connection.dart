@@ -37,7 +37,7 @@ class TwoPersonConnection extends StatelessWidget {
             clipBehavior: Clip.none,
             children: [
               Positioned.fill(
-                child: RingField(scale: 0.90, referenceWidth: 390, color: const Color(0xFFFBE6E8), outerOpacity: 0.5, middleOpacity: 0.75, innerOpacity: 1),
+                child: RingField(scale: 0.90, referenceWidth: 390, color: AppColors.onEmber, outerOpacity: 0.5, middleOpacity: 0.75, innerOpacity: 1),
               ),
               SizedBox(
                 width: ringRadius * 2,
@@ -62,7 +62,7 @@ class TwoPersonConnection extends StatelessWidget {
                     border: Border.all(color: Colors.white.withValues(alpha: 0.6), width: 1.5),
                   ),
                   alignment: Alignment.center,
-                  child: Text(leftLabel, style: TextStyle(fontSize: 15 * px, fontWeight: FontWeight.w600, color: const Color(0xFFFFF9F5))),
+                  child: Text(leftLabel, style: TextStyle(fontSize: 15 * px, fontWeight: FontWeight.w600, color: AppColors.onEmberStrong)),
                 ),
               ),
               Positioned(

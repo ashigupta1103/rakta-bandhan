@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../theme/app_colors.dart';
+import '../widgets/brand_glyph.dart';
 
 class CancelConfirmScreen extends StatelessWidget {
   final String requestId;
@@ -17,13 +18,7 @@ class CancelConfirmScreen extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Container(
-                width: 56,
-                height: 56,
-                decoration: const BoxDecoration(color: AppColors.primaryLightTint, shape: BoxShape.circle),
-                alignment: Alignment.center,
-                child: const Icon(LucideIcons.xCircle, size: 24, color: AppColors.primary),
-              ),
+              const BrandGlyph(icon: LucideIcons.x, tone: GlyphTone.neutral, size: 56),
               const SizedBox(height: 16),
               const Text(
                 'Request cancelled',
@@ -32,7 +27,7 @@ class CancelConfirmScreen extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               const Text(
-                'Donors who were already notified will see this request marked as cancelled.',
+                'It no longer appears to donors or in your requests. If you still need blood later, raise a new request.',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 13.5, color: AppColors.textSecondary, height: 1.5),
               ),

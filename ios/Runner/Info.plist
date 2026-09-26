@@ -15,7 +15,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>rakta_bandhan</string>
+	<string>Rakta Bandhan</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -66,5 +66,31 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<!-- Permission prompts. App Review rejects any permission used without a
+	     purpose string; each says exactly what the app does with it. -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Rakta Bandhan uses your location to show blood requests and donors near you. Other people only ever see an approximate distance, never your address.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Take a photo of your ID so an administrator can verify your donor profile. The photo is never shown to other users.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Choose a photo of your ID so an administrator can verify your donor profile. The photo is never shown to other users.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Needed for in-app voice calls with the donor or requester you are matched with. Calls are never recorded.</string>
+	<!-- tel: fallback ("call from your phone"). -->
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>tel</string>
+	</array>
+	<!-- audio: keeps an in-progress call alive when the screen locks.
+	     remote-notification: push delivery once the Blaze functions exist.
+	     Deliberately no "voip" — PushKit is only added together with CallKit. -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+		<string>remote-notification</string>
+	</array>
+	<!-- Only standard, exempt encryption (HTTPS, WebRTC DTLS-SRTP). -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>

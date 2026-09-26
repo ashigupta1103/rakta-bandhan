@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../services/chat_service.dart';
 import '../theme/app_colors.dart';
+import '../widgets/live_events_host.dart';
 import 'community_screen.dart';
 import 'find_donors_screen.dart';
 import 'profile_screen.dart';
@@ -46,12 +48,21 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(index: _currentIndex, children: _screens),
-      bottomNavigationBar: _bottomNav(),
+      // LiveEventsHost: incoming in-app calls and opted-in urgent alerts
+      // interrupt from here, whichever tab or pushed screen is showing.
+      body: LiveEventsHost(child: IndexedStack(index: _currentIndex, children: _screens)),
+      // Unread messages put a dot on the Request tab (where the Messages
+      // inbox lives), so a reply is noticed from any tab.
+      bottomNavigationBar: StreamBuilder<int>(
+        stream: _unread,
+        builder: (context, snap) => _bottomNav(requestHasUnread: (snap.data ?? 0) > 0),
+      ),
     );
   }
 
-  Widget _bottomNav() {
+  late final Stream<int> _unread = ChatService.instance.watchUnreadCount();
+
+  Widget _bottomNav({required bool requestHasUnread}) {
     return Container(
       padding: const EdgeInsets.fromLTRB(8, 10, 8, 12),
       decoration: BoxDecoration(
@@ -63,17 +74,18 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         top: false,
         child: Row(
           children: [
-            for (var i = 0; i < _tabs.length; i++) Expanded(child: _tabButton(index: i)),
+            for (var i = 0; i < _tabs.length; i++) Expanded(child: _tabButton(index: i, requestHasUnread: requestHasUnread)),
           ],
         ),
       ),
     );
   }
 
-  Widget _tabButton({required int index}) {
+  Widget _tabButton({required int index, required bool requestHasUnread}) {
     final isActive = _currentIndex == index;
     final tab = _tabs[index];
-    final showUnreadDot = index == 2 && _communityHasUnread && !isActive;
+    final showUnreadDot = (index == 2 && _communityHasUnread && !isActive) || (index == 0 && requestHasUnread);
+    final dotColor = index == 0 ? AppColors.brandRed : AppColors.gold;
 
     return GestureDetector(
       onTap: () => setState(() => _currentIndex = index),
@@ -105,7 +117,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                     child: Container(
                       width: 7,
                       height: 7,
-                      decoration: const BoxDecoration(color: AppColors.gold, shape: BoxShape.circle),
+                      decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
                     ),
                   ),
               ],

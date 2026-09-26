@@ -5,9 +5,12 @@ import '../services/backend.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/blood_group_droplet.dart';
+import '../widgets/confirm_sheet.dart';
 import '../widgets/identity_disc.dart';
 import '../widgets/step_tracker.dart';
+import 'call_screen.dart';
 import 'cancel_confirm_screen.dart';
+import 'chat_screen.dart';
 import 'create_request_screen.dart';
 
 /// Real request-status timeline. Watches the actual Firestore request
@@ -32,6 +35,13 @@ class _TrackingScreenState extends State<TrackingScreen> {
 
   Future<void> _cancel() async {
     if (_cancelling) return;
+    final confirmed = await ConfirmSheet.show(
+      context,
+      title: 'Cancel this request?',
+      message: 'Donors will stop seeing it, and a donor who already accepted will be told it was cancelled.',
+      confirmLabel: 'Cancel request',
+    );
+    if (!confirmed || !mounted) return;
     setState(() => _cancelling = true);
     try {
       await Backend.instance.cancelRequest(widget.requestId);
@@ -42,6 +52,19 @@ class _TrackingScreenState extends State<TrackingScreen> {
       setState(() => _cancelling = false);
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not cancel this request. Please try again.')));
     }
+  }
+
+  Future<void> _call(Map<String, dynamic> request) async {
+    final me = (await Backend.instance.myDonorDoc()).data();
+    if (!mounted) return;
+    await startCallFlow(
+      context,
+      requestId: widget.requestId,
+      peerUid: request['matched_donor_id'] as String? ?? '',
+      peerName: request['matched_donor_name'] as String? ?? 'Your donor',
+      myName: me?['name'] as String? ?? 'Rakta Bandhan user',
+      peerPhone: request['matched_donor_phone'] as String? ?? '',
+    );
   }
 
   @override
@@ -151,13 +174,17 @@ class _TrackingScreenState extends State<TrackingScreen> {
                           IdentityDisc(initials: _initials(donorName), size: 40, isPublic: true),
                           const SizedBox(width: 12),
                           Expanded(child: Text(donorName, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm))),
-                          if (urgency == 'critical' && !isFulfilled)
-                            Container(
-                              width: 34,
-                              height: 34,
-                              decoration: const BoxDecoration(color: AppColors.brandRed, shape: BoxShape.circle),
-                              alignment: Alignment.center,
-                              child: const Icon(LucideIcons.phone, size: 15, color: Colors.white),
+                          IconButton(
+                            tooltip: 'Message',
+                            icon: const Icon(LucideIcons.messageSquare, size: 18, color: AppColors.ink),
+                            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ChatScreen(requestId: widget.requestId))),
+                          ),
+                          if (status == 'matched')
+                            IconButton(
+                              tooltip: 'Voice call',
+                              style: IconButton.styleFrom(backgroundColor: AppColors.brandRed),
+                              icon: const Icon(LucideIcons.phone, size: 16, color: Colors.white),
+                              onPressed: () => _call(data),
                             ),
                         ],
                       ),
@@ -197,7 +224,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                     ),
                   ] else if (canCancel) ...[
                     const SizedBox(height: 20),
-                    const Text('IF SOMETHING CHANGES', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 1.1, color: AppColors.ink2)),
+                    const Text('If something changes', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.ink2)),
                     const SizedBox(height: 10),
                     Container(
                       decoration: BoxDecoration(color: Colors.white, border: Border.all(color: AppColors.warmBorder), borderRadius: BorderRadius.circular(12)),

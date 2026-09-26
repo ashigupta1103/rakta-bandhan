@@ -192,7 +192,7 @@ class _DonorDetailsScreenState extends State<DonorDetailsScreen> {
                 ),
               ),
               const SizedBox(height: 22),
-              const Text("WHAT WE SHOW, AND WHAT WE DON'T", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 1.2, color: AppColors.ink2)),
+              const Text("What we show, and what we don't", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.1, color: AppColors.ink2)),
               const SizedBox(height: 10),
               Container(
                 decoration: BoxDecoration(color: Colors.white, border: Border.all(color: AppColors.warmBorder), borderRadius: BorderRadius.circular(12)),

@@ -148,6 +148,24 @@ class Backend {
 
   Future<void> signOut() => _auth.signOut();
 
+  /// Firebase requires a fresh sign-in before destructive account actions
+  /// (user.delete()). With the fake-OTP scheme the credential is derivable
+  /// from the session itself; once real phone auth lands this becomes a
+  /// fresh OTP round-trip instead.
+  Future<void> reauthenticateForSensitiveAction() async {
+    final user = _auth.currentUser;
+    final email = user?.email;
+    if (user == null || email == null) return;
+    await user.reauthenticateWithCredential(
+      EmailAuthProvider.credential(email: email, password: _fakeAuthPassword),
+    );
+  }
+
+  /// ~1.1 km precision. donors_public is readable by every signed-in user,
+  /// and the consent screen promises donors are shown "approximately" —
+  /// exact coordinates only ever live on the private donors/{uid} doc.
+  static double _coarse(double degrees) => (degrees * 100).roundToDouble() / 100;
+
   Future<DocumentSnapshot<Map<String, dynamic>>> myDonorDoc() =>
       _db.collection('donors').doc(_uid).get();
 
@@ -195,9 +213,9 @@ class Backend {
       tx.set(_db.collection('donors_public').doc(_uid), {
         'name': name,
         'blood_group': bloodGroup,
-        'geohash': geohash,
-        'lat': lat,
-        'lng': lng,
+        'geohash': encodeGeohash(_coarse(lat), _coarse(lng), precision: 6),
+        'lat': _coarse(lat),
+        'lng': _coarse(lng),
         'is_available': true,
         'is_verified': false,
         'updated_at': now,
@@ -214,13 +232,40 @@ class Backend {
   /// screen.dart) constrains the picked image's resolution/quality so the
   /// encoded string comfortably fits Firestore's 1MiB document limit.
   /// Admins view it from AdminDonorDetailScreen before verifying.
+  ///
+  /// The image lives in its own document (`donors/{uid}/private/id_proof`),
+  /// not inline on the profile: the profile is read on nearly every screen,
+  /// and an inline ~200 KB image made every one of those reads download it.
+  /// The profile keeps only a `has_id_proof` flag.
   Future<void> uploadIdProof(XFile file) async {
     final bytes = await file.readAsBytes();
-    await _db.collection('donors').doc(_uid).update({
-      'id_proof_base64': base64Encode(bytes),
-      'id_proof_content_type': file.mimeType ?? 'image/jpeg',
+    final batch = _db.batch();
+    batch.set(_idProofRef(_uid), {
+      'base64': base64Encode(bytes),
+      'content_type': file.mimeType ?? 'image/jpeg',
+      'uploaded_at': FieldValue.serverTimestamp(),
     });
+    batch.update(_db.collection('donors').doc(_uid), {
+      'has_id_proof': true,
+      'id_proof_base64': FieldValue.delete(),
+      'id_proof_content_type': FieldValue.delete(),
+    });
+    await batch.commit();
   }
+
+  DocumentReference<Map<String, dynamic>> _idProofRef(String uid) =>
+      _db.collection('donors').doc(uid).collection('private').doc('id_proof');
+
+  /// Owner/admin only (rules). Falls back to the legacy inline field for
+  /// donors who uploaded before the image moved to its own document.
+  Future<String?> fetchIdProof(String uid) async {
+    final own = (await _idProofRef(uid).get()).data()?['base64'] as String?;
+    if (own != null) return own;
+    return (await _db.collection('donors').doc(uid).get()).data()?['id_proof_base64'] as String?;
+  }
+
+  /// Account deletion: the ID image document goes with the profile.
+  Future<void> deleteMyIdProof() => _idProofRef(_uid).delete();
 
   Future<void> setAvailability(bool available) async {
     await _db.runTransaction((tx) async {
@@ -231,6 +276,19 @@ class Backend {
       });
     });
   }
+
+  /// Opt-in for the ringing urgent-request alert (see UrgentAlertService).
+  /// Stored on the private profile so a future Blaze push function can
+  /// honour the same preference server-side.
+  Future<void> setUrgentAlerts(bool enabled) =>
+      _db.collection('donors').doc(_uid).update({'urgent_alerts': enabled});
+
+  /// FCM device token, for the Blaze-era push functions (urgent alerts,
+  /// incoming calls, chat). Owner-only doc, so never visible to others.
+  Future<void> savePushToken(String token) => _db.collection('donors').doc(_uid).update({
+        'fcm_token': token,
+        'fcm_token_updated_at': FieldValue.serverTimestamp(),
+      });
 
   /// Client-side stand-in for scheduledReactivation.js — call on profile load.
   Future<void> maybeReactivate() async {
@@ -243,6 +301,9 @@ class Backend {
     await setAvailability(true);
   }
 
+  /// Whole-collection scan — reads every available donor. Kept for the
+  /// admin/preview paths only; user-facing screens use NearbyDonors, whose
+  /// cost scales with local density instead of total signups.
   Stream<QuerySnapshot<Map<String, dynamic>>> availableDonorsStream() =>
       _db.collection('donors_public').where('is_available', isEqualTo: true).snapshots();
 
@@ -362,6 +423,29 @@ class Backend {
       tx.update(donorRef, {'active_request_id': requestId});
     });
     _logEvent('request_matched', {'request_id': requestId});
+  }
+
+  /// The matched donor backs out ("I can't make it"). The request goes
+  /// back to `open` with a fresh expiry window so other donors can accept
+  /// it, and the donor's lock is freed. Their name/phone come off the doc.
+  Future<void> releaseMatch(String requestId) async {
+    await _db.runTransaction((tx) async {
+      final reqRef = _db.collection('requests').doc(requestId);
+      final reqSnap = await tx.get(reqRef);
+      final data = reqSnap.data();
+      if (data == null || data['status'] != 'matched' || data['matched_donor_id'] != _uid) return;
+      tx.update(reqRef, {
+        'status': 'open',
+        'matched_donor_id': null,
+        'matched_donor_name': null,
+        'matched_donor_phone': null,
+        'matched_at': null,
+        'released_at': FieldValue.serverTimestamp(),
+        'expires_at': Timestamp.fromDate(DateTime.now().add(const Duration(hours: requestExpiryHours))),
+      });
+      tx.update(_db.collection('donors').doc(_uid), {'active_request_id': null});
+    });
+    _logEvent('request_released', {'request_id': requestId});
   }
 
   /// Matched donor self-reports the donation done, writes the immutable

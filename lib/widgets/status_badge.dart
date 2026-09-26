@@ -58,7 +58,7 @@ class StatusBadge extends StatelessWidget {
 class UrgentRibbon extends StatelessWidget {
   final String label;
 
-  const UrgentRibbon({super.key, this.label = 'URGENT'});
+  const UrgentRibbon({super.key, this.label = 'Urgent'});
 
   @override
   Widget build(BuildContext context) {

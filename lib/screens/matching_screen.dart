@@ -2,9 +2,12 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../services/backend.dart';
+import '../services/nearby_donors.dart';
 import '../theme/app_colors.dart';
 import '../widgets/blood_group_droplet.dart';
+import '../widgets/confirm_sheet.dart';
 import '../widgets/ring_field.dart';
 import 'cancel_confirm_screen.dart';
 import 'donor_found_screen.dart';
@@ -33,7 +36,8 @@ class MatchingScreen extends StatefulWidget {
 
 class _MatchingScreenState extends State<MatchingScreen> {
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _requestSub;
-  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _donorSub;
+  StreamSubscription<List<QueryDocumentSnapshot<Map<String, dynamic>>>>? _donorSub;
+  NearbyDonors? _nearby;
   Timer? _tick;
 
   DateTime? _createdAt;
@@ -52,13 +56,6 @@ class _MatchingScreenState extends State<MatchingScreen> {
     });
     _requestSub = FirebaseFirestore.instance.collection('requests').doc(widget.requestId).snapshots().listen(_onRequestUpdate);
 
-    final compatibleGroups = bloodCompatibility[widget.bloodGroup] ?? const <String>[];
-    _donorSub = Backend.instance.availableDonorsStream().listen((snap) {
-      if (!mounted) return;
-      setState(() {
-        _compatibleAvailableCount = snap.docs.where((d) => compatibleGroups.contains(d.data()['blood_group'])).length;
-      });
-    });
 
     // Real elapsed-time display and a real expiry check — no fixed-delay
     // simulation of an outcome.
@@ -76,6 +73,20 @@ class _MatchingScreenState extends State<MatchingScreen> {
       _createdAt = (data['created_at'] as Timestamp?)?.toDate();
       _expiresAt = (data['expires_at'] as Timestamp?)?.toDate();
     });
+    // Count compatible donors around the request's own location — bounded
+    // query (NearbyDonors), started once the request doc gives us a point.
+    final lat = (data['lat'] as num?)?.toDouble();
+    final lng = (data['lng'] as num?)?.toDouble();
+    if (_nearby == null && lat != null && lng != null) {
+      final compatibleGroups = bloodCompatibility[widget.bloodGroup] ?? const <String>[];
+      _nearby = NearbyDonors(lat, lng);
+      _donorSub = _nearby!.stream.listen((docs) {
+        if (!mounted) return;
+        setState(() {
+          _compatibleAvailableCount = docs.where((d) => compatibleGroups.contains(d.data()['blood_group'])).length;
+        });
+      }, onError: (_) {});
+    }
     final status = data['status'] as String? ?? 'open';
     if (status == 'matched') {
       _goTo(() => DonorFoundScreen(requestId: widget.requestId));
@@ -103,8 +114,26 @@ class _MatchingScreenState extends State<MatchingScreen> {
     Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => builder()));
   }
 
+  /// The request stays open and visible to donors — the requester just
+  /// stops watching this screen. The live status is always one tap away
+  /// under Request → My requests → Track status.
+  void _keepWaitingInBackground() {
+    _navigated = true;
+    Navigator.of(context).popUntil((route) => route.isFirst);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Still searching. Track it anytime from My requests.')),
+    );
+  }
+
   Future<void> _cancel() async {
     if (_cancelling) return;
+    final confirmed = await ConfirmSheet.show(
+      context,
+      title: 'Cancel this request?',
+      message: 'Donors will stop seeing it. Choose "Keep waiting" instead if you just want to leave this screen — the search carries on.',
+      confirmLabel: 'Cancel request',
+    );
+    if (!confirmed || !mounted) return;
     setState(() => _cancelling = true);
     _navigated = true;
     await _requestSub?.cancel();
@@ -122,6 +151,7 @@ class _MatchingScreenState extends State<MatchingScreen> {
   void dispose() {
     _requestSub?.cancel();
     _donorSub?.cancel();
+    _nearby?.dispose();
     _tick?.cancel();
     _searchPhaseTimer?.cancel();
     super.dispose();
@@ -165,20 +195,20 @@ class _MatchingScreenState extends State<MatchingScreen> {
                           alignment: Alignment.center,
                           children: [
                             const Positioned.fill(
-                              child: RingField(scale: 1.0, referenceWidth: 390, color: Color(0xFFFBE6E8), outerOpacity: 0.16, middleOpacity: 0.26, innerOpacity: 0, strokeWidth: 1),
+                              child: RingField(scale: 1.0, referenceWidth: 390, color: AppColors.onEmber, outerOpacity: 0.16, middleOpacity: 0.26, innerOpacity: 0, strokeWidth: 1),
                             ),
                             ..._compatibleDots(),
-                            BloodGroupDroplet(label: widget.bloodGroup, size: 60, filled: true, color: AppColors.primary, textColor: const Color(0xFFFBE6E8), fontSize: 20, serif: true),
+                            BloodGroupDroplet(label: widget.bloodGroup, size: 60, filled: true, color: AppColors.primary, textColor: AppColors.onEmber, fontSize: 20, serif: true),
                           ],
                         ),
                       ),
                       const SizedBox(height: 22),
-                      Text(_searchPhaseOver ? 'STILL WAITING' : 'SEARCHING', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 1.3, color: Color(0xFFE0A8AF))),
+                      Text(_searchPhaseOver ? 'Still waiting' : 'Searching', style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, letterSpacing: 0.2, color: AppColors.onEmberEyebrow)),
                       const SizedBox(height: 10),
                       Text(
                         _searchPhaseOver ? "No match confirmed yet — this screen updates the moment a donor accepts" : 'Visible now to compatible donors nearby',
                         textAlign: TextAlign.center,
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Color(0xFFFFF9F5), height: 1.35),
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.onEmberStrong, height: 1.35),
                       ),
                       const SizedBox(height: 8),
                       Text(
@@ -209,10 +239,28 @@ class _MatchingScreenState extends State<MatchingScreen> {
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                child: TextButton(
-                  onPressed: _cancelling ? null : _cancel,
-                  child: Text(_cancelling ? 'Cancelling…' : 'Cancel this request', style: TextStyle(fontSize: 13, color: Colors.white.withValues(alpha: 0.55))),
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(backgroundColor: AppColors.warmPageBackground, foregroundColor: AppColors.gradientEmberMid),
+                      onPressed: _cancelling ? null : _keepWaitingInBackground,
+                      icon: const Icon(LucideIcons.hourglass, size: 16),
+                      label: const Text('Keep waiting in background'),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Your request stays live for donors. The Request tab updates the moment someone accepts.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 11.5, color: Colors.white.withValues(alpha: 0.5), height: 1.4),
+                    ),
+                    const SizedBox(height: 4),
+                    TextButton(
+                      onPressed: _cancelling ? null : _cancel,
+                      child: Text(_cancelling ? 'Cancelling…' : 'Cancel this request', style: TextStyle(fontSize: 13, color: Colors.white.withValues(alpha: 0.55))),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -243,7 +291,7 @@ class _MatchingScreenState extends State<MatchingScreen> {
             child: Container(
               width: positions[i].size,
               height: positions[i].size,
-              decoration: const BoxDecoration(color: Color(0xFFFBE6E8), shape: BoxShape.circle),
+              decoration: const BoxDecoration(color: AppColors.onEmber, shape: BoxShape.circle),
             ),
           ),
         ),
@@ -262,12 +310,12 @@ class _MatchingScreenState extends State<MatchingScreen> {
               height: 22,
               decoration: const BoxDecoration(color: Color.fromRGBO(90, 180, 110, 0.2), shape: BoxShape.circle),
               alignment: Alignment.center,
-              child: const Icon(Icons.check, size: 12, color: Color(0xFF7FCB8E)),
+              child: const Icon(LucideIcons.check, size: 12, color: AppColors.onEmberSuccess),
             )
           else if (showSpinner)
-            const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFEDA5AC)))
+            const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.onEmberAccent))
           else
-            const Icon(Icons.schedule, size: 20, color: Color(0xFFEDA5AC)),
+            const Icon(LucideIcons.clock, size: 18, color: AppColors.onEmberAccent),
           const SizedBox(width: 10),
           Text(label, style: TextStyle(fontSize: 13, color: Colors.white.withValues(alpha: 0.85))),
         ],

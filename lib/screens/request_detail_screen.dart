@@ -165,7 +165,7 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
                             Row(
                               crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
-                                BloodGroupDroplet(label: bloodGroup, size: 44, filled: true, color: AppColors.primary, textColor: const Color(0xFFFBE6E8), fontSize: 15, serif: true),
+                                BloodGroupDroplet(label: bloodGroup, size: 44, filled: true, color: AppColors.primary, textColor: AppColors.onEmber, fontSize: 15, serif: true),
                                 const SizedBox(width: 10),
                                 if (urgency != 'normal')
                                   Container(
