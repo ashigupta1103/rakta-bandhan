@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
+import '../widgets/brand_glyph.dart';
+import 'legal_reader_screen.dart';
 import 'location_permission_screen.dart';
 
 class ConsentScreen extends StatefulWidget {
@@ -37,13 +39,7 @@ class _ConsentScreenState extends State<ConsentScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 52,
-                height: 52,
-                alignment: Alignment.center,
-                decoration: const BoxDecoration(color: AppColors.primaryLightTint, shape: BoxShape.circle),
-                child: const Icon(LucideIcons.lock, size: 22, color: AppColors.primary),
-              ),
+              const BrandGlyph(icon: LucideIcons.lock),
               const SizedBox(height: 16),
               Text('Your data, handled carefully', style: AppTextStyles.display(fontSize: 21, color: AppColors.textPrimaryWarm)),
               const SizedBox(height: 8),
@@ -64,7 +60,7 @@ class _ConsentScreenState extends State<ConsentScreen> {
               const SizedBox(height: 12),
               _infoCard(
                 'You can request deletion anytime',
-                'From Settings → Privacy, in line with the DPDP Act, 2023.',
+                'Settings › Delete my account removes it, in line with the DPDP Act, 2023.',
               ),
               const SizedBox(height: 20),
               GestureDetector(
@@ -85,14 +81,24 @@ class _ConsentScreenState extends State<ConsentScreen> {
                     const SizedBox(width: 4),
                     const Expanded(
                       child: Text(
-                        'I agree to the privacy policy and consent to being contacted for blood donation requests.',
+                        'I am 18 or older, I agree to the Terms of use and Privacy policy, and I consent to being contacted about blood donation requests.',
                         style: TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.4),
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 22),
+              Padding(
+                padding: const EdgeInsets.only(left: 40),
+                child: Wrap(
+                  spacing: 4,
+                  children: [
+                    _docLink('Terms of use', () => const LegalReaderScreen.terms()),
+                    _docLink('Privacy policy', () => const LegalReaderScreen.privacy()),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -107,6 +113,12 @@ class _ConsentScreenState extends State<ConsentScreen> {
       ),
     );
   }
+
+  Widget _docLink(String label, Widget Function() page) => TextButton(
+        style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8), minimumSize: const Size(0, 36)),
+        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => page())),
+        child: Text(label, style: const TextStyle(fontSize: 13, decoration: TextDecoration.underline, decorationColor: AppColors.red300)),
+      );
 
   Widget _infoCard(String title, String desc) {
     return Container(

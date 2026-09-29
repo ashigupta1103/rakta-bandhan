@@ -176,7 +176,7 @@ class _PreviewRequestTab extends StatelessWidget {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Text('CRITICAL', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, letterSpacing: 1.1, color: AppColors.red700)),
+                                    const Text('Critical', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, letterSpacing: 0.1, color: AppColors.red700)),
                                     const SizedBox(height: 3),
                                     Text('Apollo Hospital (sample)', style: AppTextStyles.display(fontSize: 19, color: AppColors.ink)),
                                     const SizedBox(height: 3),
@@ -436,9 +436,9 @@ class _PreviewCommunityTabState extends State<_PreviewCommunityTab> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('TOGETHER THIS MONTH', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, letterSpacing: 1.4, color: AppColors.gold)),
+          const Text('Together this month', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, letterSpacing: 0.1, color: AppColors.gold)),
           const SizedBox(height: 10),
-          Text('12', style: AppTextStyles.display(fontSize: 46, color: const Color(0xFFFBEDE6), height: 0.9)),
+          Text('12', style: AppTextStyles.display(fontSize: 46, color: AppColors.onEmberWarm, height: 0.9)),
           const SizedBox(height: 8),
           const Text('donations by the community (sample number)', style: TextStyle(fontSize: 13, color: Color(0xDDFBEDE6))),
         ],
@@ -501,7 +501,7 @@ class _PreviewMyPageTabState extends State<_PreviewMyPageTab> {
                 ),
               ),
               const SizedBox(height: 26),
-              const Text('YOUR IMPACT', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 1.3, color: AppColors.textSecondary)),
+              const Text('Your impact', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.1, color: AppColors.textSecondary)),
               const SizedBox(height: 14),
               const ImpactTrail(count: 3, caption: '3 donations (sample) · 3 lives helped'),
               const SizedBox(height: 20),

@@ -44,6 +44,26 @@ class AppColors {
   static const Color ink2 = Color(0xFF6B534E);
   static const Color ink = Color(0xFF241413);
 
+  // Ink on the ember field — text/icons/hairlines that sit on the dark
+  // red-to-black gradient screens (matching, matched, contact, call).
+  static const Color onEmberStrong = Color(0xFFFFF9F5); // headlines
+  static const Color onEmber = Color(0xFFFBE6E8); // default on-ember ink
+  static const Color onEmberWarm = Color(0xFFFBEDE6);
+  static const Color onEmberMuted = Color(0xFFE9BFC4); // body copy
+  static const Color onEmberFaint = Color(0xFFD9AFB4);
+  static const Color onEmberEyebrow = Color(0xFFE0A8AF); // small labels
+  static const Color onEmberAccent = Color(0xFFEDA5AC); // spinners, live marks
+  static const Color onEmberOutline = Color(0x8CFBE6E8); // outlined buttons
+  static const Color onEmberSuccess = Color(0xFF7FCB8E);
+
+  // Maps. The GPS blue is the one deliberate non-brand hue: "you are here"
+  // is universally read as a blue dot, and a red one would be confused with
+  // the brand's own pins.
+  static const Color gpsDot = Color(0xFF2F6FED);
+  static const Color gpsAccuracyFill = Color(0x1F2F6FED);
+  static const Color gpsAccuracyBorder = Color(0x552F6FED);
+  static const Color mapPinShadow = Color(0x40000000);
+
   // Semantic status.
   static const Color successBg = Color(0xFFE8F0DF);
   static const Color successText = Color(0xFF3F6B34);

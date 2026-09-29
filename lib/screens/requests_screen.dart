@@ -5,10 +5,13 @@ import '../services/backend.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/blood_group_droplet.dart';
+import '../widgets/confirm_sheet.dart';
 import '../widgets/dashed_border.dart';
+import '../widgets/messages_button.dart';
 import '../widgets/state_card.dart';
 import '../widgets/status_badge.dart';
 import 'cancel_confirm_screen.dart';
+import 'chat_screen.dart';
 import 'create_request_screen.dart';
 import 'match_contact_screen.dart';
 import 'request_detail_screen.dart';
@@ -77,7 +80,20 @@ class _RequestsScreenState extends State<RequestsScreen> {
   }
 
   Future<void> _cancel(String requestId) async {
-    await Backend.instance.cancelRequest(requestId);
+    final confirmed = await ConfirmSheet.show(
+      context,
+      title: 'Cancel this request?',
+      message: 'Donors will stop seeing it. If you still need blood later, you can raise a new request.',
+      confirmLabel: 'Cancel request',
+    );
+    if (!confirmed || !mounted) return;
+    try {
+      await Backend.instance.cancelRequest(requestId);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not cancel this request. Please try again.')));
+      return;
+    }
     if (!mounted) return;
     Navigator.push(context, MaterialPageRoute(builder: (context) => CancelConfirmScreen(requestId: requestId)));
   }
@@ -92,6 +108,7 @@ class _RequestsScreenState extends State<RequestsScreen> {
         automaticallyImplyLeading: false,
         title: const Text('Blood requests', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500, color: AppColors.textPrimaryWarm)),
         centerTitle: true,
+        actions: const [MessagesButton(), SizedBox(width: 6)],
       ),
       body: SafeArea(
         child: Column(
@@ -214,7 +231,10 @@ class _RequestsScreenState extends State<RequestsScreen> {
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator(strokeWidth: 2));
         }
-        final docs = snapshot.data!.docs;
+        // A cancelled request is finished business from the requester's
+        // side — it stays in Firestore (the matched donor's feed still
+        // reports it) but is no longer listed here.
+        final docs = snapshot.data!.docs.where((d) => d.data()['status'] != 'cancelled').toList();
         if (docs.isEmpty) {
           return Center(
             child: Padding(
@@ -272,6 +292,12 @@ class _RequestsScreenState extends State<RequestsScreen> {
       ),
     );
   }
+
+  Widget _messageButton(String requestId) => OutlinedButton.icon(
+        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => ChatScreen(requestId: requestId))),
+        icon: const Icon(LucideIcons.messageSquare, size: 15),
+        label: const Text('Message'),
+      );
 
   Widget _sectionLabel(String text) {
     return Row(
@@ -388,10 +414,6 @@ class _RequestsScreenState extends State<RequestsScreen> {
                   const SizedBox(height: 10),
                   _terminalNote('No donor found in time — matching stopped. You can create a new request.'),
                 ],
-                if (status == 'cancelled') ...[
-                  const SizedBox(height: 10),
-                  _terminalNote('You cancelled this request.'),
-                ],
                 const SizedBox(height: 14),
                 _cardActions(requestId, status, primaryAction),
               ],
@@ -424,9 +446,17 @@ class _RequestsScreenState extends State<RequestsScreen> {
           child: const Text('View request'),
         );
       case _CardAction.viewContact:
-        return ElevatedButton(
-          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => MatchContactScreen(requestId: requestId))),
-          child: const Text('View contact'),
+        return Row(
+          children: [
+            Expanded(
+              child: ElevatedButton(
+                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => MatchContactScreen(requestId: requestId))),
+                child: const Text('Call or view'),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(child: _messageButton(requestId)),
+          ],
         );
       case _CardAction.track:
         return Row(
@@ -442,6 +472,9 @@ class _RequestsScreenState extends State<RequestsScreen> {
               Expanded(
                 child: OutlinedButton(onPressed: () => _cancel(requestId), child: const Text('Cancel request')),
               ),
+            ] else if (status == 'matched') ...[
+              const SizedBox(width: 8),
+              Expanded(child: _messageButton(requestId)),
             ],
           ],
         );

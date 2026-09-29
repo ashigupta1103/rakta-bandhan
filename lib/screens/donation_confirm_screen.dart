@@ -44,7 +44,7 @@ class DonationConfirmScreen extends StatelessWidget {
                           alignment: Alignment.center,
                           children: [
                             Positioned.fill(
-                              child: RingField(scale: 1.0, referenceWidth: 390, color: const Color(0xFFFBE6E8), outerOpacity: 0.4, middleOpacity: 0.55, innerOpacity: 0),
+                              child: RingField(scale: 1.0, referenceWidth: 390, color: AppColors.onEmber, outerOpacity: 0.4, middleOpacity: 0.55, innerOpacity: 0),
                             ),
                             Container(
                               width: 76 * px,
@@ -64,12 +64,12 @@ class DonationConfirmScreen extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 28),
                     child: Column(
                       children: [
-                        const Text('DONATION RECORDED', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 1.5, color: Color(0xFFE0A8AF))),
+                        const Text('Donation recorded', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.1, color: AppColors.onEmberEyebrow)),
                         const SizedBox(height: 12),
                         Text(
                           count <= 1 ? "That's one life\nyou've helped" : "That's $count lives\nyou've helped",
                           textAlign: TextAlign.center,
-                          style: AppTextStyles.display(fontSize: 29, color: const Color(0xFFFFF9F5), height: 1.16),
+                          style: AppTextStyles.display(fontSize: 29, color: AppColors.onEmberStrong, height: 1.16),
                         ),
                         const SizedBox(height: 20),
                         Row(
@@ -82,7 +82,7 @@ class DonationConfirmScreen extends StatelessWidget {
                                 label: '',
                                 size: i == 3 ? 30 : 24,
                                 filled: true,
-                                color: i == 3 ? const Color(0xFFFBE6E8) : const Color(0x8CFBE6E8),
+                                color: i == 3 ? AppColors.onEmber : AppColors.onEmberOutline,
                               ),
                             ],
                           ],
@@ -98,7 +98,7 @@ class DonationConfirmScreen extends StatelessWidget {
                         const Text(
                           "Rest now. You'll be marked available again automatically in 90 days.",
                           textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 13, color: Color(0xFFD9AFB4), height: 1.6),
+                          style: TextStyle(fontSize: 13, color: AppColors.onEmberFaint, height: 1.6),
                         ),
                         const SizedBox(height: 14),
                         SizedBox(

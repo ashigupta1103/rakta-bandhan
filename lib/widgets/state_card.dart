@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../theme/app_colors.dart';
+import 'brand_glyph.dart';
 
 /// Shared icon + message (+ optional action) card for empty/error/permission
 /// states — the prototype repeats this exact shape across map, notifications,
@@ -65,13 +66,7 @@ class StateCard extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(color: iconBackground, shape: BoxShape.circle),
-            alignment: Alignment.center,
-            child: Icon(icon, size: 24, color: iconColor),
-          ),
+          BrandGlyph(icon: icon, size: 56, background: iconBackground, foreground: iconColor),
           const SizedBox(height: 12),
           Text(
             title,

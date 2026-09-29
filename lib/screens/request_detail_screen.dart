@@ -36,7 +36,8 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
   @override
   void initState() {
     super.initState();
-    Backend.instance.currentPosition().then((p) {
+    // Distance only when we truly know where the donor is.
+    Backend.instance.preciseLocation().then((p) {
       if (mounted) setState(() => _position = p);
     });
   }
@@ -165,7 +166,7 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
                             Row(
                               crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
-                                BloodGroupDroplet(label: bloodGroup, size: 44, filled: true, color: AppColors.primary, textColor: const Color(0xFFFBE6E8), fontSize: 15, serif: true),
+                                BloodGroupDroplet(label: bloodGroup, size: 44, filled: true, color: AppColors.primary, textColor: AppColors.onEmber, fontSize: 15, serif: true),
                                 const SizedBox(width: 10),
                                 if (urgency != 'normal')
                                   Container(

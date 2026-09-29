@@ -157,7 +157,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
               children: [
                 const Icon(LucideIcons.eye, size: 13, color: AppColors.goldDeep),
                 const SizedBox(width: 6),
-                const Text('PREVIEW DATA — SAMPLE STORY LAYOUT', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: AppColors.goldDeep)),
+                const Text('Preview data — sample story layout', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: AppColors.goldDeep)),
               ],
             ),
             const SizedBox(height: 10),
@@ -303,14 +303,14 @@ class _CommunityScreenState extends State<CommunityScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text('FROM RAKTA BANDHAN', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 1.2, color: AppColors.goldDeep)),
+          const Text('From Rakta Bandhan', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.1, color: AppColors.goldDeep)),
           const SizedBox(height: 14),
           if (kEnablePreviewUi) ...[
             Row(
               children: [
                 const Icon(LucideIcons.eye, size: 13, color: AppColors.goldDeep),
                 const SizedBox(width: 6),
-                const Text('PREVIEW DATA — SAMPLE ANNOUNCEMENT LAYOUT', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: AppColors.goldDeep)),
+                const Text('Preview data — sample announcement layout', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: AppColors.goldDeep)),
               ],
             ),
             const SizedBox(height: 10),
@@ -421,12 +421,12 @@ class _CommunityScreenState extends State<CommunityScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('TOGETHER THIS MONTH', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, letterSpacing: 1.4, color: AppColors.gold)),
+                    const Text('Together this month', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, letterSpacing: 0.1, color: AppColors.gold)),
                     const SizedBox(height: 10),
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        Text('$count', style: AppTextStyles.display(fontSize: 46, color: const Color(0xFFFBEDE6), height: 0.9)),
+                        Text('$count', style: AppTextStyles.display(fontSize: 46, color: AppColors.onEmberWarm, height: 0.9)),
                         const SizedBox(width: 12),
                         Padding(
                           padding: const EdgeInsets.only(bottom: 7),
@@ -442,7 +442,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
             },
           ),
           const SizedBox(height: 22),
-          const Text('COMMUNITY IMPACT', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 1.2, color: AppColors.ink2)),
+          const Text('Community impact', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.1, color: AppColors.ink2)),
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),

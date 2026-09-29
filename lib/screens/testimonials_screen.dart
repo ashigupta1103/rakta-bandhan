@@ -63,7 +63,7 @@ class TestimonialsScreen extends StatelessWidget {
         children: [
           const Icon(LucideIcons.eye, size: 13, color: AppColors.goldDeep),
           const SizedBox(width: 6),
-          const Text('PREVIEW DATA — SAMPLE LAYOUT, NOT REAL TESTIMONIALS', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: AppColors.goldDeep)),
+          const Text('Preview data — sample layout, not real testimonials', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: AppColors.goldDeep)),
         ],
       ),
       const SizedBox(height: 14),

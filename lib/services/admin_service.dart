@@ -136,11 +136,14 @@ class AdminService extends ChangeNotifier {
     if (_started) return;
     _started = true;
 
-    _db.collection('donors').snapshots().listen((snap) {
+    // Newest 200 of each — a live listener on the whole collection re-read
+    // every donor (and, before the ID image moved out, every ID photo) on
+    // each admin session. Older records are reached via search.
+    _db.collection('donors').orderBy('created_at', descending: true).limit(200).snapshots().listen((snap) {
       donors = snap.docs.map(_toDonorEntry).toList();
       notifyListeners();
     });
-    _db.collection('requests').orderBy('created_at', descending: true).snapshots().listen((snap) {
+    _db.collection('requests').orderBy('created_at', descending: true).limit(300).snapshots().listen((snap) {
       _requestDocs = snap.docs;
       requests = snap.docs.map(_toRequestEntry).toList();
       notifyListeners();

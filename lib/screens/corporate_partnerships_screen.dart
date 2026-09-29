@@ -53,7 +53,7 @@ class CorporatePartnershipsScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('FOR ORGANISATIONS', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, letterSpacing: 1.4, color: AppColors.goldDeep)),
+                    const Text('For organisations', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, letterSpacing: 0.1, color: AppColors.goldDeep)),
                     const SizedBox(height: 10),
                     Text('Put your name behind something that saves lives', style: AppTextStyles.display(fontSize: 26, color: AppColors.ink, height: 1.2)),
                     const SizedBox(height: 12),
@@ -82,7 +82,7 @@ class CorporatePartnershipsScreen extends StatelessWidget {
                         children: [
                           const Icon(LucideIcons.eye, size: 13, color: AppColors.goldDeep),
                           const SizedBox(width: 6),
-                          const Text('PREVIEW DATA — SAMPLE PARTNER LAYOUT', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: AppColors.goldDeep)),
+                          const Text('Preview data — sample partner layout', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: AppColors.goldDeep)),
                         ],
                       ),
                       const SizedBox(height: 12),
@@ -109,7 +109,7 @@ class CorporatePartnershipsScreen extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('WHERE YOUR NAME APPEARS', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, letterSpacing: 1.3, color: AppColors.gold)),
+                          const Text('Where your name appears', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, letterSpacing: 0.1, color: AppColors.gold)),
                           const SizedBox(height: 10),
                           const Text(
                             'Camp materials, the initiative card in What\'s New, donor certificates and recognition moments. Never over a blood request, and never inside an emergency flow.',
@@ -296,12 +296,12 @@ class _ConversationSheetState extends State<_ConversationSheet> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _field('ORGANISATION NAME', _orgController, validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null),
+                      _field('Organisation name', _orgController, validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null),
                       const SizedBox(height: 14),
                       _field('CONTACT PERSON’S NAME', _nameController, validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null),
                       const SizedBox(height: 14),
                       _field(
-                        'WORK EMAIL',
+                        'Work email',
                         _emailController,
                         keyboardType: TextInputType.emailAddress,
                         validator: (v) {
@@ -314,7 +314,7 @@ class _ConversationSheetState extends State<_ConversationSheet> {
                   ),
                 ),
                 const SizedBox(height: 14),
-                const Text('PARTNERSHIP INTEREST', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, letterSpacing: 1, color: AppColors.ink2)),
+                const Text('Partnership interest', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, letterSpacing: 0.1, color: AppColors.ink2)),
                 const SizedBox(height: 8),
                 FilterChipRow(
                   activeBg: AppColors.primary,
@@ -325,7 +325,7 @@ class _ConversationSheetState extends State<_ConversationSheet> {
                   const Text('Pick one to continue', style: TextStyle(fontSize: 11.5, color: AppColors.brandRed)),
                 ],
                 const SizedBox(height: 14),
-                _field('MESSAGE (OPTIONAL)', _messageController, minLines: 3, maxLines: 5, hint: 'Tell us a bit about what you have in mind'),
+                _field('Message (optional)', _messageController, minLines: 3, maxLines: 5, hint: 'Tell us a bit about what you have in mind'),
                 const SizedBox(height: 8),
                 const Text(
                   'There’s no submission service behind this yet — this previews the flow, nothing is sent or saved.',
@@ -361,7 +361,7 @@ class _ConversationSheetState extends State<_ConversationSheet> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, letterSpacing: 1, color: AppColors.ink2)),
+        Text(label, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, letterSpacing: 0.1, color: AppColors.ink2)),
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(color: Colors.white, border: Border.all(color: AppColors.warmBorder), borderRadius: BorderRadius.circular(12)),

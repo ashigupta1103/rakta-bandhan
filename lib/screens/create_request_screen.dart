@@ -9,6 +9,7 @@ import '../theme/app_text_styles.dart';
 import '../widgets/blood_group_droplet.dart';
 import '../widgets/loading_button.dart';
 import 'matching_screen.dart';
+import 'location_picker_screen.dart';
 
 enum _LocationState { idle, checking, denied, error }
 
@@ -111,7 +112,11 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
         if (mounted) setState(() => _locationState = _LocationState.denied);
         return;
       }
-      final position = await Backend.instance.currentPosition();
+      final position = await Backend.instance.preciseLocation();
+      if (position == null) {
+        if (mounted && !silent) setState(() => _locationState = _LocationState.error);
+        return;
+      }
       final label = await Backend.instance.reverseGeocode(position.latitude, position.longitude);
       if (!mounted) return;
       setState(() {
@@ -129,6 +134,27 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
     }
   }
 
+  /// Exact hospital/bed location — donors navigate here, so the pin matters
+  /// more than the address text.
+  Future<void> _pinOnMap() async {
+    final picked = await LocationPickerScreen.open(
+      context,
+      title: 'Where is the blood needed?',
+      confirmLabel: 'Use this location',
+      initialLat: _selectedLat,
+      initialLng: _selectedLng,
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _selectedLat = picked.lat;
+      _selectedLng = picked.lng;
+      _locationController.text = picked.label;
+      _suggestions = [];
+      _locationState = _LocationState.idle;
+      _locationEditing = false;
+    });
+  }
+
   bool get _locationResolved => _selectedLat != null && _selectedLng != null;
   bool get _canSubmit => _bloodGroup != null && _urgency != null && _locationController.text.trim().isNotEmpty;
 
@@ -141,7 +167,13 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
         lat = _selectedLat!;
         lng = _selectedLng!;
       } else {
-        final position = await Backend.instance.currentPosition();
+        final position = await Backend.instance.preciseLocation();
+        if (position == null) {
+          if (!mounted) return;
+          setState(() => _isSubmitting = false);
+          await _pinOnMap();
+          return;
+        }
         lat = position.latitude;
         lng = position.longitude;
       }
@@ -209,7 +241,7 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
                     _questionDivider(),
                     if (!groupAnswered)
                       _questionSection(
-                        label: 'BLOOD GROUP',
+                        label: 'Blood group',
                         live: true,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -222,9 +254,9 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
                       )
                     else
                       _answeredRow(
-                        label: 'BLOOD GROUP',
+                        label: 'Blood group',
                         onTap: () => setState(() => _bloodGroup = null),
-                        leading: BloodGroupDroplet(label: _bloodGroup!, size: 34, filled: true, color: AppColors.primary, textColor: const Color(0xFFFBE6E8), fontSize: 13, serif: true),
+                        leading: BloodGroupDroplet(label: _bloodGroup!, size: 34, filled: true, color: AppColors.primary, textColor: AppColors.onEmber, fontSize: 13, serif: true),
                         value: '$_units unit${_units == 1 ? '' : 's'}',
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -242,7 +274,7 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
                     _questionDivider(),
                     if (!urgencyAnswered)
                       _questionSection(
-                        label: 'HOW URGENT',
+                        label: 'How urgent',
                         live: urgencyIsLive,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -256,7 +288,7 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
                       )
                     else
                       _answeredRow(
-                        label: 'HOW URGENT',
+                        label: 'How urgent',
                         onTap: () => setState(() => _urgency = null),
                         value: '${_urgencyOptions.firstWhere((u) => u.id == _urgency).label} · ${_urgencyOptions.firstWhere((u) => u.id == _urgency).desc}',
                       ),
@@ -310,7 +342,7 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
           children: [
             Container(width: 18, height: 18, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: accent, width: 1.5))),
             const SizedBox(width: 11),
-            Text(label, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, letterSpacing: 1.1, color: labelColor)),
+            Text(label, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, letterSpacing: 0.1, color: labelColor)),
           ],
         ),
         const SizedBox(height: 12),
@@ -338,7 +370,7 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, letterSpacing: 1.1, color: AppColors.textSecondary)),
+                Text(label, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, letterSpacing: 0.1, color: AppColors.textSecondary)),
                 const SizedBox(height: 2),
                 Text(value, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
               ],
@@ -473,7 +505,7 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
   Widget _locationSection({required bool live}) {
     if (_locationResolved && !_locationEditing) {
       return _answeredRow(
-        label: 'WHERE',
+        label: 'Where',
         onTap: () => setState(() => _locationEditing = true),
         leading: const Icon(LucideIcons.mapPin, size: 17, color: AppColors.textSecondary),
         value: _locationController.text,
@@ -481,7 +513,7 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
     }
 
     return _questionSection(
-      label: 'WHERE',
+      label: 'Where',
       live: live,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -575,20 +607,36 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
                 ],
               ),
             ),
-          if (_locationState != _LocationState.denied && _locationState != _LocationState.error) ...[
-            const SizedBox(height: 10),
-            GestureDetector(
-              onTap: () => _useCurrentLocation(),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(LucideIcons.mapPin, size: 13, color: AppColors.primary),
-                  SizedBox(width: 6),
-                  Text('Use current location', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.primary)),
-                ],
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 16,
+            runSpacing: 6,
+            children: [
+              if (_locationState != _LocationState.denied && _locationState != _LocationState.error)
+                GestureDetector(
+                  onTap: () => _useCurrentLocation(),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(LucideIcons.locateFixed, size: 13, color: AppColors.primary),
+                      SizedBox(width: 6),
+                      Text('Use current location', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.primary)),
+                    ],
+                  ),
+                ),
+              GestureDetector(
+                onTap: _pinOnMap,
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(LucideIcons.mapPin, size: 13, color: AppColors.primary),
+                    SizedBox(width: 6),
+                    Text('Pin exact spot on map', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.primary)),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
           if (_locationState == _LocationState.denied) ...[
             const SizedBox(height: 4),
             GestureDetector(

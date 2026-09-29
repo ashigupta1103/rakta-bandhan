@@ -8,8 +8,21 @@ class DonorMatch {
   final String initials;
   final String bloodGroup;
   final String distance;
+  final String uid;
+  /// Revealed to the requester on match (see Backend.acceptRequest) — used
+  /// only for the "call from your phone" fallback; in-app calls don't need it.
+  final String phone;
+  final bool isVerified;
 
-  const DonorMatch({required this.name, required this.initials, required this.bloodGroup, required this.distance});
+  const DonorMatch({
+    required this.name,
+    required this.initials,
+    required this.bloodGroup,
+    required this.distance,
+    this.uid = '',
+    this.phone = '',
+    this.isVerified = false,
+  });
 }
 
 abstract class DonorMatchService {
@@ -49,11 +62,13 @@ class FirestoreDonorMatchService implements DonorMatchService {
 
     String bloodGroup = '';
     String distance = '';
+    var isVerified = false;
     if (donorId != null) {
       final publicSnap = await _db.collection('donors_public').doc(donorId).get();
       final donor = publicSnap.data();
       if (donor != null) {
         bloodGroup = donor['blood_group'] as String? ?? '';
+        isVerified = donor['is_verified'] == true;
         final donorLat = (donor['lat'] as num?)?.toDouble();
         final donorLng = (donor['lng'] as num?)?.toDouble();
         if (reqLat != null && reqLng != null && donorLat != null && donorLng != null) {
@@ -62,6 +77,14 @@ class FirestoreDonorMatchService implements DonorMatchService {
       }
     }
 
-    return DonorMatch(name: name, initials: _initialsOf(name), bloodGroup: bloodGroup, distance: distance);
+    return DonorMatch(
+      name: name,
+      initials: _initialsOf(name),
+      bloodGroup: bloodGroup,
+      distance: distance,
+      uid: donorId ?? '',
+      phone: req['matched_donor_phone'] as String? ?? '',
+      isVerified: isVerified,
+    );
   }
 }

@@ -4,6 +4,7 @@ import '../services/backend.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/blood_group_droplet.dart';
+import '../widgets/confirm_sheet.dart';
 import '../widgets/ring_field.dart';
 import 'cancel_confirm_screen.dart';
 
@@ -30,6 +31,13 @@ class _NoDonorFoundScreenState extends State<NoDonorFoundScreen> {
 
   Future<void> _cancel() async {
     if (_cancelling) return;
+    final confirmed = await ConfirmSheet.show(
+      context,
+      title: 'Cancel this request?',
+      message: 'Donors will stop seeing it. Keep waiting instead if you still need blood — someone may become available.',
+      confirmLabel: 'Cancel request',
+    );
+    if (!confirmed || !mounted) return;
     setState(() => _cancelling = true);
     try {
       await Backend.instance.cancelRequest(widget.requestId);
@@ -77,7 +85,7 @@ class _NoDonorFoundScreenState extends State<NoDonorFoundScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('STILL SEARCHING', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 1.3, color: AppColors.warmAmberText)),
+                      const Text('Still searching', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.1, color: AppColors.warmAmberText)),
                       const SizedBox(height: 10),
                       Text(
                         'No donor within 15 km yet',

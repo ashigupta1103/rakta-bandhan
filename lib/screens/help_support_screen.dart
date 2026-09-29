@@ -164,7 +164,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                       ),
                     ),
                     const SizedBox(height: 22),
-                    const Text('COMMON QUESTIONS', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 1.2, color: AppColors.ink2)),
+                    const Text('Common questions', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.1, color: AppColors.ink2)),
                     const SizedBox(height: 10),
                     if (_filtered.isEmpty)
                       Container(
@@ -294,14 +294,14 @@ class _ReportIssueSheetState extends State<_ReportIssueSheet> {
                 const SizedBox(height: 16),
                 SizedBox(width: double.infinity, child: OutlinedButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))),
               ] else ...[
-                const Text('REASON', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, letterSpacing: 1, color: AppColors.ink2)),
+                const Text('Reason', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, letterSpacing: 0.1, color: AppColors.ink2)),
                 const SizedBox(height: 8),
                 FilterChipRow(
                   activeBg: AppColors.primary,
                   chips: [for (final r in _reasons) FilterChipItem(label: r, active: _reason == r, onTap: () => setState(() => _reason = r))],
                 ),
                 const SizedBox(height: 16),
-                const Text('DETAILS (OPTIONAL)', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, letterSpacing: 1, color: AppColors.ink2)),
+                const Text('Details (optional)', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, letterSpacing: 0.1, color: AppColors.ink2)),
                 const SizedBox(height: 8),
                 Container(
                   decoration: BoxDecoration(color: Colors.white, border: Border.all(color: AppColors.warmBorder), borderRadius: BorderRadius.circular(12)),

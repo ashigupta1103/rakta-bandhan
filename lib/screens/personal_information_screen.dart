@@ -114,7 +114,7 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
                   final phone = data['phone'] as String? ?? '—';
                   final bloodGroup = data['blood_group'] as String? ?? '—';
                   final isVerified = data['is_verified'] as bool? ?? false;
-                  final idProofBase64 = data['id_proof_base64'] as String?;
+                  final hasIdProof = data['has_id_proof'] == true || data['id_proof_base64'] != null;
                   final createdAt = data['created_at'] as Timestamp?;
                   final lat = data['lat'] as num?;
                   final lng = data['lng'] as num?;
@@ -140,7 +140,7 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
                                   Positioned(
                                     right: -6,
                                     bottom: -4,
-                                    child: BloodGroupDroplet(label: bloodGroup, size: 26, filled: true, color: AppColors.primary, textColor: const Color(0xFFFBE6E8), fontSize: 9),
+                                    child: BloodGroupDroplet(label: bloodGroup, size: 26, filled: true, color: AppColors.primary, textColor: AppColors.onEmber, fontSize: 9),
                                   ),
                               ],
                             ),
@@ -178,9 +178,9 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
                             valueColor: isVerified ? AppColors.warmGreenText : AppColors.warmAmberText,
                             iconBg: isVerified ? AppColors.warmGreenBg : AppColors.warmAmberBg,
                             iconColor: isVerified ? AppColors.warmGreenText : AppColors.warmAmberText,
-                            isLast: idProofBase64 != null,
+                            isLast: hasIdProof,
                           ),
-                          if (idProofBase64 == null)
+                          if (!hasIdProof)
                             Padding(
                               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                               child: Row(

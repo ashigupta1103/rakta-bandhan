@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../services/backend.dart';
+import 'location_picker_screen.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/blood_group_droplet.dart';
@@ -63,7 +64,19 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   Future<void> _useCurrentLocation({bool silent = false}) async {
     if (!silent) setState(() => _locatingCurrent = true);
     try {
-      final position = await Backend.instance.currentPosition();
+      // Real GPS only — a donor's registered area decides which requests
+      // reach them, so a guessed city here would silently break matching.
+      final position = await Backend.instance.preciseLocation();
+      if (position == null) {
+        if (!mounted) return;
+        setState(() => _locatingCurrent = false);
+        if (!silent) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Couldn’t get your GPS location. Search for your area or pin it on the map.'),
+          ));
+        }
+        return;
+      }
       final label = await Backend.instance.reverseGeocode(
         position.latitude,
         position.longitude,
@@ -79,6 +92,23 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     } catch (_) {
       if (mounted) setState(() => _locatingCurrent = false);
     }
+  }
+
+  Future<void> _pinOnMap() async {
+    final picked = await LocationPickerScreen.open(
+      context,
+      title: 'Where do you usually live or work?',
+      confirmLabel: 'Use this area',
+      initialLat: _selectedLat,
+      initialLng: _selectedLng,
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _selectedLat = picked.lat;
+      _selectedLng = picked.lng;
+      _locationController.text = picked.label;
+      _addressSuggestions = [];
+    });
   }
 
   @override
@@ -139,7 +169,13 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         lat = _selectedLat!;
         lng = _selectedLng!;
       } else {
-        final position = await Backend.instance.currentPosition();
+        final position = await Backend.instance.preciseLocation();
+        if (position == null) {
+          if (!mounted) return;
+          setState(() => _isSubmitting = false);
+          await _pinOnMap();
+          return;
+        }
         lat = position.latitude;
         lng = position.longitude;
       }
@@ -402,6 +438,14 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                               color: AppColors.primary,
                             ),
                           ),
+                          const SizedBox(width: 14),
+                          GestureDetector(
+                            onTap: _pinOnMap,
+                            child: const Text(
+                              'Pin on map',
+                              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.primary, decoration: TextDecoration.underline, decorationColor: AppColors.red300),
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -443,7 +487,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                                 ? AppColors.primary
                                 : AppColors.dividerWarm,
                             textColor: _selectedBloodGroup == group
-                                ? const Color(0xFFFBE6E8)
+                                ? AppColors.onEmber
                                 : AppColors.textSecondary,
                             fontSize: 12,
                             serif: _selectedBloodGroup == group,

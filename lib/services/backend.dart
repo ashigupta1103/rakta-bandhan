@@ -1,12 +1,16 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart' show XFile;
+
+import 'geo_config.dart';
 
 /// Recipient blood group -> donor groups that can give to it.
 const bloodCompatibility = <String, List<String>>{
@@ -148,6 +152,24 @@ class Backend {
 
   Future<void> signOut() => _auth.signOut();
 
+  /// Firebase requires a fresh sign-in before destructive account actions
+  /// (user.delete()). With the fake-OTP scheme the credential is derivable
+  /// from the session itself; once real phone auth lands this becomes a
+  /// fresh OTP round-trip instead.
+  Future<void> reauthenticateForSensitiveAction() async {
+    final user = _auth.currentUser;
+    final email = user?.email;
+    if (user == null || email == null) return;
+    await user.reauthenticateWithCredential(
+      EmailAuthProvider.credential(email: email, password: _fakeAuthPassword),
+    );
+  }
+
+  /// ~1.1 km precision. donors_public is readable by every signed-in user,
+  /// and the consent screen promises donors are shown "approximately" —
+  /// exact coordinates only ever live on the private donors/{uid} doc.
+  static double _coarse(double degrees) => (degrees * 100).roundToDouble() / 100;
+
   Future<DocumentSnapshot<Map<String, dynamic>>> myDonorDoc() =>
       _db.collection('donors').doc(_uid).get();
 
@@ -195,9 +217,9 @@ class Backend {
       tx.set(_db.collection('donors_public').doc(_uid), {
         'name': name,
         'blood_group': bloodGroup,
-        'geohash': geohash,
-        'lat': lat,
-        'lng': lng,
+        'geohash': encodeGeohash(_coarse(lat), _coarse(lng), precision: 6),
+        'lat': _coarse(lat),
+        'lng': _coarse(lng),
         'is_available': true,
         'is_verified': false,
         'updated_at': now,
@@ -214,13 +236,40 @@ class Backend {
   /// screen.dart) constrains the picked image's resolution/quality so the
   /// encoded string comfortably fits Firestore's 1MiB document limit.
   /// Admins view it from AdminDonorDetailScreen before verifying.
+  ///
+  /// The image lives in its own document (`donors/{uid}/private/id_proof`),
+  /// not inline on the profile: the profile is read on nearly every screen,
+  /// and an inline ~200 KB image made every one of those reads download it.
+  /// The profile keeps only a `has_id_proof` flag.
   Future<void> uploadIdProof(XFile file) async {
     final bytes = await file.readAsBytes();
-    await _db.collection('donors').doc(_uid).update({
-      'id_proof_base64': base64Encode(bytes),
-      'id_proof_content_type': file.mimeType ?? 'image/jpeg',
+    final batch = _db.batch();
+    batch.set(_idProofRef(_uid), {
+      'base64': base64Encode(bytes),
+      'content_type': file.mimeType ?? 'image/jpeg',
+      'uploaded_at': FieldValue.serverTimestamp(),
     });
+    batch.update(_db.collection('donors').doc(_uid), {
+      'has_id_proof': true,
+      'id_proof_base64': FieldValue.delete(),
+      'id_proof_content_type': FieldValue.delete(),
+    });
+    await batch.commit();
   }
+
+  DocumentReference<Map<String, dynamic>> _idProofRef(String uid) =>
+      _db.collection('donors').doc(uid).collection('private').doc('id_proof');
+
+  /// Owner/admin only (rules). Falls back to the legacy inline field for
+  /// donors who uploaded before the image moved to its own document.
+  Future<String?> fetchIdProof(String uid) async {
+    final own = (await _idProofRef(uid).get()).data()?['base64'] as String?;
+    if (own != null) return own;
+    return (await _db.collection('donors').doc(uid).get()).data()?['id_proof_base64'] as String?;
+  }
+
+  /// Account deletion: the ID image document goes with the profile.
+  Future<void> deleteMyIdProof() => _idProofRef(_uid).delete();
 
   Future<void> setAvailability(bool available) async {
     await _db.runTransaction((tx) async {
@@ -231,6 +280,19 @@ class Backend {
       });
     });
   }
+
+  /// Opt-in for the ringing urgent-request alert (see UrgentAlertService).
+  /// Stored on the private profile so a future Blaze push function can
+  /// honour the same preference server-side.
+  Future<void> setUrgentAlerts(bool enabled) =>
+      _db.collection('donors').doc(_uid).update({'urgent_alerts': enabled});
+
+  /// FCM device token, for the Blaze-era push functions (urgent alerts,
+  /// incoming calls, chat). Owner-only doc, so never visible to others.
+  Future<void> savePushToken(String token) => _db.collection('donors').doc(_uid).update({
+        'fcm_token': token,
+        'fcm_token_updated_at': FieldValue.serverTimestamp(),
+      });
 
   /// Client-side stand-in for scheduledReactivation.js — call on profile load.
   Future<void> maybeReactivate() async {
@@ -243,6 +305,9 @@ class Backend {
     await setAvailability(true);
   }
 
+  /// Whole-collection scan — reads every available donor. Kept for the
+  /// admin/preview paths only; user-facing screens use NearbyDonors, whose
+  /// cost scales with local density instead of total signups.
   Stream<QuerySnapshot<Map<String, dynamic>>> availableDonorsStream() =>
       _db.collection('donors_public').where('is_available', isEqualTo: true).snapshots();
 
@@ -364,6 +429,29 @@ class Backend {
     _logEvent('request_matched', {'request_id': requestId});
   }
 
+  /// The matched donor backs out ("I can't make it"). The request goes
+  /// back to `open` with a fresh expiry window so other donors can accept
+  /// it, and the donor's lock is freed. Their name/phone come off the doc.
+  Future<void> releaseMatch(String requestId) async {
+    await _db.runTransaction((tx) async {
+      final reqRef = _db.collection('requests').doc(requestId);
+      final reqSnap = await tx.get(reqRef);
+      final data = reqSnap.data();
+      if (data == null || data['status'] != 'matched' || data['matched_donor_id'] != _uid) return;
+      tx.update(reqRef, {
+        'status': 'open',
+        'matched_donor_id': null,
+        'matched_donor_name': null,
+        'matched_donor_phone': null,
+        'matched_at': null,
+        'released_at': FieldValue.serverTimestamp(),
+        'expires_at': Timestamp.fromDate(DateTime.now().add(const Duration(hours: requestExpiryHours))),
+      });
+      tx.update(_db.collection('donors').doc(_uid), {'active_request_id': null});
+    });
+    _logEvent('request_released', {'request_id': requestId});
+  }
+
   /// Matched donor self-reports the donation done, writes the immutable
   /// history record, and starts their own 90-day cooldown (admin
   /// confirmation of the same donation is also possible — see
@@ -438,9 +526,19 @@ class Backend {
         'at': FieldValue.serverTimestamp(),
       });
 
+  /// Verifying also deletes the ID-proof photo: once an admin has checked
+  /// it, keeping a copy of someone's ID only adds risk (and storage). The
+  /// profile records that it was checked, and when.
   Future<void> adminVerifyDonor(String donorId) async {
     await _db.runTransaction((tx) async {
-      tx.update(_db.collection('donors').doc(donorId), {'is_verified': true});
+      tx.delete(_idProofRef(donorId));
+      tx.update(_db.collection('donors').doc(donorId), {
+        'is_verified': true,
+        'has_id_proof': false,
+        'id_proof_checked_at': FieldValue.serverTimestamp(),
+        'id_proof_base64': FieldValue.delete(),
+        'id_proof_content_type': FieldValue.delete(),
+      });
       tx.update(_db.collection('donors_public').doc(donorId), {
         'is_verified': true,
         'updated_at': FieldValue.serverTimestamp(),
@@ -498,47 +596,68 @@ class Backend {
   Future<void> adminSendBroadcast(String message, String audience) =>
       _logAdminAction('broadcast[$audience]', message);
 
-  /// Falls back to Thiruvananthapuram (matches the existing UI's demo
-  /// city) if the browser/device denies location — never blocks the flow.
-  Future<Position> currentPosition() async {
+  /// The device's real position, or null — never an invented place.
+  ///
+  /// High accuracy with a 12 s budget (a cold GPS start routinely needs
+  /// more than the old 5 s); if the fix times out, the OS's last known
+  /// position is used when there is one. Anything that is *stored* — a
+  /// donor's registered area, a request's location, a location shared in
+  /// chat — must come from here, a search result, or the map picker.
+  Future<Position?> preciseLocation({Duration timeout = const Duration(seconds: 12)}) async {
     try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        return _fallbackPosition();
-      }
-
+      if (!await Geolocator.isLocationServiceEnabled()) return null;
       var permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
       }
-      if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever) {
-        return _fallbackPosition();
+      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+        return null;
       }
-      return await Geolocator.getCurrentPosition(
-        timeLimit: const Duration(seconds: 5),
-      );
+      try {
+        return await Geolocator.getCurrentPosition(
+          locationSettings: LocationSettings(accuracy: LocationAccuracy.high, timeLimit: timeout),
+        );
+      } on TimeoutException {
+        if (kIsWeb) return null;
+        return await Geolocator.getLastKnownPosition();
+      }
     } catch (_) {
-      return _fallbackPosition();
+      return null;
     }
   }
 
-  /// OpenStreetMap Nominatim Geocoding API (free, no API key required).
-  /// Converts a typed address into a pickable list of {label, lat, lng}.
-  Future<List<Map<String, dynamic>>> searchAddress(String query) async {
+  /// Where to *centre a map* when there's no real fix: the device position
+  /// if available, else the demo city. Display only — this used to feed
+  /// registration and request creation too, which silently put anyone with
+  /// slow GPS in Thiruvananthapuram. Check [isFallback] before trusting it.
+  Future<Position> currentPosition() async => await preciseLocation() ?? _fallbackPosition();
+
+  static bool isFallback(Position p) => p.accuracy == 0 && p.latitude == 8.5241 && p.longitude == 76.9366;
+
+  Uri _geocodeUri(String path, Map<String, String> params) => kLocationIqKey.isEmpty
+      ? Uri.https('nominatim.openstreetmap.org', path, params)
+      : Uri.https('us1.locationiq.com', '/v1$path', {...params, 'key': kLocationIqKey});
+
+  /// Address search (LocationIQ with a key, else public Nominatim), limited
+  /// to India and biased towards [near] when given — so "City Hospital"
+  /// means the one in your city. Returns {label, lat, lng}.
+  Future<List<Map<String, dynamic>>> searchAddress(String query, {({double lat, double lng})? near}) async {
     if (query.trim().length < 3) return [];
     try {
-      final uri = Uri.https(
-        'nominatim.openstreetmap.org',
-        '/search',
-        {
-          'q': query,
-          'format': 'json',
-          'limit': '5',
-          'addressdetails': '1'
-        },
-      );
-      final response = await http.get(uri, headers: {'User-Agent': 'RaktaBandhan/1.0'});
+      final params = <String, String>{
+        'q': query,
+        'format': 'json',
+        'limit': '6',
+        'addressdetails': '1',
+        'countrycodes': kGeocodeCountryCodes,
+      };
+      if (near != null) {
+        // ~50 km box around the user; results inside rank first, but
+        // anything in India can still match ("bounded" is not set).
+        const d = 0.45;
+        params['viewbox'] = '${near.lng - d},${near.lat + d},${near.lng + d},${near.lat - d}';
+      }
+      final response = await http.get(_geocodeUri('/search', params), headers: {'User-Agent': 'RaktaBandhan/1.0'});
       if (response.statusCode != 200) return [];
       final List results = jsonDecode(response.body);
       return results
@@ -553,22 +672,15 @@ class Backend {
     }
   }
 
-  /// OpenStreetMap Nominatim reverse geocoding — turns a GPS fix into a real
-  /// street-level address label (e.g. "MG Road, Kochi") instead of a generic
-  /// "Current location" placeholder. Returns null (caller falls back to a 
-  /// generic label) if the lookup fails.
+  /// Reverse geocoding — turns a GPS fix or a dropped pin into a readable
+  /// address. Returns null if the lookup fails (callers show coordinates or
+  /// a generic label instead).
   Future<String?> reverseGeocode(double lat, double lng) async {
     try {
-      final uri = Uri.https(
-        'nominatim.openstreetmap.org',
-        '/reverse',
-        {
-          'lat': lat.toString(),
-          'lon': lng.toString(),
-          'format': 'json',
-        },
+      final response = await http.get(
+        _geocodeUri('/reverse', {'lat': lat.toString(), 'lon': lng.toString(), 'format': 'json', 'zoom': '18'}),
+        headers: {'User-Agent': 'RaktaBandhan/1.0'},
       );
-      final response = await http.get(uri, headers: {'User-Agent': 'RaktaBandhan/1.0'});
       if (response.statusCode != 200) return null;
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       return body['display_name'] as String?;

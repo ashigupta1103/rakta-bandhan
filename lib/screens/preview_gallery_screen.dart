@@ -161,7 +161,7 @@ class PreviewGalleryScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title.toUpperCase(), style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, letterSpacing: 1.2, color: AppColors.ink2)),
+          Text(title, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, letterSpacing: 0.1, color: AppColors.ink2)),
           const SizedBox(height: 10),
           Container(
             decoration: BoxDecoration(color: Colors.white, border: Border.all(color: AppColors.warmBorder), borderRadius: BorderRadius.circular(14)),
@@ -243,7 +243,7 @@ class _PreviewFrame extends StatelessWidget {
                     child: const Row(mainAxisSize: MainAxisSize.min, children: [Icon(LucideIcons.arrowLeft, size: 14, color: Colors.white), SizedBox(width: 6), Text('Back to gallery', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white))]),
                   ),
                   const Spacer(),
-                  const Text('PREVIEW · SAMPLE DATA', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: AppColors.gold, letterSpacing: 0.3)),
+                  const Text('Preview · sample data', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.gold, letterSpacing: 0.3)),
                 ],
               ),
             ),
@@ -304,15 +304,15 @@ class _MatchingPreview extends StatelessWidget {
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    const Positioned.fill(child: RingField(color: Color(0xFFFBE6E8), outerOpacity: 0.16, middleOpacity: 0.26)),
-                    const BloodGroupDroplet(label: 'O+', size: 60, filled: true, color: AppColors.primary, textColor: Color(0xFFFBE6E8), fontSize: 20, serif: true),
+                    const Positioned.fill(child: RingField(color: AppColors.onEmber, outerOpacity: 0.16, middleOpacity: 0.26)),
+                    const BloodGroupDroplet(label: 'O+', size: 60, filled: true, color: AppColors.primary, textColor: AppColors.onEmber, fontSize: 20, serif: true),
                   ],
                 ),
               ),
               const SizedBox(height: 22),
-              const Text('SEARCHING (sample)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 1.3, color: Color(0xFFE0A8AF))),
+              const Text('Searching (sample)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.1, color: AppColors.onEmberEyebrow)),
               const SizedBox(height: 10),
-              const Text('Notifying compatible donors near you', textAlign: TextAlign.center, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Color(0xFFFFF9F5))),
+              const Text('Notifying compatible donors near you', textAlign: TextAlign.center, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.onEmberStrong)),
             ],
           ),
         ),
@@ -367,9 +367,9 @@ class _MatchContactPreview extends StatelessWidget {
               children: [
                 HeartConnector(leftInitials: 'You', rightInitials: 'SP', leftIsPublic: true, rightIsPublic: false, discSize: 68),
                 SizedBox(height: 26),
-                Text("YOU'RE CONNECTED", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 1.5, color: Color(0xFFE0A8AF))),
+                Text("You're connected", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.1, color: AppColors.onEmberEyebrow)),
                 SizedBox(height: 12),
-                Text('Sample Patient needs your help', textAlign: TextAlign.center, style: TextStyle(fontSize: 24, color: Color(0xFFFFF9F5), fontWeight: FontWeight.w600)),
+                Text('Sample Patient needs your help', textAlign: TextAlign.center, style: TextStyle(fontSize: 24, color: AppColors.onEmberStrong, fontWeight: FontWeight.w600)),
               ],
             ),
           ),
@@ -433,7 +433,7 @@ class _PersonalInfoPreview extends StatelessWidget {
         children: [
           Row(
             children: [
-              const BloodGroupDroplet(label: 'AB+', size: 60, filled: true, color: AppColors.primary, textColor: Color(0xFFFBE6E8), fontSize: 19, serif: true),
+              const BloodGroupDroplet(label: 'AB+', size: 60, filled: true, color: AppColors.primary, textColor: AppColors.onEmber, fontSize: 19, serif: true),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(

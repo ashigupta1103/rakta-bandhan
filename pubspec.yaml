@@ -1,5 +1,5 @@
 name: rakta_bandhan
-description: "A new Flutter project."
+description: "Rakta Bandhan — connects people who need blood with nearby compatible donors."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -47,6 +47,15 @@ dependencies:
   country_flags: ^3.1.0
   image_picker: ^1.2.3
   firebase_analytics: ^11.6.0
+  # Push-permission prompt + device token today; the Blaze push functions
+  # deliver to this token later. Pinned to the firebase_core 3.x train.
+  firebase_messaging: ^15.2.10
+  # In-app voice calls (peer-to-peer audio, Firestore signalling).
+  flutter_webrtc: ^1.6.2
+  # Looping ring/chime for incoming calls and urgent-request alerts.
+  audioplayers: ^6.8.1
+  # "Call from your phone" fallback (tel: — no call permissions needed).
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:
@@ -75,6 +84,8 @@ flutter:
     - assets/branding/final-logo-transparent.png
     - assets/illustrations/received-empty-state.png
     - assets/illustrations/hands_heart.png
+    - assets/sounds/urgent_alert.wav
+    - assets/sounds/incoming_call.wav
 
   # To add assets to your application, add an assets section, like this:
   # assets:

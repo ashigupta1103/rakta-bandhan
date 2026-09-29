@@ -52,7 +52,7 @@ class AboutScreen extends StatelessWidget {
                             child: Image.asset('assets/branding/final-logo-transparent.png', fit: BoxFit.contain),
                           ),
                           const SizedBox(height: 18),
-                          Text('Find your blood mate.', textAlign: TextAlign.center, style: AppTextStyles.display(fontSize: 24, color: const Color(0xFFFBEDE6)).copyWith(fontStyle: FontStyle.italic)),
+                          Text('Find your blood mate.', textAlign: TextAlign.center, style: AppTextStyles.display(fontSize: 24, color: AppColors.onEmberWarm).copyWith(fontStyle: FontStyle.italic)),
                           const SizedBox(height: 12),
                           const Text.rich(
                             TextSpan(
@@ -75,22 +75,22 @@ class AboutScreen extends StatelessWidget {
                               children: [
                                 const Icon(LucideIcons.eye, size: 13, color: AppColors.goldDeep),
                                 const SizedBox(width: 6),
-                                const Text('PREVIEW DATA — SAMPLE COPY, NOT APPROVED', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: AppColors.goldDeep)),
+                                const Text('Preview data — sample copy, not approved', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: AppColors.goldDeep)),
                               ],
                             ),
                             const SizedBox(height: 14),
                             _textBlock(
-                              label: 'OUR MISSION',
+                              label: 'Our mission',
                               body: 'To make it faster and simpler for someone who urgently needs blood to reach a willing, compatible donor nearby — replacing word-of-mouth and cold calls with one request that reaches the right people.',
                             ),
                             const SizedBox(height: 20),
                             _textBlock(
-                              label: 'OUR VISION',
+                              label: 'Our vision',
                               body: 'A community where no one waits helplessly for blood because a compatible donor was simply out of reach — every donor and every request connected within minutes, not days.',
                             ),
                             const SizedBox(height: 20),
                             _textBlock(
-                              label: 'HOW RAKTA BANDHAN HELPS',
+                              label: 'How Rakta Bandhan helps',
                               body: 'Donors register once with their blood group and general location. When someone raises a request, the app finds compatible, available donors nearby and lets them accept directly — no public posting of anyone’s phone number or address.',
                             ),
                           ] else
@@ -126,12 +126,12 @@ class AboutScreen extends StatelessWidget {
                           const SizedBox(height: 24),
                           Row(
                             children: [
-                              const Text('THE TEAM', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 1.2, color: AppColors.ink2)),
+                              const Text('The team', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.1, color: AppColors.ink2)),
                               const SizedBox(width: 8),
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                                 decoration: BoxDecoration(color: AppColors.sand, borderRadius: BorderRadius.circular(999)),
-                                child: const Text('INFO PENDING', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: AppColors.ink2)),
+                                child: const Text('Info pending', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.ink2)),
                               ),
                             ],
                           ),
@@ -165,7 +165,7 @@ class AboutScreen extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 1.2, color: AppColors.ink2)),
+        Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.1, color: AppColors.ink2)),
         const SizedBox(height: 10),
         Text(body, style: AppTextStyles.display(fontSize: 16, color: AppColors.ink, height: 1.6)),
       ],

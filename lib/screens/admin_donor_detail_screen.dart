@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../services/admin_service.dart';
+import '../services/backend.dart';
 import '../theme/app_colors.dart';
 import '../widgets/avatar_badge.dart';
 import '../widgets/status_badge.dart';
@@ -37,7 +38,6 @@ class AdminDonorDetailScreen extends StatelessWidget {
             final donor = service.donors.firstWhere((d) => d.id == donorId);
             final (statusBg, statusText, statusLabel) = _statusStyle(donor.status);
             final initials = donor.name.trim().split(RegExp(r'\s+')).take(2).map((w) => w[0].toUpperCase()).join();
-            final idProofBytes = donor.idProofBase64 == null ? null : base64Decode(donor.idProofBase64!);
 
             return SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -91,24 +91,7 @@ class AdminDonorDetailScreen extends StatelessWidget {
                   const SizedBox(height: 20),
                   Text('ID proof', style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
                   const SizedBox(height: 8),
-                  idProofBytes == null
-                      ? Container(
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(color: AppColors.dividerWarm, borderRadius: BorderRadius.circular(14)),
-                          child: const Text('Not uploaded yet.', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-                        )
-                      : GestureDetector(
-                          onTap: () => showDialog(
-                            context: context,
-                            builder: (context) => Dialog(
-                              child: InteractiveViewer(child: Image.memory(idProofBytes)),
-                            ),
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(14),
-                            child: Image.memory(idProofBytes, height: 180, width: double.infinity, fit: BoxFit.cover),
-                          ),
-                        ),
+                  _IdProofView(donorId: donor.id),
                   const SizedBox(height: 20),
                   Row(
                     children: [
@@ -149,6 +132,49 @@ class AdminDonorDetailScreen extends StatelessWidget {
         Text(label, style: const TextStyle(fontSize: 13.5, color: AppColors.textSecondary)),
         Text(value, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
       ],
+    );
+  }
+}
+
+/// Loads the ID image once, from its own document (see
+/// Backend.uploadIdProof) — admins open one donor at a time, so the donor
+/// list itself never downloads images.
+class _IdProofView extends StatefulWidget {
+  final String donorId;
+  const _IdProofView({required this.donorId});
+
+  @override
+  State<_IdProofView> createState() => _IdProofViewState();
+}
+
+class _IdProofViewState extends State<_IdProofView> {
+  late final Future<String?> _proof = Backend.instance.fetchIdProof(widget.donorId);
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<String?>(
+      future: _proof,
+      builder: (context, snap) {
+        if (snap.connectionState != ConnectionState.done) {
+          return const SizedBox(height: 60, child: Center(child: CircularProgressIndicator(strokeWidth: 2)));
+        }
+        final b64 = snap.data;
+        if (b64 == null) {
+          return Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(color: AppColors.dividerWarm, borderRadius: BorderRadius.circular(14)),
+            child: const Text('Not uploaded yet.', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+          );
+        }
+        final bytes = base64Decode(b64);
+        return GestureDetector(
+          onTap: () => showDialog(context: context, builder: (context) => Dialog(child: InteractiveViewer(child: Image.memory(bytes)))),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: Image.memory(bytes, height: 180, width: double.infinity, fit: BoxFit.cover),
+          ),
+        );
+      },
     );
   }
 }

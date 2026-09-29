@@ -143,7 +143,7 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
                       ],
                     ),
                     const SizedBox(height: 22),
-                    const Text('CHOOSE A TOPIC', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 1.2, color: AppColors.ink2)),
+                    const Text('Choose a topic', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.1, color: AppColors.ink2)),
                     const SizedBox(height: 10),
                     Wrap(
                       spacing: 8,
@@ -165,7 +165,7 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
                       ],
                     ),
                     const SizedBox(height: 22),
-                    const Text('PRIVACY', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 1.2, color: AppColors.ink2)),
+                    const Text('Privacy', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.1, color: AppColors.ink2)),
                     const SizedBox(height: 10),
                     Container(
                       decoration: BoxDecoration(color: Colors.white, border: Border.all(color: AppColors.warmBorder), borderRadius: BorderRadius.circular(12)),

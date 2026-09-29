@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../services/notifications_service.dart';
+import '../services/urgent_alert_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/blood_group_droplet.dart';
+import 'match_contact_screen.dart';
+import 'tracking_screen.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -70,13 +73,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       children: [
                         if (actionable != null) ...[
-                          const Text('NEEDS YOU NOW', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 1.3, color: AppColors.textSecondary)),
+                          const Text('Needs you now', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.1, color: AppColors.textSecondary)),
                           const SizedBox(height: 10),
                           _actionableCard(actionable),
                           const SizedBox(height: 22),
                         ],
                         if (rest.isNotEmpty) ...[
-                          const Text('EARLIER', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 1.3, color: AppColors.textSecondary)),
+                          const Text('Earlier', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.1, color: AppColors.textSecondary)),
                           for (var i = 0; i < rest.length; i++) _archivalRow(rest[i], showDivider: i < rest.length - 1),
                         ],
                       ],
@@ -126,9 +129,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         SizedBox(
           width: double.infinity,
           child: ElevatedButton(
-            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Notification permissions coming soon')),
-            ),
+            onPressed: () async {
+              final messenger = ScaffoldMessenger.of(context);
+              final allowed = await UrgentAlertService.instance.requestPushPermission();
+              messenger.showSnackBar(SnackBar(
+                content: Text(allowed ? 'Notifications are on.' : 'Notifications are still off — allow them in your device settings.'),
+              ));
+            },
             child: const Text('Enable notifications'),
           ),
         ),
@@ -183,6 +190,21 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   /// The one actionable item: red-edge card, group droplet, primary button.
+  /// Feed ids are `<requestId>_<event>` (see FirestoreNotificationsService),
+  /// so the request is recoverable without widening AppNotification.
+  void _openRequest(AppNotification n) {
+    final sep = n.id.lastIndexOf('_');
+    if (sep <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('This is sample data in preview mode.')));
+      return;
+    }
+    final requestId = n.id.substring(0, sep);
+    // A cancellation is the donor-side event; everything else in the feed
+    // is about the requester's own request.
+    final screen = n.kind == NotificationKind.cancellation ? MatchContactScreen(requestId: requestId) : TrackingScreen(requestId: requestId);
+    Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
+  }
+
   Widget _actionableCard(AppNotification n) {
     return Container(
       clipBehavior: Clip.antiAlias,
@@ -202,7 +224,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               children: [
                 Row(
                   children: [
-                    const BloodGroupDroplet(label: '', size: 40, filled: true, color: AppColors.primary, textColor: Color(0xFFFBE6E8), centerIcon: Icon(LucideIcons.droplet, size: 16, color: Color(0xFFFBE6E8))),
+                    const BloodGroupDroplet(label: '', size: 40, filled: true, color: AppColors.primary, textColor: AppColors.onEmber, centerIcon: Icon(LucideIcons.droplet, size: 16, color: AppColors.onEmber)),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
@@ -218,7 +240,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 ),
                 const SizedBox(height: 13),
                 ElevatedButton(
-                  onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Opening request — coming soon.'))),
+                  onPressed: () => _openRequest(n),
                   child: const Text('View request'),
                 ),
               ],

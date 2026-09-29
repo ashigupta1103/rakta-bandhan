@@ -7,6 +7,7 @@ import '../theme/app_text_styles.dart';
 import '../widgets/app_header.dart';
 import '../widgets/blood_group_droplet.dart';
 import '../widgets/impact_trail.dart';
+import '../widgets/urgent_alert_toggle.dart';
 import '../widgets/logout_flow.dart';
 import '../widgets/pulsing_dot.dart';
 import 'cooldown_screen.dart';
@@ -103,7 +104,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 Positioned(
                                   right: -8,
                                   bottom: -6,
-                                  child: BloodGroupDroplet(label: bloodGroup, size: 34, filled: true, color: AppColors.primary, textColor: const Color(0xFFFBE6E8), fontSize: 11),
+                                  child: BloodGroupDroplet(label: bloodGroup, size: 34, filled: true, color: AppColors.primary, textColor: AppColors.onEmber, fontSize: 11),
                                 ),
                             ],
                           ),
@@ -181,8 +182,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ],
                         ),
                       ),
+                      const SizedBox(height: 10),
+                      const UrgentAlertToggle(),
                       const SizedBox(height: 26),
-                      const Text('YOUR IMPACT', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 1.3, color: AppColors.textSecondary)),
+                      const Text('Your impact', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.1, color: AppColors.textSecondary)),
                       const SizedBox(height: 14),
                       ImpactTrail(
                         count: donationCount,

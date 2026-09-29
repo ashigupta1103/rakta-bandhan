@@ -144,18 +144,18 @@ class _SuccessConnection extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 28),
                     child: Column(
                       children: [
-                        const Text("YOU'RE CONNECTED", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 1.5, color: Color(0xFFE0A8AF))),
+                        const Text("You're connected", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.1, color: AppColors.onEmberEyebrow)),
                         const SizedBox(height: 12),
                         Text(
                           '${name == 'the requester' ? 'The requester' : name} is\nexpecting you',
                           textAlign: TextAlign.center,
-                          style: AppTextStyles.display(fontSize: 28, color: const Color(0xFFFFF9F5), height: 1.2),
+                          style: AppTextStyles.display(fontSize: 28, color: AppColors.onEmberStrong, height: 1.2),
                         ),
                         const SizedBox(height: 12),
                         Text(
                           '$bloodGroup · $units unit${units == 1 ? '' : 's'} · $location',
                           textAlign: TextAlign.center,
-                          style: const TextStyle(fontSize: 13.5, color: Color(0xFFE9BFC4), height: 1.6),
+                          style: const TextStyle(fontSize: 13.5, color: AppColors.onEmberMuted, height: 1.6),
                         ),
                       ],
                     ),
