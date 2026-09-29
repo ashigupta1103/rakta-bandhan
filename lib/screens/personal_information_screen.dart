@@ -50,12 +50,18 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
             ListTile(
               leading: const Icon(LucideIcons.camera),
               title: const Text('Take a photo'),
-              onTap: () async => Navigator.pop(context, await ImagePicker().pickImage(source: ImageSource.camera, maxWidth: 1280, imageQuality: 70)),
+              onTap: () async {
+                final file = await ImagePicker().pickImage(source: ImageSource.camera, maxWidth: 1280, imageQuality: 70);
+                if (context.mounted) Navigator.pop(context, file);
+              },
             ),
             ListTile(
               leading: const Icon(LucideIcons.image),
               title: const Text('Choose from gallery'),
-              onTap: () async => Navigator.pop(context, await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 1280, imageQuality: 70)),
+              onTap: () async {
+                final file = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 1280, imageQuality: 70);
+                if (context.mounted) Navigator.pop(context, file);
+              },
             ),
           ],
         ),

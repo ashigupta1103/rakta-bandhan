@@ -319,7 +319,7 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
                 // Invisible, but required: on web this element is what
                 // actually plays the other person's voice. Unmounted as soon
                 // as the call ends — the renderer is disposed right after.
-                SizedBox(width: 1, height: 1, child: live ? RTCVideoView(call!.remoteRenderer) : null),
+                SizedBox(width: 1, height: 1, child: live ? RTCVideoView(call.remoteRenderer) : null),
                 Expanded(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -389,7 +389,7 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
     if (_stage == _Stage.starting) {
       endAction = () => Navigator.of(context).maybePop();
     } else {
-      endAction = enabled ? call!.hangUp : null;
+      endAction = enabled ? call.hangUp : null;
     }
     return Column(
       children: [
@@ -402,13 +402,13 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
                 icon: (call?.muted ?? false) ? LucideIcons.micOff : LucideIcons.mic,
                 label: (call?.muted ?? false) ? 'Unmute' : 'Mute',
                 active: call?.muted ?? false,
-                onTap: enabled ? call!.toggleMute : null,
+                onTap: enabled ? call.toggleMute : null,
               ),
               _RoundControl(
                 icon: LucideIcons.volume2,
                 label: 'Speaker',
                 active: call?.speakerOn ?? false,
-                onTap: enabled ? call!.toggleSpeaker : null,
+                onTap: enabled ? call.toggleSpeaker : null,
               ),
               _RoundControl(icon: LucideIcons.messageSquare, label: 'Message', active: false, onTap: _openChat),
             ],
@@ -533,9 +533,9 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> with SingleTick
   Future<void> _accept() async {
     if (_busy) return;
     setState(() => _busy = true);
-    await AlertSound.incomingCall.stop();
     final navigator = Navigator.of(context);
     final messenger = ScaffoldMessenger.of(context);
+    await AlertSound.incomingCall.stop();
     try {
       final call = await CallService.instance.answer(incoming);
       navigator.pushReplacement(MaterialPageRoute(fullscreenDialog: true, builder: (_) => CallScreen(call: call)));

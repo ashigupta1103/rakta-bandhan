@@ -71,6 +71,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
     if (!mounted) return;
     setState(() => _exporting = false);
+    final messenger = ScaffoldMessenger.of(context);
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -104,7 +105,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     await Clipboard.setData(ClipboardData(text: json));
                     if (!sheet.mounted) return;
                     Navigator.pop(sheet);
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Copied to clipboard.')));
+                    messenger.showSnackBar(const SnackBar(content: Text('Copied to clipboard.')));
                   },
                   icon: const Icon(LucideIcons.clipboardList, size: 16),
                   label: const Text('Copy all'),
