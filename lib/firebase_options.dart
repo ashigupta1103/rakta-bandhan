@@ -50,20 +50,20 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyC-Maq9_JwK9gEaKAyC1-CDc995LlA2cPY',
-    appId: '1:323116488555:web:04ea5be4983471efb15e2e',
-    messagingSenderId: '323116488555',
-    projectId: 'project-673480bf-b9b8-4e5b-8a1',
-    authDomain: 'project-673480bf-b9b8-4e5b-8a1.firebaseapp.com',
-    storageBucket: 'project-673480bf-b9b8-4e5b-8a1.firebasestorage.app',
-    measurementId: 'G-J8TLQ4KG5K',
+    apiKey: 'AIzaSyDX-ErtJ-YzGrsmA35-QVowcIGEcyIRPjs',
+    appId: '1:686452527533:web:96e80f3e108d8f3015d124',
+    messagingSenderId: '686452527533',
+    projectId: 'rakta-bandhan2026',
+    authDomain: 'rakta-bandhan2026.firebaseapp.com',
+    storageBucket: 'rakta-bandhan2026.firebasestorage.app',
+    measurementId: 'G-D7RXE48E0D',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyB1PBGC-VJi4koP0FAXSZyPZjKKxtt6oQs',
-    appId: '1:323116488555:android:9764f97cbf9e29bfb15e2e',
-    messagingSenderId: '323116488555',
-    projectId: 'project-673480bf-b9b8-4e5b-8a1',
-    storageBucket: 'project-673480bf-b9b8-4e5b-8a1.firebasestorage.app',
+    apiKey: 'AIzaSyA1pAyg9LQwU94Qli0R1BubgDsMBA6n9CA',
+    appId: '1:686452527533:android:1612485ff7a2ebc715d124',
+    messagingSenderId: '686452527533',
+    projectId: 'rakta-bandhan2026',
+    storageBucket: 'rakta-bandhan2026.firebasestorage.app',
   );
 }

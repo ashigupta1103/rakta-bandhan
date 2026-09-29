@@ -1,33 +1,33 @@
 {
   "project_info": {
-    "project_number": "323116488555",
-    "project_id": "project-673480bf-b9b8-4e5b-8a1",
-    "storage_bucket": "project-673480bf-b9b8-4e5b-8a1.firebasestorage.app"
+    "project_number": "686452527533",
+    "project_id": "rakta-bandhan2026",
+    "storage_bucket": "rakta-bandhan2026.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:323116488555:android:9764f97cbf9e29bfb15e2e",
+        "mobilesdk_app_id": "1:686452527533:android:1612485ff7a2ebc715d124",
         "android_client_info": {
           "package_name": "com.raktabandhan.app"
         }
       },
       "oauth_client": [
         {
-          "client_id": "323116488555-io25mv8im3hprcqt1ooe2t8kps4d7rn4.apps.googleusercontent.com",
+          "client_id": "686452527533-4vclkso6hcuq6g1ut5dl5dk2f642oqpn.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyB1PBGC-VJi4koP0FAXSZyPZjKKxtt6oQs"
+          "current_key": "AIzaSyA1pAyg9LQwU94Qli0R1BubgDsMBA6n9CA"
         }
       ],
       "services": {
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "323116488555-io25mv8im3hprcqt1ooe2t8kps4d7rn4.apps.googleusercontent.com",
+              "client_id": "686452527533-4vclkso6hcuq6g1ut5dl5dk2f642oqpn.apps.googleusercontent.com",
               "client_type": 3
             }
           ]

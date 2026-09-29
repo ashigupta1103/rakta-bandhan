@@ -32,6 +32,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _loaded = false;
   bool _showExactAddress = false;
   bool _loggingOut = false;
+  bool _deleting = false;
 
   @override
   void initState() {
@@ -55,7 +56,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   bool _exporting = false;
-  bool _deleting = false;
 
   Future<void> _downloadData() async {
     if (_exporting) return;

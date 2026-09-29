@@ -13,13 +13,13 @@ import { getFirestore } from 'firebase/firestore';
 // Same project/web app the Flutter build's firebase_options.dart uses
 // (DefaultFirebaseOptions.web) — one Firebase project, two clients.
 const firebaseConfig = {
-  apiKey: "AIzaSyC-Maq9_JwK9gEaKAyC1-CDc995LlA2cPY",
-  authDomain: "project-673480bf-b9b8-4e5b-8a1.firebaseapp.com",
-  projectId: "project-673480bf-b9b8-4e5b-8a1",
-  storageBucket: "project-673480bf-b9b8-4e5b-8a1.firebasestorage.app",
-  messagingSenderId: "323116488555",
-  appId: "1:323116488555:web:04ea5be4983471efb15e2e",
-  measurementId: "G-J8TLQ4KG5K",
+  apiKey: "AIzaSyDX-ErtJ-YzGrsmA35-QVowcIGEcyIRPjs",
+  authDomain: "rakta-bandhan2026.firebaseapp.com",
+  projectId: "rakta-bandhan2026",
+  storageBucket: "rakta-bandhan2026.firebasestorage.app",
+  messagingSenderId: "686452527533",
+  appId: "1:686452527533:web:96e80f3e108d8f3015d124",
+  measurementId: "G-D7RXE48E0D",
 };
 
 const app = initializeApp(firebaseConfig);

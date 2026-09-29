@@ -6,11 +6,12 @@ import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/filter_chip_row.dart';
 import '../widgets/status_badge.dart';
+import 'admin_content_tab.dart';
 import 'admin_donor_detail_screen.dart';
 import 'admin_hospital_form_screen.dart';
 import 'admin_request_detail_screen.dart';
 
-enum _AdminTab { dashboard, donors, requests, hospitals, activity }
+enum _AdminTab { dashboard, donors, requests, hospitals, inbox, content, activity }
 
 /// Mobile-companion admin console. All data/actions route through
 /// AdminService (real Firestore, gated by firestore.rules' isAdmin()).
@@ -35,6 +36,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   DonorVerificationStatus? _donorFilter;
   String? _requestFilter;
   String _hospitalSearch = '';
+  InboxStatus? _inboxFilter;
 
   final _broadcastController = TextEditingController();
   String _audience = 'All donors';
@@ -78,14 +80,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 ],
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-              child: FilterChipRow(
-                activeBg: AppColors.textPrimaryWarm,
-                chips: [
-                  for (final t in _AdminTab.values)
-                    FilterChipItem(label: _tabLabel(t), active: _tab == t, onTap: () => setState(() => _tab = t)),
-                ],
+            // Rebuilt on service changes too — the Inbox chip carries the
+            // untriaged count, which has to move without a tab switch.
+            ListenableBuilder(
+              listenable: _service,
+              builder: (context, _) => Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                child: FilterChipRow(
+                  activeBg: AppColors.textPrimaryWarm,
+                  chips: [
+                    for (final t in _AdminTab.values)
+                      FilterChipItem(label: _tabLabel(t), active: _tab == t, onTap: () => setState(() => _tab = t)),
+                  ],
+                ),
               ),
             ),
             Expanded(
@@ -96,6 +103,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   _AdminTab.donors => _buildDonors(),
                   _AdminTab.requests => _buildRequests(),
                   _AdminTab.hospitals => _buildHospitals(),
+                  _AdminTab.inbox => _buildInbox(),
+                  _AdminTab.content => const AdminContentTab(),
                   _AdminTab.activity => _buildActivity(),
                 },
               ),
@@ -111,8 +120,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         _AdminTab.donors => 'Donors',
         _AdminTab.requests => 'Requests',
         _AdminTab.hospitals => 'Hospitals',
+        _AdminTab.inbox => _inboxLabel(),
+        _AdminTab.content => 'Content',
         _AdminTab.activity => 'Activity',
       };
+
+  /// Unhandled count on the tab itself — an untriaged report shouldn't need
+  /// the admin to open the tab to discover it exists.
+  String _inboxLabel() {
+    final open = _service.issueReports.where((r) => r.status != InboxStatus.resolved).length +
+        _service.partnershipInquiries.where((p) => p.status != InboxStatus.resolved).length +
+        _service.reports.where((r) => r.status != InboxStatus.resolved).length;
+    return open == 0 ? 'Inbox' : 'Inbox ($open)';
+  }
 
   // ---------------------------------------------------------------- Dashboard
 
@@ -345,6 +365,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       ? OutlinedButton(onPressed: () => _service.unbanDonor(donor.id), child: const Text('Unban'))
                       : OutlinedButton(onPressed: () => _service.banDonor(donor.id), child: const Text('Ban')),
                 ),
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(LucideIcons.trash2, size: 18, color: AppColors.primary),
+                  tooltip: 'Delete donor profile',
+                  onPressed: () => confirmAdminDelete(
+                    context,
+                    what: '${donor.name}\'s profile',
+                    detail: 'This removes their profile from Firestore. Their sign-in stays active — use Ban to actually lock them out.',
+                    onConfirm: () => _service.deleteDonor(donor.id),
+                  ),
+                ),
               ],
             ),
           ],
@@ -416,6 +447,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               const SizedBox(height: 4),
               Text('Matched: ${request.matchedDonorName}', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
             ],
+            Align(
+              alignment: Alignment.centerRight,
+              child: IconButton(
+                icon: const Icon(LucideIcons.trash2, size: 16, color: AppColors.primary),
+                tooltip: 'Delete request',
+                onPressed: () => confirmAdminDelete(
+                  context,
+                  what: 'this request',
+                  detail: 'Removes it outright — for spam, duplicates or test postings. Use Cancel from the requester\'s side for a normal withdrawal.',
+                  onConfirm: () => _service.deleteRequest(request.id),
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -478,6 +522,222 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  // --------------------------------------------------------------------- Inbox
+
+  /// Inbox = the two one-way submission forms, triaged. A report can be
+  /// moved New → In progress → Resolved, carry an admin-only note, or be
+  /// deleted outright (spam). Everything here is audit-logged by
+  /// Backend.adminSet*Status. Community-story moderation moved to the
+  /// Content tab, where the rest of the member-facing content lives.
+  Widget _buildInbox() {
+    final issueReports = _service.issueReports.where((r) => _inboxFilter == null || r.status == _inboxFilter).toList();
+    final inquiries = _service.partnershipInquiries.where((p) => _inboxFilter == null || p.status == _inboxFilter).toList();
+    final abuseReports = _service.reports.where((r) => _inboxFilter == null || r.status == _inboxFilter).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 10),
+          child: FilterChipRow(
+            chips: [
+              FilterChipItem(label: 'All', active: _inboxFilter == null, onTap: () => setState(() => _inboxFilter = null)),
+              for (final s in InboxStatus.values)
+                FilterChipItem(
+                  label: inboxStatusLabel(s),
+                  active: _inboxFilter == s,
+                  onTap: () => setState(() => _inboxFilter = s),
+                ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: issueReports.isEmpty && inquiries.isEmpty && abuseReports.isEmpty
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Text(
+                      _inboxFilter == null
+                          ? 'No reports or inquiries yet.'
+                          : 'Nothing is ${inboxStatusLabel(_inboxFilter!).toLowerCase()}.',
+                      style: const TextStyle(color: AppColors.textMuted),
+                    ),
+                  ),
+                )
+              : ListView(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                  children: [
+                    if (abuseReports.isNotEmpty) ...[
+                      _inboxSectionLabel('CHAT & CALL REPORTS'),
+                      for (final entry in abuseReports)
+                        _inboxCard(
+                          title: entry.reason,
+                          subtitle: 'Reported user ${entry.reportedUid} · request ${entry.requestId}',
+                          body: entry.details,
+                          meta: entry.time,
+                          status: entry.status,
+                          note: entry.adminNote,
+                          onStatus: (s) => runAdminWrite(context, () => _service.setReportStatus(entry.id, s),
+                              done: 'Marked ${inboxStatusLabel(s).toLowerCase()}.'),
+                          onNote: () => _editInboxNote(
+                            current: entry.adminNote,
+                            save: (note) => _service.setReportStatus(entry.id, entry.status, note: note),
+                          ),
+                        ),
+                      const SizedBox(height: 14),
+                    ],
+                    if (issueReports.isNotEmpty) ...[
+                      _inboxSectionLabel('ISSUE REPORTS'),
+                      for (final entry in issueReports)
+                        _inboxCard(
+                          title: entry.reason,
+                          body: entry.details,
+                          meta: entry.time,
+                          status: entry.status,
+                          note: entry.adminNote,
+                          onStatus: (s) => runAdminWrite(context, () => _service.setIssueStatus(entry.id, s),
+                              done: 'Marked ${inboxStatusLabel(s).toLowerCase()}.'),
+                          onNote: () => _editInboxNote(
+                            current: entry.adminNote,
+                            save: (note) => _service.setIssueStatus(entry.id, entry.status, note: note),
+                          ),
+                          onDelete: () => confirmAdminDelete(
+                            context,
+                            what: 'this report',
+                            onConfirm: () => _service.deleteIssueReport(entry.id),
+                          ),
+                        ),
+                      const SizedBox(height: 14),
+                    ],
+                    if (inquiries.isNotEmpty) ...[
+                      _inboxSectionLabel('PARTNERSHIP INQUIRIES'),
+                      for (final entry in inquiries)
+                        _inboxCard(
+                          title: entry.orgName,
+                          subtitle: '${entry.contactName} · ${entry.workEmail}',
+                          highlight: entry.interest,
+                          body: entry.message,
+                          meta: entry.time,
+                          status: entry.status,
+                          note: entry.adminNote,
+                          onStatus: (s) => runAdminWrite(context, () => _service.setPartnershipStatus(entry.id, s),
+                              done: 'Marked ${inboxStatusLabel(s).toLowerCase()}.'),
+                          onNote: () => _editInboxNote(
+                            current: entry.adminNote,
+                            save: (note) => _service.setPartnershipStatus(entry.id, entry.status, note: note),
+                          ),
+                          onDelete: () => confirmAdminDelete(
+                            context,
+                            what: 'this inquiry',
+                            onConfirm: () => _service.deletePartnershipInquiry(entry.id),
+                          ),
+                        ),
+                    ],
+                  ],
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _inboxSectionLabel(String text) => Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Text(text, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.textMuted, letterSpacing: 0.4)),
+      );
+
+  Future<void> _editInboxNote({required String current, required Future<void> Function(String) save}) async {
+    final values = await openAdminEditor(
+      context,
+      title: 'Internal note',
+      note: 'Only admins can read this. The person who submitted never sees it — there is no reply channel.',
+      fields: [AdminEditorField(key: 'note', label: 'Note', initial: current, lines: 3)],
+    );
+    if (values == null || !mounted) return;
+    await runAdminWrite(context, () => save(values['note'] ?? ''), done: 'Note saved.');
+  }
+
+  Widget _inboxCard({
+    required String title,
+    String? subtitle,
+    String? highlight,
+    required String body,
+    required String meta,
+    required InboxStatus status,
+    required String note,
+    required void Function(InboxStatus) onStatus,
+    required VoidCallback onNote,
+    VoidCallback? onDelete,
+  }) {
+    final (bg, fg) = switch (status) {
+      InboxStatus.isNew => (AppColors.statusUrgentBg, AppColors.statusUrgentText),
+      InboxStatus.inProgress => (AppColors.warmAmberBg, AppColors.warmAmberText),
+      InboxStatus.resolved => (AppColors.warmGreenBg, AppColors.warmGreenText),
+    };
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: Colors.white, border: Border.all(color: AppColors.cardBorderWarm), borderRadius: BorderRadius.circular(12)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(child: Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm))),
+              const SizedBox(width: 6),
+              StatusBadge(label: inboxStatusLabel(status), background: bg, textColor: fg, fontSize: 11),
+            ],
+          ),
+          if (subtitle != null) ...[
+            const SizedBox(height: 3),
+            Text(subtitle, style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary)),
+          ],
+          if (highlight != null && highlight.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(highlight, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w500, color: AppColors.primary)),
+          ],
+          if (body.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(body, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.45)),
+          ],
+          if (note.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppColors.sand,
+                border: const Border(left: BorderSide(color: AppColors.textMuted, width: 2)),
+                borderRadius: const BorderRadius.horizontal(right: Radius.circular(8)),
+              ),
+              child: Text(note, style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary, height: 1.4)),
+            ),
+          ],
+          const SizedBox(height: 8),
+          Text(meta, style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
+          const Divider(height: 18, color: AppColors.cardBorderWarm),
+          FilterChipRow(
+            chips: [
+              for (final s in InboxStatus.values)
+                FilterChipItem(label: inboxStatusLabel(s), active: status == s, onTap: () => onStatus(s)),
+            ],
+          ),
+          Row(
+            children: [
+              TextButton(onPressed: onNote, child: Text(note.isEmpty ? 'Add note' : 'Edit note')),
+              const Spacer(),
+              if (onDelete != null)
+                IconButton(
+                  icon: const Icon(LucideIcons.trash2, size: 15, color: AppColors.primary),
+                  tooltip: 'Delete',
+                  onPressed: onDelete,
+                ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 

@@ -82,6 +82,11 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
 
   static const _bloodGroups = ['All', 'A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
 
+  /// The geohash grid query (Backend.availableDonorsNearbyStream) only
+  /// bounds which documents Firestore returns — this is the real cutoff
+  /// applied to that candidate set below.
+  static const _searchRadiusKm = 50.0;
+
   @override
   void initState() {
     super.initState();
@@ -280,6 +285,7 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
                     .where((d) => d.id != myUid)
                     .map(_donorCardData)
                     .where((d) => _bloodGroupFilter == 'All' || d['bloodGroup'] == _bloodGroupFilter)
+                    .where((d) => (d['distanceKm'] as double?) == null || (d['distanceKm'] as double) <= _searchRadiusKm)
                     .toList()
                   ..sort((a, b) {
                     final da = a['distanceKm'] as double?;
@@ -483,6 +489,7 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
                         .where((d) => d.id != myUid)
                         .map(_donorCardData)
                         .where((d) => _bloodGroupFilter == 'All' || d['bloodGroup'] == _bloodGroupFilter)
+                        .where((d) => (d['distanceKm'] as double?) == null || (d['distanceKm'] as double) <= _searchRadiusKm)
                         .toList()
                       ..sort((a, b) {
                         final da = a['distanceKm'] as double?;

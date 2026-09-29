@@ -14,12 +14,17 @@ class AppNotification {
   final String body;
   final String time;
 
+  /// The request this notification is about, so "View request" can open it.
+  /// Null for the mock fixtures, which have no real document behind them.
+  final String? requestId;
+
   const AppNotification({
     required this.id,
     required this.kind,
     required this.title,
     required this.body,
     required this.time,
+    this.requestId,
   });
 }
 
@@ -118,6 +123,7 @@ class FirestoreNotificationsService implements NotificationsService {
             title: '${data['matched_donor_name'] ?? 'A donor'} accepted your request',
             body: '$bloodGroup · $location',
             time: _timeAgo(at),
+            requestId: doc.id,
           ),
           at,
         );
@@ -130,6 +136,7 @@ class FirestoreNotificationsService implements NotificationsService {
             title: 'Thanks for donating!',
             body: '${data['matched_donor_name'] ?? 'Your donor'} confirmed the donation.',
             time: _timeAgo(at),
+            requestId: doc.id,
           ),
           at,
         );
@@ -142,6 +149,7 @@ class FirestoreNotificationsService implements NotificationsService {
             title: 'Request expired',
             body: 'No donor found in time for your $bloodGroup request.',
             time: _timeAgo(at),
+            requestId: doc.id,
           ),
           at,
         );
@@ -161,6 +169,7 @@ class FirestoreNotificationsService implements NotificationsService {
         title: 'Request cancelled',
         body: '${data['requester_name'] ?? 'The requester'} cancelled a ${data['blood_group'] ?? ''} request you accepted.',
         time: _timeAgo(at),
+        requestId: doc.id,
       ),
       at,
     );

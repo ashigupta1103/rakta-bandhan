@@ -21,6 +21,7 @@ import {
   addDoc,
   updateDoc,
   deleteDoc,
+  setDoc,
   writeBatch,
   deleteField,
   getCountFromServer,
@@ -88,6 +89,80 @@ export interface AuditEntry extends DocumentData {
   target_name?: string;
   reason?: string;
   at?: { toDate: () => Date };
+}
+
+/** Triage state on both inbox collections. A doc with no `status` is new. */
+export type InboxStatus = 'new' | 'in_progress' | 'resolved';
+
+export const INBOX_STATUSES: InboxStatus[] = ['new', 'in_progress', 'resolved'];
+
+export const INBOX_STATUS_LABELS: Record<InboxStatus, string> = {
+  new: 'New',
+  in_progress: 'In progress',
+  resolved: 'Resolved',
+};
+
+export interface IssueReport extends DocumentData {
+  id: string;
+  reporter_uid: string;
+  reason: string;
+  details?: string;
+  status?: InboxStatus;
+  admin_note?: string;
+  created_at?: { toDate: () => Date };
+}
+
+export interface PartnershipInquiry extends DocumentData {
+  id: string;
+  requester_uid: string;
+  org_name: string;
+  contact_name: string;
+  work_email: string;
+  interest: string;
+  message?: string;
+  status?: InboxStatus;
+  admin_note?: string;
+  created_at?: { toDate: () => Date };
+}
+
+/** Chat/call abuse report (ChatService.report) — admin can update the
+ * triage status but never delete one; the rules keep it a permanent
+ * record regardless of outcome. */
+export interface AbuseReport extends DocumentData {
+  id: string;
+  reporter_uid: string;
+  reported_uid: string;
+  request_id: string;
+  reason: string;
+  details?: string;
+  status?: InboxStatus;
+  admin_note?: string;
+  created_at?: { toDate: () => Date };
+}
+
+export interface CommunityStory extends DocumentData {
+  id: string;
+  author_uid: string;
+  author_name?: string;
+  topic?: string;
+  body: string;
+  is_hidden?: boolean;
+  created_at?: { toDate: () => Date };
+}
+
+export interface Announcement extends DocumentData {
+  id: string;
+  title: string;
+  body: string;
+  created_at?: { toDate: () => Date };
+}
+
+export interface Testimonial extends DocumentData {
+  id: string;
+  quote: string;
+  name: string;
+  role?: string;
+  created_at?: { toDate: () => Date };
 }
 
 export interface DashboardStats {
@@ -213,6 +288,96 @@ export function useAuditLog() {
   }, []);
 
   return { entries, loading };
+}
+
+/**
+ * One generic live-collection hook for the five newest-first collections the
+ * Inbox and Content pages read. They differ only in name and shape, so a
+ * hook each would be five copies of the same six lines.
+ */
+function useCollection<T>(name: string, max = 100) {
+  const [items, setItems] = useState<T[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const q = query(collection(db, name), orderBy('created_at', 'desc'), limit(max));
+    const unsub = onSnapshot(
+      q,
+      (snapshot) => {
+        setItems(snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as T)));
+        setLoading(false);
+      },
+      () => setLoading(false)
+    );
+    return () => unsub();
+  }, [name, max]);
+
+  return { items, loading };
+}
+
+/** "Report an issue" submissions (Help & support in the app). */
+export function useIssueReports() {
+  const { items, loading } = useCollection<IssueReport>('issue_reports');
+  return { reports: items, loading };
+}
+
+/** "Start a conversation" submissions (Corporate partnerships in the app). */
+export function usePartnershipInquiries() {
+  const { items, loading } = useCollection<PartnershipInquiry>('partnership_inquiries');
+  return { inquiries: items, loading };
+}
+
+/** Chat/call abuse reports (ChatService.report) — the one inbox the
+ * chat/calls branch didn't wire into either admin console. */
+export function useAbuseReports() {
+  const { items, loading } = useCollection<AbuseReport>('reports');
+  return { reports: items, loading };
+}
+
+/** Member-posted Community stories — admin moderates (hide or delete). */
+export function useCommunityStories() {
+  const { items, loading } = useCollection<CommunityStory>('community_stories');
+  return { stories: items, loading };
+}
+
+/** Community → What's New. Admin-authored; no user-write path exists. */
+export function useAnnouncements() {
+  const { items, loading } = useCollection<Announcement>('announcements');
+  return { announcements: items, loading };
+}
+
+/** More → Testimonials. Curated quotes, admin-write-only per rules. */
+export function useTestimonials() {
+  const { items, loading } = useCollection<Testimonial>('testimonials');
+  return { testimonials: items, loading };
+}
+
+function currentMonthKey() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
+/**
+ * The `public_stats/impact` counter behind Community → Impact. Reads 0 for a
+ * stale month rather than last month's figure — same rule the Flutter client
+ * applies in Backend.impactThisMonthStream.
+ */
+export function useImpactCounter() {
+  const [count, setCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'public_stats', 'impact'), (snap) => {
+      const data = snap.data();
+      if (!data || data.month_key !== currentMonthKey()) {
+        setCount(0);
+        return;
+      }
+      setCount(Number(data.donations_this_month ?? 0));
+    });
+    return () => unsub();
+  }, []);
+
+  return { count };
 }
 
 // ─── Client-computed dashboard stats (no Cloud Function) ─────────────────────
@@ -442,6 +607,30 @@ export function useAdminActions() {
       await logAudit(isBanned ? 'BAN_USER' : 'UNBAN_USER', { uid: donorId, name: donorName }, reason);
     });
 
+  /**
+   * Removes a donor's Firestore profile (`donors` + `donors_public`). The
+   * underlying Firebase Auth account is untouched — deleting or disabling
+   * another user's Auth account needs the Admin SDK, which is Blaze-only.
+   * `banUser` (is_banned) is the real access-lock on Spark; use this when
+   * the record itself, not just access, needs to go (spam, duplicates,
+   * a takedown request).
+   */
+  const deleteDonor = (donorId: string, name?: string) =>
+    run(async () => {
+      const batch = writeBatch(db);
+      batch.delete(doc(db, 'donors_public', donorId));
+      batch.delete(doc(db, 'donors', donorId));
+      await batch.commit();
+      await logAudit('DELETE_DONOR', { uid: donorId, name });
+    });
+
+  /** Removes a request outright — spam, duplicate or test postings. */
+  const deleteRequest = (requestId: string) =>
+    run(async () => {
+      await deleteDoc(doc(db, 'requests', requestId));
+      await logAudit('DELETE_REQUEST', { uid: requestId });
+    });
+
   const createHospital = (fields: Record<string, unknown>) =>
     run(async () => {
       const ref = await addDoc(collection(db, 'hospitals'), {
@@ -495,15 +684,169 @@ export function useAdminActions() {
       };
     });
 
+  // ── Inbox triage (issue_reports / partnership_inquiries) ────────────────
+  //
+  // Both collections are create-only for the submitter and admin-updatable
+  // per firestore.rules, so triage is a plain field write. There is no reply
+  // channel — `admin_note` is internal, and the submitter never reads it.
+
+  const setIssueStatus = (id: string, status: InboxStatus, note?: string) =>
+    run(async () => {
+      await updateDoc(doc(db, 'issue_reports', id), {
+        status,
+        ...(note === undefined ? {} : { admin_note: note.trim() }),
+        handled_by: auth.currentUser?.uid || null,
+        handled_at: serverTimestamp(),
+      });
+      await logAudit(`issue_${status}`, { uid: id });
+    });
+
+  const deleteIssueReport = (id: string) =>
+    run(async () => {
+      await deleteDoc(doc(db, 'issue_reports', id));
+      await logAudit('delete_issue_report', { uid: id });
+    });
+
+  const setInquiryStatus = (id: string, status: InboxStatus, note?: string) =>
+    run(async () => {
+      await updateDoc(doc(db, 'partnership_inquiries', id), {
+        status,
+        ...(note === undefined ? {} : { admin_note: note.trim() }),
+        handled_by: auth.currentUser?.uid || null,
+        handled_at: serverTimestamp(),
+      });
+      await logAudit(`inquiry_${status}`, { uid: id });
+    });
+
+  const deleteInquiry = (id: string) =>
+    run(async () => {
+      await deleteDoc(doc(db, 'partnership_inquiries', id));
+      await logAudit('delete_partnership_inquiry', { uid: id });
+    });
+
+  /**
+   * Chat/call abuse reports (ChatService.report). Same triage shape, but
+   * firestore.rules gives admins `update` only, never `delete` — a report
+   * stays on record regardless of outcome, so there is no delete action.
+   */
+  const setReportStatus = (id: string, status: InboxStatus, note?: string) =>
+    run(async () => {
+      await updateDoc(doc(db, 'reports', id), {
+        status,
+        ...(note === undefined ? {} : { admin_note: note.trim() }),
+        handled_by: auth.currentUser?.uid || null,
+        handled_at: serverTimestamp(),
+      });
+      await logAudit(`report_${status}`, { uid: id });
+    });
+
+  // ── App content (announcements, testimonials, impact, story moderation) ──
+
+  const saveAnnouncement = (fields: { id?: string; title: string; body: string }) =>
+    run(async () => {
+      const data = {
+        title: fields.title.trim(),
+        body: fields.body.trim(),
+        updated_at: serverTimestamp(),
+        author_uid: auth.currentUser?.uid || null,
+      };
+      if (fields.id) {
+        await updateDoc(doc(db, 'announcements', fields.id), data);
+        await logAudit('edit_announcement', { uid: fields.id, name: data.title });
+      } else {
+        // created_at is set on create only, so an edit doesn't jump the post
+        // back to the top of the feed.
+        const ref = await addDoc(collection(db, 'announcements'), { ...data, created_at: serverTimestamp() });
+        await logAudit('publish_announcement', { uid: ref.id, name: data.title });
+      }
+    });
+
+  const deleteAnnouncement = (id: string, title?: string) =>
+    run(async () => {
+      await deleteDoc(doc(db, 'announcements', id));
+      await logAudit('delete_announcement', { uid: id, name: title });
+    });
+
+  const saveTestimonial = (fields: { id?: string; quote: string; name: string; role: string }) =>
+    run(async () => {
+      const data = {
+        quote: fields.quote.trim(),
+        name: fields.name.trim(),
+        role: fields.role.trim(),
+        updated_at: serverTimestamp(),
+        author_uid: auth.currentUser?.uid || null,
+      };
+      if (fields.id) {
+        await updateDoc(doc(db, 'testimonials', fields.id), data);
+        await logAudit('edit_testimonial', { uid: fields.id, name: data.name });
+      } else {
+        const ref = await addDoc(collection(db, 'testimonials'), { ...data, created_at: serverTimestamp() });
+        await logAudit('publish_testimonial', { uid: ref.id, name: data.name });
+      }
+    });
+
+  const deleteTestimonial = (id: string, name?: string) =>
+    run(async () => {
+      await deleteDoc(doc(db, 'testimonials', id));
+      await logAudit('delete_testimonial', { uid: id, name });
+    });
+
+  /**
+   * Overrides the Community Impact figure for the current month. The
+   * +1-per-write cap in the rules applies to donors, not admins — this is
+   * the correction path for a miscount or an offline-confirmed donation.
+   */
+  const setImpactCount = (count: number) =>
+    run(async () => {
+      await setDoc(doc(db, 'public_stats', 'impact'), {
+        month_key: currentMonthKey(),
+        donations_this_month: count,
+        updated_at: serverTimestamp(),
+        set_by_admin: auth.currentUser?.uid || null,
+      });
+      await logAudit('set_impact_count', { name: String(count) });
+    });
+
+  /** Reversible moderation — the Community feed filters `is_hidden` out. */
+  const setStoryHidden = (id: string, hidden: boolean, author?: string) =>
+    run(async () => {
+      await updateDoc(doc(db, 'community_stories', id), {
+        is_hidden: hidden,
+        moderated_by: auth.currentUser?.uid || null,
+        moderated_at: serverTimestamp(),
+      });
+      await logAudit(hidden ? 'hide_story' : 'unhide_story', { uid: id, name: author });
+    });
+
+  const deleteStory = (id: string, author?: string) =>
+    run(async () => {
+      await deleteDoc(doc(db, 'community_stories', id));
+      await logAudit('remove_story', { uid: id, name: author });
+    });
+
   return {
     actionLoading,
     actionError,
     verifyDonor,
     toggleAvailability,
     banUser,
+    deleteDonor,
+    deleteRequest,
     createHospital,
     toggleHospitalVerified,
     deleteHospital,
     broadcastNotification,
+    setIssueStatus,
+    deleteIssueReport,
+    setInquiryStatus,
+    deleteInquiry,
+    setReportStatus,
+    saveAnnouncement,
+    deleteAnnouncement,
+    saveTestimonial,
+    deleteTestimonial,
+    setImpactCount,
+    setStoryHidden,
+    deleteStory,
   };
 }

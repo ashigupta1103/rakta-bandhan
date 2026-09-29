@@ -55,6 +55,10 @@ service cloud.firestore {
 
       // Owner delete = in-app account deletion (App Store 5.1.1(v) /
       // Google Play account-deletion policy). See AccountService.
+      // Deliberately unconditional, including for a banned donor: both
+      // stores require deletion to always be available in-app, with no
+      // carve-out for a suspended account — a ban can't turn into a
+      // reason to refuse the request.
       allow delete: if isOwner(uid) || isAdmin();
 
       // Private attachments (the ID-proof image) — same visibility as the
@@ -206,6 +210,10 @@ service cloud.firestore {
             && previewUnchangedOrMine())
       ));
 
+      // Admin cleanup (spam/duplicate/test requests) — not a transition,
+      // so it sits outside coreUnchanged()'s update rule entirely.
+      allow delete: if isAdmin();
+
       // In-app chat. Only the two participants; append-only (a sender may
       // delete their own messages — used by account deletion).
       match /messages/{messageId} {
@@ -292,6 +300,77 @@ service cloud.firestore {
     match /audit_log/{id} {
       allow read, create: if isAdmin();
       allow update, delete: if false;
+    }
+
+    // issue_reports/{id} & partnership_inquiries/{id} — one-way submission
+    // forms (Help & support, Partner with us). Any signed-in user can file
+    // one under their own uid; only admins can read the inbox. The author
+    // can never edit or withdraw a submission — but an admin triages it
+    // (status + internal note) from the console's Inbox tab, so admin
+    // update/delete is allowed. Everything an admin writes there is
+    // mirrored into audit_log by the caller.
+    match /issue_reports/{id} {
+      allow create: if isSignedIn() && request.resource.data.reporter_uid == request.auth.uid;
+      allow read: if isAdmin();
+      allow update, delete: if isAdmin();
+    }
+
+    match /partnership_inquiries/{id} {
+      allow create: if isSignedIn() && request.resource.data.requester_uid == request.auth.uid;
+      allow read: if isAdmin();
+      allow update, delete: if isAdmin();
+    }
+
+    // community_stories/{id} — "Share an experience". Readable by any
+    // signed-in user (that's the point), written only under the author's
+    // own uid, and never edited by the author afterwards. Admins moderate:
+    // `is_hidden` (reversible — the feed filters it out client-side) or an
+    // outright delete.
+    match /community_stories/{id} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.author_uid == request.auth.uid;
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // announcements/{id} — Community → What's New. Admin-authored only;
+    // any signed-in user reads them. No user-submitted path at all.
+    match /announcements/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // testimonials/{id} — the curated quotes behind More → Testimonials.
+    // Deliberately separate from community_stories: those are member posts,
+    // these are copy the team has explicit permission to publish, so only
+    // an admin can ever create one.
+    match /testimonials/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // public_stats/impact — the Community Impact counter. A normal user
+    // can't query `requests` for fulfilled ones (those carry phone numbers
+    // and stay private), so the aggregate lives here instead. Any signed-in
+    // user may bump it, but only by exactly +1, or reset to 1 on a new
+    // month — so it can't be inflated in a single write. An admin can set
+    // it to any value (correcting a miscount, or seeding the figure for a
+    // month whose donations were confirmed offline).
+    match /public_stats/{id} {
+      allow read: if isSignedIn();
+
+      allow create: if isAdmin() || (isSignedIn()
+        && request.resource.data.donations_this_month == 1);
+
+      allow update: if isAdmin() || (isSignedIn() && (
+          (request.resource.data.month_key == resource.data.month_key
+            && request.resource.data.donations_this_month == resource.data.donations_this_month + 1)
+          ||
+          (request.resource.data.month_key != resource.data.month_key
+            && request.resource.data.donations_this_month == 1)
+      ));
+
+      allow delete: if isAdmin();
     }
 
     match /{document=**} {

@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../services/backend.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/dashed_border.dart';
 
-/// "Share an experience" per the final artifact's Create-experience section.
-/// Fully interactive frontend, nothing persisted: there is no posts
-/// collection to write to yet (public-handle model is still pending
-/// approval), so every selection here — text, topic, privacy toggles — is
-/// local widget state only, and submitting shows an honest "not available
-/// yet" message rather than a fake success.
+/// "Share an experience" — posts a real story to `community_stories`, shown
+/// on the Community → Stories tab. Photo attachment is still not offered:
+/// images would need Cloud Storage (Blaze-only since Sep 2026) and the
+/// base64-in-Firestore trick used for ID proof doesn't scale to a public
+/// feed of images.
 class CreateExperienceScreen extends StatefulWidget {
   const CreateExperienceScreen({super.key});
 
@@ -43,10 +43,37 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$label — coming soon.')));
   }
 
-  void _submit() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Sharing experiences isn\'t available yet — this is a preview of what\'s coming.')),
-    );
+  bool _submitting = false;
+
+  Future<void> _submit() async {
+    final body = _textController.text.trim();
+    if (body.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Write something to share first.')),
+      );
+      return;
+    }
+    setState(() => _submitting = true);
+    try {
+      final donor = (await Backend.instance.myDonorDoc()).data();
+      await Backend.instance.submitCommunityStory(
+        topic: _topic,
+        body: body,
+        bloodGroup: _showBloodGroup ? (donor?['blood_group'] as String?) : null,
+        locationLabel: _tagLocation ? (donor?['location_label'] as String?) : null,
+      );
+      if (!mounted) return;
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Shared with the community.')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _submitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not share this. Please try again.')),
+      );
+    }
   }
 
   @override
@@ -77,9 +104,9 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
                       text: TextSpan(
                         style: const TextStyle(fontSize: 13.5, color: AppColors.ink2),
                         children: [
-                          const TextSpan(text: 'Your private name is never shown. You would post as '),
-                          TextSpan(text: 'a community handle', style: TextStyle(color: AppColors.goldDeep, fontWeight: FontWeight.w700)),
-                          const TextSpan(text: ' once that launches.'),
+                          const TextSpan(text: 'You post as '),
+                          TextSpan(text: 'your registered name', style: TextStyle(color: AppColors.goldDeep, fontWeight: FontWeight.w700)),
+                          const TextSpan(text: '. Your phone number and exact address are never shown.'),
                         ],
                       ),
                     ),
@@ -188,12 +215,14 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: _textController.text.trim().isEmpty ? null : _submit,
-                      child: const Text('Share experience'),
+                      onPressed: (_textController.text.trim().isEmpty || _submitting) ? null : _submit,
+                      child: _submitting
+                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : const Text('Share experience'),
                     ),
                   ),
                   const SizedBox(height: 9),
-                  const Text("Posting isn't live yet — nothing you write here is saved", textAlign: TextAlign.center, style: TextStyle(fontSize: 11.5, color: AppColors.disabledTint)),
+                  const Text('Your story appears on the Community tab for other donors', textAlign: TextAlign.center, style: TextStyle(fontSize: 11.5, color: AppColors.disabledTint)),
                 ],
               ),
             ),

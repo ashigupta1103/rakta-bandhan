@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:firebase_core/firebase_core.dart' show FirebaseException;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../services/backend.dart';
@@ -154,13 +155,17 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
     setState(() {
       _nameError = name.isEmpty ? 'Name is required' : null;
-      _whatsappError = whatsapp.isEmpty ? 'WhatsApp number is required' : null;
+      _whatsappError = whatsapp.isEmpty
+          ? 'WhatsApp number is required'
+          : whatsapp.length != 10
+              ? 'Enter a valid 10-digit number'
+              : null;
       _bloodGroupError = _selectedBloodGroup == null
           ? 'Please select a blood group'
           : null;
     });
 
-    if (name.isEmpty || whatsapp.isEmpty || _selectedBloodGroup == null) return;
+    if (name.isEmpty || whatsapp.length != 10 || _selectedBloodGroup == null) return;
 
     setState(() => _isSubmitting = true);
     try {
@@ -335,6 +340,10 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                   controller: _whatsappController,
                   keyboardType: TextInputType.phone,
                   style: Theme.of(context).textTheme.bodyLarge,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(10),
+                  ],
                   onChanged: (_) {
                     if (_whatsappError != null) {
                       setState(() => _whatsappError = null);

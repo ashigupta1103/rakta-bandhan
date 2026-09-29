@@ -1,5 +1,6 @@
 import 'package:country_flags/country_flags.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../preview_mode.dart';
 import '../theme/app_colors.dart';
@@ -152,6 +153,12 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() {
         _country = picked;
         _errorMessage = null;
+        // Switching to a shorter-numbered country must not leave a
+        // now-too-long number sitting in the field.
+        final limit = picked.digits;
+        if (limit != null && _phoneController.text.length > limit) {
+          _phoneController.text = _phoneController.text.substring(0, limit);
+        }
       });
     }
   }
@@ -272,6 +279,12 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: TextField(
                         controller: _phoneController,
                         keyboardType: TextInputType.phone,
+                        // Hard cap at the selected country's length (India = 10)
+                        // so an over-long number can't even be typed.
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(_country.digits ?? 15),
+                        ],
                         onChanged: (val) {
                           if (_errorMessage != null) {
                             setState(() {
@@ -297,6 +310,10 @@ class _LoginScreenState extends State<LoginScreen> {
                 TextField(
                   controller: _customCodeController,
                   keyboardType: TextInputType.phone,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(4),
+                  ],
                   onChanged: (val) {
                     if (_errorMessage != null) setState(() => _errorMessage = null);
                   },

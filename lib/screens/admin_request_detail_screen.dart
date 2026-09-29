@@ -3,11 +3,35 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../services/admin_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/status_badge.dart';
+import 'admin_content_tab.dart' show confirmAdminDelete;
 
-class AdminRequestDetailScreen extends StatelessWidget {
+class AdminRequestDetailScreen extends StatefulWidget {
   final AdminRequestEntry request;
 
   const AdminRequestDetailScreen({super.key, required this.request});
+
+  @override
+  State<AdminRequestDetailScreen> createState() => _AdminRequestDetailScreenState();
+}
+
+class _AdminRequestDetailScreenState extends State<AdminRequestDetailScreen> {
+  bool _confirming = false;
+
+  Future<void> _confirmDonation() async {
+    if (_confirming) return;
+    setState(() => _confirming = true);
+    try {
+      await AdminService.instance.confirmDonation(widget.request.id);
+      if (!mounted) return;
+      Navigator.pop(context);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _confirming = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not confirm this donation. Please try again.')),
+      );
+    }
+  }
 
   (Color, Color) _statusStyle(String status) => switch (status) {
         'open' => (AppColors.statusUrgentBg, AppColors.statusUrgentText),
@@ -18,6 +42,7 @@ class AdminRequestDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final request = widget.request;
     final (statusBg, statusText) = _statusStyle(request.status);
     return Scaffold(
       backgroundColor: AppColors.warmPageBackground,
@@ -84,6 +109,29 @@ class AdminRequestDetailScreen extends StatelessWidget {
                     ),
                   ],
                 ),
+              ),
+              if (request.status == 'matched') ...[
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: _confirming ? null : _confirmDonation,
+                  child: _confirming
+                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.whiteTextOnPrimary))
+                      : const Text('Confirm donation completed'),
+                ),
+              ],
+              const SizedBox(height: 8),
+              OutlinedButton(
+                style: OutlinedButton.styleFrom(foregroundColor: AppColors.primary, side: const BorderSide(color: AppColors.primary)),
+                onPressed: () async {
+                  final deleted = await confirmAdminDelete(
+                    context,
+                    what: 'this request',
+                    detail: 'Removes it outright — for spam, duplicates or test postings. Use Cancel from the requester\'s side for a normal withdrawal.',
+                    onConfirm: () => AdminService.instance.deleteRequest(request.id),
+                  );
+                  if (deleted && context.mounted) Navigator.pop(context);
+                },
+                child: const Text('Delete request'),
               ),
             ],
           ),

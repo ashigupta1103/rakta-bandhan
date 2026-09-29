@@ -6,7 +6,7 @@
 
 import { useState } from 'react';
 import { useDonors, useAdminActions, type Donor } from '../hooks/useFirebaseData';
-import { CheckCircle, AlertTriangle, Search, Filter } from 'lucide-react';
+import { CheckCircle, AlertTriangle, Search, Filter, Trash2 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -14,11 +14,12 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@
 
 const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
-function DonorRow({ donor, onVerify, onToggle, onBan, busy }: {
+function DonorRow({ donor, onVerify, onToggle, onBan, onDelete, busy }: {
   donor: Donor;
   onVerify: (id: string, v: boolean, name: string) => void;
   onToggle: (id: string, v: boolean, name: string) => void;
   onBan: (id: string, v: boolean, name: string) => void;
+  onDelete: (id: string, name: string) => void;
   busy: boolean;
 }) {
   return (
@@ -71,6 +72,20 @@ function DonorRow({ donor, onVerify, onToggle, onBan, busy }: {
           >
             {donor.is_banned ? 'Unban' : 'Ban'}
           </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="text-red-600"
+            disabled={busy}
+            title="Delete profile — sign-in stays active, use Ban to lock them out"
+            onClick={() => {
+              if (confirm(`Delete ${donor.name}'s profile? Their sign-in stays active — this only removes the Firestore record. Use Ban to actually lock them out.`)) {
+                onDelete(donor.id, donor.name);
+              }
+            }}
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </Button>
         </div>
       </TableCell>
     </TableRow>
@@ -81,7 +96,7 @@ export default function DonorsPage() {
   const [bloodGroupFilter, setBloodGroupFilter] = useState('');
   const [search, setSearch] = useState('');
   const { donors, loading } = useDonors(bloodGroupFilter || undefined);
-  const { actionLoading, actionError, verifyDonor, toggleAvailability, banUser } = useAdminActions();
+  const { actionLoading, actionError, verifyDonor, toggleAvailability, banUser, deleteDonor } = useAdminActions();
 
   const filtered = donors.filter((d) =>
     !search ||
@@ -160,6 +175,7 @@ export default function DonorsPage() {
                       onVerify={verifyDonor}
                       onToggle={toggleAvailability}
                       onBan={banUser}
+                      onDelete={deleteDonor}
                     />
                   ))
               }

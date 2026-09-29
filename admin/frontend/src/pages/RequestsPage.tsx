@@ -3,8 +3,8 @@
  */
 
 import { useState } from 'react';
-import { useRequests } from '../hooks/useFirebaseData';
-import { Droplets, Clock, AlertTriangle } from 'lucide-react';
+import { useRequests, useAdminActions } from '../hooks/useFirebaseData';
+import { Droplets, Clock, AlertTriangle, Trash2 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -46,6 +46,7 @@ function timeAgo(ts: { toDate: () => Date } | undefined): string {
 export default function RequestsPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const { requests, loading } = useRequests(statusFilter);
+  const { deleteRequest } = useAdminActions();
 
   const openCount = requests.filter((r) => r.status === 'open').length;
   const criticalCount = requests.filter((r) => r.urgency === 'critical' && r.status === 'open').length;
@@ -92,13 +93,14 @@ export default function RequestsPage() {
                 <TableHead>Requester</TableHead>
                 <TableHead>Created</TableHead>
                 <TableHead>Expires</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading
                 ? [...Array(10)].map((_, i) => (
                     <TableRow key={i}>
-                      <TableCell colSpan={7}>
+                      <TableCell colSpan={8}>
                         <div className="h-6 bg-muted rounded animate-pulse" />
                       </TableCell>
                     </TableRow>
@@ -129,12 +131,25 @@ export default function RequestsPage() {
                       <TableCell>
                         <span className="text-xs text-muted-foreground">{timeAgo(req.expires_at)}</span>
                       </TableCell>
+                      <TableCell>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-red-600"
+                          title="Delete outright — for spam, duplicates or test postings"
+                          onClick={() => {
+                            if (confirm('Delete this request? This cannot be undone.')) deleteRequest(req.id);
+                          }}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))
               }
               {!loading && requests.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-12 text-muted-foreground text-sm">
+                  <TableCell colSpan={8} className="text-center py-12 text-muted-foreground text-sm">
                     No requests found for this filter.
                   </TableCell>
                 </TableRow>

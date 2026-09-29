@@ -13,7 +13,6 @@ class AdminDonorEntry {
   final bool available;
   final String location;
   final String joinedOn;
-  final String? idProofBase64;
 
   const AdminDonorEntry({
     required this.id,
@@ -24,7 +23,6 @@ class AdminDonorEntry {
     required this.available,
     required this.location,
     required this.joinedOn,
-    this.idProofBase64,
   });
 }
 
@@ -77,6 +75,145 @@ class AdminAuditEntry {
   const AdminAuditEntry({required this.actor, required this.text, required this.time});
 }
 
+/// Triage state shared by both inbox collections. `new` is the implicit
+/// state of anything submitted before triage existed — a missing `status`
+/// field reads as new rather than as an error.
+enum InboxStatus { isNew, inProgress, resolved }
+
+InboxStatus _inboxStatus(String? raw) => switch (raw) {
+      'in_progress' => InboxStatus.inProgress,
+      'resolved' => InboxStatus.resolved,
+      _ => InboxStatus.isNew,
+    };
+
+String inboxStatusKey(InboxStatus s) => switch (s) {
+      InboxStatus.isNew => 'new',
+      InboxStatus.inProgress => 'in_progress',
+      InboxStatus.resolved => 'resolved',
+    };
+
+String inboxStatusLabel(InboxStatus s) => switch (s) {
+      InboxStatus.isNew => 'New',
+      InboxStatus.inProgress => 'In progress',
+      InboxStatus.resolved => 'Resolved',
+    };
+
+class AdminIssueReportEntry {
+  final String id;
+  final String reason;
+  final String details;
+  final String time;
+  final InboxStatus status;
+  final String adminNote;
+
+  const AdminIssueReportEntry({
+    required this.id,
+    required this.reason,
+    required this.details,
+    required this.time,
+    this.status = InboxStatus.isNew,
+    this.adminNote = '',
+  });
+}
+
+/// A chat/call abuse report (`reports/{id}`, see chat_service.dart's
+/// `report()`). Admin-read-only; the rules give admins `update` but not
+/// `delete`, so triage sets `status` the same way the other inboxes do,
+/// and there is no separate remove action.
+class AdminReportEntry {
+  final String id;
+  final String reporterUid;
+  final String reportedUid;
+  final String requestId;
+  final String reason;
+  final String details;
+  final String time;
+  final InboxStatus status;
+  final String adminNote;
+
+  const AdminReportEntry({
+    required this.id,
+    required this.reporterUid,
+    required this.reportedUid,
+    required this.requestId,
+    required this.reason,
+    required this.details,
+    required this.time,
+    this.status = InboxStatus.isNew,
+    this.adminNote = '',
+  });
+}
+
+class AdminStoryEntry {
+  final String id;
+  final String authorName;
+  final String topic;
+  final String body;
+  final String time;
+  final bool isHidden;
+
+  const AdminStoryEntry({
+    required this.id,
+    required this.authorName,
+    required this.topic,
+    required this.body,
+    required this.time,
+    this.isHidden = false,
+  });
+}
+
+class AdminPartnershipEntry {
+  final String id;
+  final String orgName;
+  final String contactName;
+  final String workEmail;
+  final String interest;
+  final String message;
+  final String time;
+  final InboxStatus status;
+  final String adminNote;
+
+  const AdminPartnershipEntry({
+    required this.id,
+    required this.orgName,
+    required this.contactName,
+    required this.workEmail,
+    required this.interest,
+    required this.message,
+    required this.time,
+    this.status = InboxStatus.isNew,
+    this.adminNote = '',
+  });
+}
+
+/// Community → What's New. Admin-authored, no user-write path.
+class AdminAnnouncementEntry {
+  final String id;
+  final String title;
+  final String body;
+  final String time;
+
+  const AdminAnnouncementEntry({required this.id, required this.title, required this.body, required this.time});
+}
+
+/// More → Testimonials. Curated copy the team has permission to publish —
+/// deliberately not the same thing as a community story.
+class AdminTestimonialEntry {
+  final String id;
+  final String quote;
+  final String name;
+  final String role;
+  final String time;
+
+  const AdminTestimonialEntry({
+    required this.id,
+    required this.quote,
+    required this.name,
+    required this.role,
+    required this.time,
+  });
+}
+
 String _timeAgo(DateTime? time) {
   if (time == null) return '';
   final diff = DateTime.now().difference(time);
@@ -108,6 +245,16 @@ class AdminService extends ChangeNotifier {
   List<AdminRequestEntry> requests = [];
   List<AdminHospitalEntry> hospitals = [];
   List<AdminAuditEntry> auditLog = [];
+  List<AdminIssueReportEntry> issueReports = [];
+  List<AdminReportEntry> reports = [];
+  List<AdminPartnershipEntry> partnershipInquiries = [];
+  List<AdminStoryEntry> stories = [];
+  List<AdminAnnouncementEntry> announcements = [];
+  List<AdminTestimonialEntry> testimonials = [];
+
+  /// Live Community Impact counter for the current month — null until the
+  /// first snapshot lands, 0 once it has and the month has no donations.
+  int? impactThisMonth;
 
   /// Fulfilment rate for each of the last 7 days (0.0–1.0), derived from
   /// the live `requests` cache — feeds the dashboard's bar chart.
@@ -156,7 +303,80 @@ class AdminService extends ChangeNotifier {
       auditLog = snap.docs.map(_toAuditEntry).toList();
       notifyListeners();
     });
+    _db.collection('issue_reports').orderBy('created_at', descending: true).limit(100).snapshots().listen((snap) {
+      issueReports = snap.docs.map(_toIssueReportEntry).toList();
+      notifyListeners();
+    });
+    // Chat/call abuse reports (ChatService.report) — the one inbox the
+    // branch that added in-app chat left for the admin console to pick up.
+    _db.collection('reports').orderBy('created_at', descending: true).limit(100).snapshots().listen((snap) {
+      reports = snap.docs.map(_toReportEntry).toList();
+      notifyListeners();
+    });
+    _db.collection('partnership_inquiries').orderBy('created_at', descending: true).limit(100).snapshots().listen((snap) {
+      partnershipInquiries = snap.docs.map(_toPartnershipEntry).toList();
+      notifyListeners();
+    });
+    _db.collection('community_stories').orderBy('created_at', descending: true).limit(100).snapshots().listen((snap) {
+      stories = snap.docs.map(_toStoryEntry).toList();
+      notifyListeners();
+    });
+    _db.collection('announcements').orderBy('created_at', descending: true).limit(100).snapshots().listen((snap) {
+      announcements = snap.docs.map(_toAnnouncementEntry).toList();
+      notifyListeners();
+    });
+    _db.collection('testimonials').orderBy('created_at', descending: true).limit(100).snapshots().listen((snap) {
+      testimonials = snap.docs.map(_toTestimonialEntry).toList();
+      notifyListeners();
+    });
+    Backend.instance.impactThisMonthStream().listen((value) {
+      impactThisMonth = value;
+      notifyListeners();
+    });
   }
+
+  AdminAnnouncementEntry _toAnnouncementEntry(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
+    final d = doc.data();
+    return AdminAnnouncementEntry(
+      id: doc.id,
+      title: d['title'] as String? ?? '',
+      body: d['body'] as String? ?? '',
+      time: _timeAgo((d['created_at'] as Timestamp?)?.toDate()),
+    );
+  }
+
+  AdminTestimonialEntry _toTestimonialEntry(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
+    final d = doc.data();
+    return AdminTestimonialEntry(
+      id: doc.id,
+      quote: d['quote'] as String? ?? '',
+      name: d['name'] as String? ?? '',
+      role: d['role'] as String? ?? '',
+      time: _timeAgo((d['created_at'] as Timestamp?)?.toDate()),
+    );
+  }
+
+  AdminStoryEntry _toStoryEntry(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
+    final d = doc.data();
+    return AdminStoryEntry(
+      id: doc.id,
+      authorName: d['author_name'] as String? ?? 'A donor',
+      topic: d['topic'] as String? ?? '',
+      body: d['body'] as String? ?? '',
+      time: _timeAgo((d['created_at'] as Timestamp?)?.toDate()),
+      isHidden: d['is_hidden'] as bool? ?? false,
+    );
+  }
+
+  /// Moderation: rules allow only an admin to delete a story.
+  Future<void> deleteStory(String id) async {
+    await _db.collection('community_stories').doc(id).delete();
+    await Backend.instance.adminLogStoryRemoval(id);
+  }
+
+  /// The reversible half of story moderation — the Community feed filters
+  /// hidden stories out, so nothing is destroyed.
+  Future<void> setStoryHidden(String id, bool hidden) => Backend.instance.adminSetStoryHidden(id, hidden);
 
   AdminDonorEntry _toDonorEntry(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
     final d = doc.data();
@@ -174,7 +394,6 @@ class AdminService extends ChangeNotifier {
       available: d['is_available'] as bool? ?? false,
       location: (d['location_label'] as String?)?.isNotEmpty == true ? d['location_label'] as String : '—',
       joinedOn: _timeAgo((d['created_at'] as Timestamp?)?.toDate()),
-      idProofBase64: d['id_proof_base64'] as String?,
     );
   }
 
@@ -202,6 +421,48 @@ class AdminService extends ChangeNotifier {
     );
   }
 
+  AdminIssueReportEntry _toIssueReportEntry(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
+    final d = doc.data();
+    return AdminIssueReportEntry(
+      id: doc.id,
+      reason: d['reason'] as String? ?? '',
+      details: d['details'] as String? ?? '',
+      time: _timeAgo((d['created_at'] as Timestamp?)?.toDate()),
+      status: _inboxStatus(d['status'] as String?),
+      adminNote: d['admin_note'] as String? ?? '',
+    );
+  }
+
+  AdminReportEntry _toReportEntry(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
+    final d = doc.data();
+    return AdminReportEntry(
+      id: doc.id,
+      reporterUid: d['reporter_uid'] as String? ?? '',
+      reportedUid: d['reported_uid'] as String? ?? '',
+      requestId: d['request_id'] as String? ?? '',
+      reason: d['reason'] as String? ?? '',
+      details: d['details'] as String? ?? '',
+      time: _timeAgo((d['created_at'] as Timestamp?)?.toDate()),
+      status: _inboxStatus(d['status'] as String?),
+      adminNote: d['admin_note'] as String? ?? '',
+    );
+  }
+
+  AdminPartnershipEntry _toPartnershipEntry(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
+    final d = doc.data();
+    return AdminPartnershipEntry(
+      id: doc.id,
+      orgName: d['org_name'] as String? ?? '',
+      contactName: d['contact_name'] as String? ?? '',
+      workEmail: d['work_email'] as String? ?? '',
+      interest: d['interest'] as String? ?? '',
+      message: d['message'] as String? ?? '',
+      time: _timeAgo((d['created_at'] as Timestamp?)?.toDate()),
+      status: _inboxStatus(d['status'] as String?),
+      adminNote: d['admin_note'] as String? ?? '',
+    );
+  }
+
   Future<void> verifyDonor(String id) => Backend.instance.adminVerifyDonor(id);
   Future<void> banDonor(String id) => Backend.instance.adminBanDonor(id);
   Future<void> unbanDonor(String id) => Backend.instance.adminUnbanDonor(id);
@@ -210,6 +471,38 @@ class AdminService extends ChangeNotifier {
     final donor = donors.firstWhere((d) => d.id == id);
     return Backend.instance.adminSetDonorAvailability(id, !donor.available);
   }
+
+  Future<void> confirmDonation(String requestId) => Backend.instance.adminConfirmDonation(requestId);
+
+  /// Deletes the donor's Firestore profile only — see
+  /// Backend.adminDeleteDonor for why the Auth account can't come with it
+  /// on Spark. Use banDonor for an actual access lock.
+  Future<void> deleteDonor(String id) => Backend.instance.adminDeleteDonor(id);
+  Future<void> deleteRequest(String id) => Backend.instance.adminDeleteRequest(id);
+
+  // ---------------------------------------------------- Inbox triage
+  Future<void> setIssueStatus(String id, InboxStatus status, {String? note}) =>
+      Backend.instance.adminSetIssueStatus(id, inboxStatusKey(status), note: note);
+  Future<void> deleteIssueReport(String id) => Backend.instance.adminDeleteIssueReport(id);
+  Future<void> setPartnershipStatus(String id, InboxStatus status, {String? note}) =>
+      Backend.instance.adminSetPartnershipStatus(id, inboxStatusKey(status), note: note);
+  Future<void> deletePartnershipInquiry(String id) => Backend.instance.adminDeletePartnershipInquiry(id);
+
+  /// Chat/call abuse reports are admin-`update`-only in the rules — no
+  /// delete, so they stay a permanent trail regardless of outcome.
+  Future<void> setReportStatus(String id, InboxStatus status, {String? note}) =>
+      Backend.instance.adminSetReportStatus(id, inboxStatusKey(status), note: note);
+
+  // ------------------------------------------- App content (Content tab)
+  Future<void> saveAnnouncement({String? id, required String title, required String body}) =>
+      Backend.instance.adminSaveAnnouncement(id: id, title: title, body: body);
+  Future<void> deleteAnnouncement(String id) => Backend.instance.adminDeleteAnnouncement(id);
+
+  Future<void> saveTestimonial({String? id, required String quote, required String name, required String role}) =>
+      Backend.instance.adminSaveTestimonial(id: id, quote: quote, name: name, role: role);
+  Future<void> deleteTestimonial(String id) => Backend.instance.adminDeleteTestimonial(id);
+
+  Future<void> setImpactCount(int count) => Backend.instance.adminSetImpactCount(count);
 
   Future<void> addHospital(String name, String address) => Backend.instance.adminAddHospital(name, address);
   Future<void> updateHospital(String id, String name, String address) => Backend.instance.adminUpdateHospital(id, name, address);

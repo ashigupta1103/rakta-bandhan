@@ -7,6 +7,7 @@ import '../services/backend.dart';
 import '../theme/app_colors.dart';
 import '../widgets/avatar_badge.dart';
 import '../widgets/status_badge.dart';
+import 'admin_content_tab.dart' show confirmAdminDelete;
 
 class AdminDonorDetailScreen extends StatelessWidget {
   final String donorId;
@@ -115,6 +116,20 @@ class AdminDonorDetailScreen extends StatelessWidget {
                   OutlinedButton(
                     onPressed: () => service.toggleAvailability(donor.id),
                     child: Text(donor.available ? 'Mark unavailable' : 'Mark available'),
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton(
+                    style: OutlinedButton.styleFrom(foregroundColor: AppColors.primary, side: const BorderSide(color: AppColors.primary)),
+                    onPressed: () async {
+                      final deleted = await confirmAdminDelete(
+                        context,
+                        what: '${donor.name}\'s profile',
+                        detail: 'This removes their profile from Firestore. Their sign-in stays active — use Ban to actually lock them out.',
+                        onConfirm: () => service.deleteDonor(donor.id),
+                      );
+                      if (deleted && context.mounted) Navigator.pop(context);
+                    },
+                    child: const Text('Delete profile'),
                   ),
                 ],
               ),

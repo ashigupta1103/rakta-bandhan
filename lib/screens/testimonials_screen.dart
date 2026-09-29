@@ -1,18 +1,21 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../preview_mode.dart';
+import '../services/backend.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/state_card.dart';
 
 /// Testimonials — curated and verified by Rakta Bandhan, distinct from the
-/// anonymous-handle Community stories feed. Real testimonial copy has not
-/// been supplied and has deliberately not been written, so a production
-/// build (kEnablePreviewUi off) shows an honest empty state instead of any
-/// placeholder card. In preview builds, two clearly-fictional sample
-/// testimonials stand in for the final layout — one subtle "Preview data"
-/// tag for the whole section, not a badge repeated on every card, per the
-/// client-preview-vs-production split.
+/// anonymous-handle Community stories feed. Real quotes are published by an
+/// admin from the console's Content tab into `testimonials`, a collection
+/// only an admin can write (see firestore.rules) — that admin-only write
+/// path is what makes "curated and verified" structural rather than a
+/// claim. Until one is published the page shows an honest empty state; in
+/// preview builds, clearly-fictional samples stand in for the layout, with
+/// one subtle "Preview data" tag for the whole section.
 class TestimonialsScreen extends StatelessWidget {
   const TestimonialsScreen({super.key});
 
@@ -46,7 +49,34 @@ class TestimonialsScreen extends StatelessWidget {
                     const SizedBox(height: 8),
                     const Text('Curated and verified by Rakta Bandhan. Member stories live in Community.', style: TextStyle(fontSize: 13, color: AppColors.ink2)),
                     const SizedBox(height: 20),
-                    if (kEnablePreviewUi) ..._previewContent() else _productionEmptyState(),
+                    // No Firebase app (widget tests, or an init failure) means
+                    // no stream to build — fall back rather than throw on
+                    // FirebaseFirestore.instance.
+                    if (Firebase.apps.isEmpty)
+                      _fallbackContent()
+                    else
+                      StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                        stream: Backend.instance.testimonialsStream(),
+                        builder: (context, snapshot) {
+                          if (!snapshot.hasData && !snapshot.hasError) {
+                            return const SizedBox(height: 160, child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary)));
+                          }
+                          final docs = snapshot.data?.docs ?? const [];
+                          // Samples only stand in while nothing real is
+                          // published — a preview build with real
+                          // testimonials shows the real ones.
+                          if (docs.isEmpty) return _fallbackContent();
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              for (final doc in docs) ...[
+                                _publishedCard(doc.data()),
+                                const SizedBox(height: 12),
+                              ],
+                            ],
+                          );
+                        },
+                      ),
                   ],
                 ),
               ),
@@ -96,6 +126,31 @@ class TestimonialsScreen extends StatelessWidget {
         style: TextStyle(fontSize: 11.5, color: AppColors.disabledTint, height: 1.4),
       ),
     ];
+  }
+
+  /// Shown when nothing is published yet (or there is no backend to ask).
+  Widget _fallbackContent() => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: kEnablePreviewUi ? _previewContent() : [_productionEmptyState()],
+      );
+
+  Widget _publishedCard(Map<String, dynamic> data) {
+    final created = (data['created_at'] as Timestamp?)?.toDate();
+    return _quoteCard(
+      quote: '"${data['quote'] as String? ?? ''}"',
+      name: data['name'] as String? ?? '',
+      subtitle: (data['role'] as String?)?.trim().isNotEmpty == true ? data['role'] as String : 'Rakta Bandhan community',
+      timeAgo: created == null ? '' : _timeAgo(created),
+      avatarIcon: LucideIcons.quote,
+    );
+  }
+
+  static String _timeAgo(DateTime time) {
+    final diff = DateTime.now().difference(time);
+    if (diff.inDays < 1) return 'today';
+    if (diff.inDays < 30) return '${diff.inDays}d ago';
+    final months = (diff.inDays / 30).floor();
+    return months < 12 ? '${months}mo ago' : '${(months / 12).floor()}y ago';
   }
 
   Widget _productionEmptyState() {

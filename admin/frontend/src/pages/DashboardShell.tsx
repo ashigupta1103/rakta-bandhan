@@ -7,10 +7,12 @@ import { Routes, Route, NavLink, useLocation } from 'react-router-dom';
 import { useState } from 'react';
 import {
   LayoutDashboard, Users, Droplets, Building2, Map as MapIcon,
-  History, BarChart3, Bell, Shield, LogOut, PanelLeftClose, PanelLeft,
+  History, BarChart3, Bell, Shield, LogOut, ChevronLeft, ChevronRight,
+  Inbox, FileText,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { cn } from '../lib/utils';
+import raktaMark from '../assets/rakta-mark.png';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -26,6 +28,8 @@ import DonationHistoryPage from './DonationHistoryPage';
 import AnalyticsPage from './AnalyticsPage';
 import AuditLogPage from './AuditLogPage';
 import BroadcastPage from './BroadcastPage';
+import InboxPage from './InboxPage';
+import ContentPage from './ContentPage';
 
 const navGroups = [
   {
@@ -41,6 +45,8 @@ const navGroups = [
       { to: '/donors', label: 'Donors', icon: Users, end: false },
       { to: '/requests', label: 'Requests', icon: Droplets, end: false },
       { to: '/hospitals', label: 'Hospitals', icon: Building2, end: false },
+      { to: '/inbox', label: 'Inbox', icon: Inbox, end: false },
+      { to: '/content', label: 'Content', icon: FileText, end: false },
     ],
   },
   {
@@ -65,6 +71,8 @@ const PAGE_TITLES: Record<string, string> = {
   '/donors': 'Donors',
   '/requests': 'Blood Requests',
   '/hospitals': 'Hospitals',
+  '/inbox': 'Inbox',
+  '/content': 'Content',
   '/history': 'Donation History',
   '/analytics': 'Analytics',
   '/broadcast': 'Broadcast',
@@ -84,13 +92,24 @@ export default function DashboardShell() {
       {/* ── Sidebar ─────────────────────────────────────────────────── */}
       <aside
         className={cn(
-          'flex flex-col bg-card border-r border-border transition-all duration-300',
+          'relative flex flex-col bg-card border-r border-border transition-all duration-300',
           sidebarOpen ? 'w-60' : 'w-16'
         )}
       >
-        <div className="flex items-center gap-3 px-4 py-5 border-b border-border">
-          <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-sm">
-            <Droplets className="w-4 h-4 text-primary-foreground" />
+        {/* Floating edge toggle — sits on the border itself so it stays in
+            the same spot whichever state the sidebar is in, instead of a
+            row at the bottom that reflows the whole nav when it disappears. */}
+        <button
+          onClick={() => setSidebarOpen((v) => !v)}
+          title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+          className="absolute -right-3 top-6 z-10 flex items-center justify-center w-6 h-6 rounded-full border border-border bg-card text-muted-foreground shadow-sm hover:text-foreground hover:border-primary/40 transition-colors"
+        >
+          {sidebarOpen ? <ChevronLeft className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+        </button>
+
+        <div className={cn('flex items-center gap-2.5 py-5 border-b border-border', sidebarOpen ? 'px-4' : 'px-0 justify-center')}>
+          <div className="flex-shrink-0 w-9 h-9 flex items-center justify-center">
+            <img src={raktaMark} alt="Rakta Bandhan" className="w-full h-full object-contain" />
           </div>
           {sidebarOpen && (
             <div className="min-w-0">
@@ -131,19 +150,6 @@ export default function DashboardShell() {
             </div>
           ))}
         </nav>
-
-        <div className="border-t border-border px-3 py-3">
-          <button
-            onClick={() => setSidebarOpen((v) => !v)}
-            className={cn(
-              'flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-accent transition-colors',
-              !sidebarOpen && 'justify-center'
-            )}
-          >
-            {sidebarOpen ? <PanelLeftClose className="w-4 h-4 flex-shrink-0" /> : <PanelLeft className="w-4 h-4 flex-shrink-0" />}
-            {sidebarOpen && <span>Collapse</span>}
-          </button>
-        </div>
       </aside>
 
       {/* ── Main Content ─────────────────────────────────────────────── */}
@@ -180,6 +186,8 @@ export default function DashboardShell() {
             <Route path="/donors"     element={<DonorsPage />} />
             <Route path="/requests"   element={<RequestsPage />} />
             <Route path="/hospitals"  element={<HospitalsPage />} />
+            <Route path="/inbox"      element={<InboxPage />} />
+            <Route path="/content"    element={<ContentPage />} />
             <Route path="/history"    element={<DonationHistoryPage />} />
             <Route path="/analytics"  element={<AnalyticsPage />} />
             <Route path="/broadcast"  element={<BroadcastPage />} />

@@ -1,19 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../preview_mode.dart';
+import '../services/backend.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/filter_chip_row.dart';
 
 /// Corporate partnerships — per the final artifact's "Trust & brand"
-/// section. This screen IS specified in the design (it is not a
-/// coming-soon placeholder); what's genuinely undecided is the commercial
-/// side of it — sponsor names, tiers, pricing and the real submission
-/// endpoint behind "Start a conversation". The frontend below is real and
-/// complete (validated form, loading/success states); what it honestly
-/// does NOT do is send anything anywhere — see _ConversationSheet's own
-/// header comment and the stakeholder checklist's "Corporate partnerships"
-/// section for the exact backend capability this is waiting on.
+/// section. "Start a conversation" writes a real inquiry to Firestore
+/// (Backend.submitPartnershipInquiry), visible to admins in the console.
+/// What's genuinely undecided is the commercial side of it — sponsor
+/// names, tiers, pricing; see the stakeholder checklist's "Corporate
+/// partnerships" section for that.
 class CorporatePartnershipsScreen extends StatelessWidget {
   const CorporatePartnershipsScreen({super.key});
 
@@ -237,6 +235,7 @@ class _ConversationSheetState extends State<_ConversationSheet> {
   bool _interestError = false;
   bool _submitting = false;
   bool _submitted = false;
+  String? _error;
 
   @override
   void dispose() {
@@ -249,18 +248,33 @@ class _ConversationSheetState extends State<_ConversationSheet> {
 
   Future<void> _submit() async {
     final formOk = _formKey.currentState?.validate() ?? false;
-    setState(() => _interestError = _interest == null);
+    setState(() {
+      _interestError = _interest == null;
+      _error = null;
+    });
     if (!formOk || _interest == null) return;
 
     setState(() => _submitting = true);
-    // Frontend-only: no endpoint exists to send this to yet. The delay is
-    // purely a loading-state UI beat, not a real network call.
-    await Future.delayed(const Duration(milliseconds: 700));
-    if (!mounted) return;
-    setState(() {
-      _submitting = false;
-      _submitted = true;
-    });
+    try {
+      await Backend.instance.submitPartnershipInquiry(
+        orgName: _orgController.text,
+        contactName: _nameController.text,
+        workEmail: _emailController.text,
+        interest: _interest!,
+        message: _messageController.text,
+      );
+      if (!mounted) return;
+      setState(() {
+        _submitting = false;
+        _submitted = true;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _submitting = false;
+        _error = 'Could not send this. Please try again.';
+      });
+    }
   }
 
   @override
@@ -277,14 +291,14 @@ class _ConversationSheetState extends State<_ConversationSheet> {
             children: [
               Center(child: Container(width: 38, height: 4, decoration: BoxDecoration(color: AppColors.warmBorder, borderRadius: BorderRadius.circular(2)))),
               const SizedBox(height: 16),
-              Text(_submitted ? 'Details prepared' : 'Start a conversation', style: AppTextStyles.display(fontSize: 21, color: AppColors.ink)),
+              Text(_submitted ? 'Details sent' : 'Start a conversation', style: AppTextStyles.display(fontSize: 21, color: AppColors.ink)),
               const SizedBox(height: 16),
               if (_submitted) ...[
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(color: AppColors.goldTint, border: const Border(left: BorderSide(color: AppColors.gold, width: 3)), borderRadius: const BorderRadius.horizontal(right: Radius.circular(12))),
                   child: const Text(
-                    'Your details are prepared. A live submission service will be connected after approval — nothing was actually sent, and none of this was saved.',
+                    'Your details have been sent to the team. They will follow up at the work email you provided.',
                     style: TextStyle(fontSize: 13, color: AppColors.goldDeepest, height: 1.5),
                   ),
                 ),
@@ -326,11 +340,10 @@ class _ConversationSheetState extends State<_ConversationSheet> {
                 ],
                 const SizedBox(height: 14),
                 _field('Message (optional)', _messageController, minLines: 3, maxLines: 5, hint: 'Tell us a bit about what you have in mind'),
-                const SizedBox(height: 8),
-                const Text(
-                  'There’s no submission service behind this yet — this previews the flow, nothing is sent or saved.',
-                  style: TextStyle(fontSize: 11.5, color: AppColors.disabledTint, height: 1.4),
-                ),
+                if (_error != null) ...[
+                  const SizedBox(height: 8),
+                  Text(_error!, style: const TextStyle(fontSize: 11.5, color: AppColors.brandRed)),
+                ],
                 const SizedBox(height: 16),
                 SizedBox(
                   width: double.infinity,
