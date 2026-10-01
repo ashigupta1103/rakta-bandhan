@@ -108,7 +108,7 @@ class _ConversationRow extends StatelessWidget {
   String get _initials {
     final t = c.peerName.trim();
     if (t.isEmpty) return '?';
-    return t.split(RegExp(r'\s+')).take(2).map((w) => w[0].toUpperCase()).join();
+    return initialsOf(t);
   }
 
   String get _preview {

@@ -95,6 +95,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       if (_center != null) {
         _resolve(_center!);
       } else {
+        setState(() => _center = LatLng(kDefaultCity.lat, kDefaultCity.lng));
         _locate(initial: true);
       }
     });
@@ -114,12 +115,8 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
     if (!mounted) return;
     setState(() => _locating = false);
     if (p == null) {
-      if (initial) {
-        // Open somewhere sensible, but say so — never pretend it's them.
-        final fallback = await Backend.instance.currentPosition();
-        if (!mounted) return;
-        setState(() => _center = LatLng(fallback.latitude, fallback.longitude));
-      }
+      // The map already sits on Chennai; say so — never pretend it's them.
+      if (initial && _center != null) _resolve(_center!);
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         content: Text('Couldn’t get your GPS location. Search for the place, or move the map to it.'),
       ));
@@ -128,9 +125,9 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
     final here = LatLng(p.latitude, p.longitude);
     setState(() {
       _gps = p;
-      _center ??= here;
+      _center = here;
     });
-    if (!initial) _moveTo(here, 17.5);
+    _moveTo(here, 17.5);
     _resolve(here);
   }
 

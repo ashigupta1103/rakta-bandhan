@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import '../services/backend.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -37,7 +38,7 @@ Future<void> startCallFlow(BuildContext context, {required String requestId, req
 String _initialsOf(String name) {
   final t = name.trim();
   if (t.isEmpty) return '?';
-  return t.split(RegExp(r'\s+')).take(2).map((w) => w[0].toUpperCase()).join();
+  return initialsOf(t);
 }
 
 String _mmss(int s) => '${(s ~/ 60).toString().padLeft(2, '0')}:${(s % 60).toString().padLeft(2, '0')}';

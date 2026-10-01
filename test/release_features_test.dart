@@ -56,6 +56,14 @@ void main() {
     });
   });
 
+  test('avatar initials ignore punctuation', () {
+    expect(initialsOf('Priya (test)'), 'PT');
+    expect(initialsOf('  meera  s '), 'MS');
+    expect(initialsOf('PHF Rtn. Radhika Dhruv'), 'PR');
+    expect(initialsOf('(  )'), '?');
+    expect(initialsOf(''), '?');
+  });
+
   group('place names', () {
     test('shortPlace never shows coordinates or PIN codes', () {
       expect(Backend.shortPlace('13.0827, 80.2707'), 'Location shared');

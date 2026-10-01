@@ -29,6 +29,10 @@ const bloodCompatibility = <String, List<String>>{
 
 const donorCooldownDays = 90;
 
+/// Where a map opens before (or without) a GPS fix: Chennai Central. Display
+/// only — never stored as anyone's location (see Backend.isFallback).
+const kDefaultCity = (lat: 13.0827, lng: 80.2707);
+
 /// Region the Cloud Functions are deployed to — must equal REGION in
 /// functions/src/app.ts.
 const kFunctionsRegion = 'asia-south1';
@@ -79,6 +83,18 @@ String encodeGeohash(double lat, double lng, {int precision = 9}) {
     }
   }
   return buffer.toString();
+}
+
+/// Up to two initials for an avatar: the first letter or digit of the
+/// first two words, ignoring punctuation — "Priya (test)" → "PT", not "P(".
+String initialsOf(String name) {
+  final words = name
+      .trim()
+      .split(RegExp(r'\s+'))
+      .map((w) => w.replaceAll(RegExp(r'[^\p{L}\p{N}]', unicode: true), ''))
+      .where((w) => w.isNotEmpty);
+  final initials = words.take(2).map((w) => String.fromCharCode(w.runes.first).toUpperCase()).join();
+  return initials.isEmpty ? '?' : initials;
 }
 
 double distanceKm(double lat1, double lng1, double lat2, double lng2) {
@@ -1425,12 +1441,12 @@ class Backend {
   }
 
   /// Where to *centre a map* when there's no real fix: the device position
-  /// if available, else the demo city. Display only — this used to feed
+  /// if available, else Chennai (kDefaultCity). Display only — this used to feed
   /// registration and request creation too, which silently put anyone with
   /// slow GPS in Thiruvananthapuram. Check [isFallback] before trusting it.
   Future<Position> currentPosition() async => await preciseLocation() ?? _fallbackPosition();
 
-  static bool isFallback(Position p) => p.accuracy == 0 && p.latitude == 8.5241 && p.longitude == 76.9366;
+  static bool isFallback(Position p) => p.accuracy == 0 && p.latitude == kDefaultCity.lat && p.longitude == kDefaultCity.lng;
 
   /// Address lookups are a nicety — never let a slow geocoding server hold
   /// up registration or a request (callers fall back to no label).
@@ -1542,8 +1558,8 @@ class Backend {
   }
 
   Position _fallbackPosition() => Position(
-        latitude: 8.5241,
-        longitude: 76.9366,
+        latitude: kDefaultCity.lat,
+        longitude: kDefaultCity.lng,
         timestamp: DateTime.now(),
         accuracy: 0,
         altitude: 0,

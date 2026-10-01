@@ -36,7 +36,7 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
   String _initials(String name) {
     final trimmed = name.trim();
     if (trimmed.isEmpty) return '?';
-    return trimmed.split(RegExp(r'\s+')).take(2).map((w) => w[0].toUpperCase()).join();
+    return initialsOf(trimmed);
   }
 
   Future<void> _openEditSheet({required String name, required String phone}) async {

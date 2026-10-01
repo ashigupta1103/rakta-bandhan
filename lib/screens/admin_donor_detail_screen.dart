@@ -39,7 +39,7 @@ class AdminDonorDetailScreen extends StatelessWidget {
           builder: (context, _) {
             final donor = service.donors.firstWhere((d) => d.id == donorId);
             final (statusBg, statusText, statusLabel) = _statusStyle(donor.status);
-            final initials = donor.name.trim().split(RegExp(r'\s+')).take(2).map((w) => w[0].toUpperCase()).join();
+            final initials = initialsOf(donor.name.trim());
 
             return SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),

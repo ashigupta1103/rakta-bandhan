@@ -16,6 +16,9 @@ LOG="$OUT/run.log"
 mkdir -p "$OUT"
 : > "$LOG"
 
+# Start from a clean install (no signed-in session left from a previous run).
+"$ADB" uninstall "$PKG" >/dev/null 2>&1
+
 # GPS at Chennai Central, so registration finds a real fix.
 "$ADB" emu geo fix 80.2707 13.0827 >/dev/null 2>&1
 
