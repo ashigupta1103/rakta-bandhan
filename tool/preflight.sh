@@ -23,6 +23,9 @@ flutter test
 step "functions: unit tests"
 (cd functions && deps && npm test)
 
+step "edge Worker: tests and bundle"
+(cd edge && deps && npm test && WRANGLER_SEND_METRICS=false npm run check >/dev/null)
+
 step "rules tests (Firebase emulator)"
 (cd backend/rules-test && deps && npm test)
 

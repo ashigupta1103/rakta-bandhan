@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "es2022",
+    "lib": ["es2022"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "types": ["@cloudflare/workers-types"],
+    "outDir": "build",
+    "rootDir": "src",
+    "strict": true,
+    "noImplicitReturns": true,
+    "noUnusedLocals": true,
+    "skipLibCheck": true
+  },
+  "include": ["src"]
+}

@@ -64,6 +64,25 @@ jobs:
       - run: npm ci
       - run: npm test
 
+  edge:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: edge
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: edge/package-lock.json
+      - run: npm ci
+      - run: npm test
+      # Bundles the Worker exactly as a deploy would, without logging in.
+      - run: npm run check
+        env:
+          WRANGLER_SEND_METRICS: 'false'
+
   admin:
     runs-on: ubuntu-latest
     defaults:
