@@ -77,6 +77,7 @@ void main() {
       expect(Backend.areaFromAddress({'village': 'Mahabalipuram', 'state_district': 'Chengalpattu'}), 'Mahabalipuram, Chengalpattu');
       expect(Backend.areaFromAddress({'city': 'Chennai'}), 'Chennai');
       expect(Backend.areaFromAddress({}), isNull);
+      expect(Backend.areaFromAddress({'suburb': 'Zone 5 Royapuram', 'city': 'Chennai Corporation'}), 'Royapuram, Chennai');
     });
   });
 

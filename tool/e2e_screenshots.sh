@@ -16,6 +16,10 @@ LOG="$OUT/run.log"
 mkdir -p "$OUT"
 : > "$LOG"
 
+# Warm up the sign-in function: the emulator's first call stalls while it
+# looks up the SMTP secret, which would time out the app's first request.
+curl -s --max-time 120 -X POST -H "Content-Type: application/json"   -d '{"data":{"email":"warmup@example.com"}}'   http://127.0.0.1:5001/rakta-bandhan2026/asia-south1/requestLoginCode >/dev/null 2>&1
+
 # Start from a clean install (no signed-in session left from a previous run).
 "$ADB" uninstall "$PKG" >/dev/null 2>&1
 
