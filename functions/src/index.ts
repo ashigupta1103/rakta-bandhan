@@ -7,35 +7,26 @@
 //     a data message; iOS: a time-sensitive alert until PushKit is added);
 //   - nearby-donor fan-out when a request is raised;
 //   - admin broadcasts to FCM topics;
-//   - expiring requests nobody accepted, and deleting a removed post's photo.
+//   - expiring requests nobody accepted, and deleting a removed post's photo;
+//   - passwordless sign-in codes (login.ts).
 //
 // Every function stays well inside the Blaze free tier (2M invocations a
 // month) at the volumes in docs/publishing/cost-estimate.md.
 
-import { setGlobalOptions } from 'firebase-functions/v2';
 import { onDocumentCreated, onDocumentDeleted, onDocumentUpdated } from 'firebase-functions/v2/firestore';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import * as logger from 'firebase-functions/logger';
-import { initializeApp } from 'firebase-admin/app';
-import { DocumentData, FieldValue, Timestamp, getFirestore } from 'firebase-admin/firestore';
-import { Message, getMessaging } from 'firebase-admin/messaging';
+import { DocumentData, FieldValue, Timestamp } from 'firebase-admin/firestore';
+import { Message } from 'firebase-admin/messaging';
 import { getStorage } from 'firebase-admin/storage';
+
+import { db, messaging } from './app';
 
 import { BLOOD_COMPATIBILITY, bloodGroupTopic, cellsCovering, distanceKm } from './geo';
 import { shortPlace } from './text';
 
-/**
- * Must match the Firestore database's location (Firebase console →
- * Firestore → the location shown at the top). Firestore triggers deploy
- * only to that region; a mismatch fails the deploy with a clear error.
- */
-export const REGION = 'asia-south1';
+export { REGION } from './app';
 
-setGlobalOptions({ region: REGION, maxInstances: 10, memory: '256MiB', timeoutSeconds: 60 });
-
-initializeApp();
-const db = getFirestore();
-const messaging = getMessaging();
 
 /** Small monochrome status-bar icon: android/app/src/main/res/drawable/ic_stat_notify.xml */
 const ICON = 'ic_stat_notify';
@@ -419,3 +410,5 @@ export const onStoryDeleted = onDocumentDeleted('community_stories/{id}', async 
   const bucket = getStorage().bucket();
   await Promise.all(paths.map((p) => bucket.file(p).delete({ ignoreNotFound: true })));
 });
+
+export { requestLoginCode, verifyLoginCode, deleteMyAuthAccount } from './login';

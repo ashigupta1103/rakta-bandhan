@@ -4,7 +4,6 @@ import '../theme/app_colors.dart';
 import 'login_screen.dart';
 import 'main_navigation_screen.dart';
 import 'registration_screen.dart';
-import 'verify_email_screen.dart';
 
 /// Branded launch — a deliberate brand reveal, not a loading screen.
 ///
@@ -89,20 +88,17 @@ class _SplashScreenState extends State<SplashScreen>
     );
   }
 
-  /// signed out                 -> LoginScreen
-  /// signed in, email unverified  -> VerifyEmailScreen
-  /// verified, no donor profile   -> RegistrationScreen
-  /// verified with a profile      -> MainNavigationScreen
+  /// signed out               -> LoginScreen
+  /// signed in, no profile    -> RegistrationScreen
+  /// signed in with a profile -> MainNavigationScreen
   Future<Widget> _resolveDestination() async {
     final user = Backend.instance.currentUser;
     if (user == null) return const LoginScreen();
     try {
-      if (!await Backend.instance.refreshEmailVerified()) return const VerifyEmailScreen();
       return await Backend.instance.hasProfile() ? const MainNavigationScreen() : const RegistrationScreen();
     } catch (_) {
-      // Offline at launch: fall back to the cached state rather than
-      // stranding the user on the splash.
-      if (!Backend.instance.isEmailVerified) return const VerifyEmailScreen();
+      // Offline at launch: Firestore's cache usually answers; if it can't,
+      // open the app rather than strand the user on the splash.
       return const MainNavigationScreen();
     }
   }

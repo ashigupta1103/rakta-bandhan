@@ -1,15 +1,21 @@
 import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
 import 'package:flutter/material.dart';
 import 'firebase_options.dart';
+import 'services/backend.dart';
 import 'services/push_service.dart';
 import 'theme/app_colors.dart';
 import 'theme/app_theme.dart';
 import 'screens/splash_screen.dart';
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  // Local end-to-end testing against the Firebase emulators (debug only):
+  //   flutter run --dart-define=USE_EMULATORS=true
+  if (kDebugMode && const bool.fromEnvironment('USE_EMULATORS')) {
+    await Backend.connectToEmulators(const String.fromEnvironment('EMULATOR_HOST', defaultValue: '10.0.2.2'));
+  }
   // Background message handler, notification taps, and the native
   // incoming-call screen's accept/decline events.
   await PushService.instance.init();

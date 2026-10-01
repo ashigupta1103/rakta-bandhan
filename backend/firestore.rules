@@ -27,12 +27,14 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == uid;
     }
 
-    // Accounts must confirm their email (Firebase verification link) — or,
-    // later, a phone number — before they can create anything. Stops
-    // throwaway sign-ups from posting requests or messaging donors.
+    // Accounts must have proved they own their email or phone before they
+    // can create anything: signed in with an emailed code (custom-token
+    // claim `login`, minted by functions/src/login.ts), a verified email,
+    // or a phone number. Stops throwaway sign-ups.
     function isVerifiedUser() {
       return isSignedIn()
-        && (request.auth.token.get('email_verified', false) == true
+        && (request.auth.token.get('login', '') == 'email_otp'
+            || request.auth.token.get('email_verified', false) == true
             || request.auth.token.get('phone_number', null) != null);
     }
 

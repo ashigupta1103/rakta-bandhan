@@ -38,6 +38,9 @@ dependencies:
   firebase_core: ^3.6.0
   cloud_firestore: ^5.4.4
   firebase_auth: ^5.3.1
+  # Passwordless sign-in: the app calls requestLoginCode / verifyLoginCode
+  # (functions/src/login.ts). Pinned to the firebase_core 3.x train.
+  cloud_functions: ^5.6.2
   geolocator: ^13.0.1
   http: ^1.2.2
   google_fonts: ^8.2.1
@@ -72,6 +75,8 @@ dependencies:
 
 dev_dependencies:
   flutter_test:
+    sdk: flutter
+  integration_test:
     sdk: flutter
 
   # The "flutter_lints" package below contains a set of recommended lints to

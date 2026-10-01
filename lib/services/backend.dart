@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -27,6 +28,10 @@ const bloodCompatibility = <String, List<String>>{
 };
 
 const donorCooldownDays = 90;
+
+/// Region the Cloud Functions are deployed to — must equal REGION in
+/// functions/src/app.ts.
+const kFunctionsRegion = 'asia-south1';
 const requestExpiryHours = 6;
 
 const _base32 = '0123456789bcdefghjkmnpqrstuvwxyz';
@@ -206,72 +211,76 @@ class Backend {
 
   // ------------------------------------------------------------ Sign-in
   //
-  // Email + password, with the address confirmed through Firebase's own
-  // verification email (free; 100,000/day on Blaze). Phone verification
-  // (Truecaller / WhatsApp OTP) can be layered on later without changing
-  // accounts — see docs/publishing/cost-estimate.md. Firestore rules only
-  // let a verified account write (see isVerifiedUser in firestore.rules).
+  // Passwordless: a 6-digit code goes to the user's email
+  // (requestLoginCode), and verifyLoginCode trades it for a Firebase custom
+  // token — see functions/src/login.ts. The same email always lands on the
+  // same account. Codes by SMS plug into the same two functions later
+  // (channel: 'sms'). Firestore rules treat a code-login token as verified
+  // (isVerifiedUser in firestore.rules).
 
-  /// Creates the account and sends the verification email.
-  Future<User> signUpWithEmail(String email, String password) async {
-    final cred = await _auth.createUserWithEmailAndPassword(email: email.trim(), password: password);
-    await cred.user!.sendEmailVerification();
-    _logEvent('sign_up', {'method': 'email'});
+  FirebaseFunctions get _functions => FirebaseFunctions.instanceFor(region: kFunctionsRegion);
+
+  /// Sends a sign-in code to [email]. Returns how many seconds to wait
+  /// before offering "Resend".
+  Future<int> requestLoginCode(String email) async {
+    final result = await _functions.httpsCallable('requestLoginCode').call<Map<String, dynamic>>({
+      'channel': 'email',
+      'email': email.trim(),
+    });
+    _logEvent('login_code_requested', {'channel': 'email'});
+    return (result.data['resendAfterS'] as num?)?.toInt() ?? 30;
+  }
+
+  /// Checks the code and signs in. Throws [FirebaseFunctionsException]
+  /// with a human message on a wrong / expired code.
+  Future<User> verifyLoginCode(String email, String code) async {
+    final result = await _functions.httpsCallable('verifyLoginCode').call<Map<String, dynamic>>({
+      'email': email.trim(),
+      'code': code.trim(),
+    });
+    final cred = await _auth.signInWithCustomToken(result.data['token'] as String);
+    _logEvent('login', {'method': 'email_code'});
     return cred.user!;
   }
-
-  Future<User> signInWithEmail(String email, String password) async {
-    final cred = await _auth.signInWithEmailAndPassword(email: email.trim(), password: password);
-    _logEvent('login', {'method': 'email'});
-    return cred.user!;
-  }
-
-  Future<void> resendVerificationEmail() async => _auth.currentUser?.sendEmailVerification();
-
-  /// Re-reads the account from Firebase. After the user taps the link in
-  /// the email, `emailVerified` only flips once the account is reloaded,
-  /// and the ID token Firestore rules see only carries the new claim once
-  /// it's force-refreshed — both happen here.
-  Future<bool> refreshEmailVerified() async {
-    final user = _auth.currentUser;
-    if (user == null) return false;
-    await user.reload();
-    final fresh = _auth.currentUser;
-    if (fresh == null || !fresh.emailVerified) return false;
-    await fresh.getIdToken(true);
-    return true;
-  }
-
-  bool get isEmailVerified => _auth.currentUser?.emailVerified ?? false;
-
-  Future<void> sendPasswordReset(String email) => _auth.sendPasswordResetEmail(email: email.trim());
 
   Future<void> signOut() => _auth.signOut();
 
-  /// Firebase requires a recent sign-in before destructive account actions
-  /// (user.delete()) — the caller asks for the password again.
-  Future<void> reauthenticateForSensitiveAction(String password) async {
-    final user = _auth.currentUser;
-    final email = user?.email;
-    if (user == null || email == null) return;
-    await user.reauthenticateWithCredential(EmailAuthProvider.credential(email: email, password: password));
-  }
+  /// Last step of account deletion: the sign-in account itself, removed by
+  /// a function (a passwordless account can't re-enter a password to
+  /// satisfy Firebase's recent-login rule on the device).
+  Future<void> deleteMyAuthAccount() => _functions.httpsCallable('deleteMyAuthAccount').call<Map<String, dynamic>>();
 
-  /// Human wording for the FirebaseAuthException codes the sign-in screens
-  /// can hit. Never echoes raw exception text.
+  /// Human wording for sign-in errors. The sign-in functions already send
+  /// a readable message; anything else gets a generic one. Never echoes a
+  /// raw exception.
   static String authErrorMessage(Object e) {
+    if (e is FirebaseFunctionsException) {
+      final message = e.message ?? '';
+      if (e.code == 'internal' || e.code == 'unknown' || message.isEmpty) {
+        return 'Something went wrong. Check your connection and try again.';
+      }
+      if (e.code == 'unavailable' && message.toLowerCase() == 'unavailable') {
+        return 'No internet connection. Check your network and try again.';
+      }
+      return message;
+    }
     final code = e is FirebaseAuthException ? e.code : '';
     return switch (code) {
-      'invalid-email' => 'That email address doesn’t look right.',
-      'email-already-in-use' => 'An account already exists for this email. Sign in instead.',
-      'weak-password' => 'Choose a stronger password — at least 8 characters.',
-      'user-not-found' || 'wrong-password' || 'invalid-credential' => 'Incorrect email or password.',
       'user-disabled' => 'This account has been disabled. Contact support.',
       'too-many-requests' => 'Too many attempts. Wait a few minutes and try again.',
       'network-request-failed' => 'No internet connection. Check your network and try again.',
-      'requires-recent-login' => 'Please sign in again to continue.',
       _ => 'Something went wrong. Please try again.',
     };
+  }
+
+  /// Debug builds with `--dart-define=USE_EMULATORS=true` talk to the local
+  /// Firebase emulators instead of the live project (from an Android
+  /// emulator the host is 10.0.2.2). Called once from main().
+  static Future<void> connectToEmulators(String host) async {
+    await FirebaseAuth.instance.useAuthEmulator(host, 9099);
+    FirebaseFirestore.instance.useFirestoreEmulator(host, 8080);
+    FirebaseFunctions.instanceFor(region: kFunctionsRegion).useFunctionsEmulator(host, 5001);
+    await FirebaseStorage.instance.useStorageEmulator(host, 9199);
   }
 
   /// ~1.1 km precision. donors_public is readable by every signed-in user,

@@ -59,15 +59,9 @@ class AccountService {
   /// - every chat message this user sent is deleted;
   /// - donation_history rows stay (they only hold the now-orphaned uid —
   ///   an anonymous count, not personal data).
-  Future<void> deleteMyAccount({required String password}) async {
+  Future<void> deleteMyAccount() async {
     final user = _auth.currentUser;
     if (user == null) return;
-
-    // Re-authenticate up front: Firebase refuses user.delete() on a stale
-    // session, and failing *after* wiping Firestore would strand the
-    // account in a half-deleted state. A wrong password throws here, before
-    // anything is touched.
-    await Backend.instance.reauthenticateForSensitiveAction(password);
 
     final asRequester = await _db.collection('requests').where('requester_uid', isEqualTo: _uid).get();
     for (final doc in asRequester.docs) {
@@ -93,6 +87,10 @@ class AccountService {
     await Backend.instance.deleteMyIdProof();
     await _db.collection('donors_public').doc(_uid).delete();
     await _db.collection('donors').doc(_uid).delete();
-    await user.delete();
+    // The sign-in account goes last, server-side (deleteMyAuthAccount). If
+    // this step fails the user can simply retry: every step above is safe
+    // to repeat.
+    await Backend.instance.deleteMyAuthAccount();
+    await Backend.instance.signOut();
   }
 }

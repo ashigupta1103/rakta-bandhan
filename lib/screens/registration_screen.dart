@@ -226,7 +226,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   }
 
   // This screen is usually reached via Navigator.pushAndRemoveUntil right
-  // after email verification (see verify_email_screen.dart) — it is the
+  // after the sign-in code is accepted (see login_code_screen.dart) — it is the
   // new stack root with nothing beneath it. A plain Navigator.pop() here
   // would empty the Navigator and leave a black screen, so backing out
   // signs out and returns to the sign-in screen instead.

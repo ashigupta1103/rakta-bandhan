@@ -28,6 +28,7 @@ import { ref, uploadBytes } from 'firebase/storage';
 let env;
 
 const verified = (uid) => env.authenticatedContext(uid, { email: `${uid}@example.com`, email_verified: true }).firestore();
+const codeLogin = (uid) => env.authenticatedContext(uid, { login: 'email_otp' }).firestore();
 const unverified = (uid) => env.authenticatedContext(uid, { email: `${uid}@example.com`, email_verified: false }).firestore();
 const storageAs = (uid, verifiedEmail = true) =>
   env.authenticatedContext(uid, { email: `${uid}@example.com`, email_verified: verifiedEmail }).storage();
@@ -100,6 +101,16 @@ describe('sign-up and verified accounts', () => {
 
   test('a verified account can create its own donor profile', async () => {
     await assertSucceeds(setDoc(doc(verified('u1'), 'donors/u1'), donorDoc()));
+  });
+
+  test('an account signed in with an emailed code counts as verified', async () => {
+    await assertSucceeds(setDoc(doc(codeLogin('u2'), 'donors/u2'), donorDoc()));
+    await assertSucceeds(addDoc(collection(codeLogin('u2'), 'requests'), openRequest({ requester_uid: 'u2' })));
+  });
+
+  test('login codes are never readable or writable from the app', async () => {
+    await assertFails(getDoc(doc(verified('u1'), 'login_codes/anything')));
+    await assertFails(setDoc(doc(verified('u1'), 'login_codes/anything'), { code_hash: 'x' }));
   });
 
   test('nobody can create a profile that is already verified', async () => {

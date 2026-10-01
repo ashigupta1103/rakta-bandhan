@@ -1,6 +1,6 @@
 // Regression check for the registration-screen black-screen bug:
 // RegistrationScreen is always reached via Navigator.pushAndRemoveUntil
-// right after email verification (verify_email_screen.dart), so it is the stack
+// right after the sign-in code is accepted (login_code_screen.dart), so it is the stack
 // root with nothing beneath it. The back arrow must never call a plain
 // Navigator.pop() on that root — it must fall back to LoginScreen instead
 // of popping into an empty Navigator (see registration_screen.dart's
