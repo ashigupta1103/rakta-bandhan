@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import 'main_navigation_screen.dart';
+import '../widgets/rb_icon.dart';
 
 class VerifyingScreen extends StatelessWidget {
   const VerifyingScreen({super.key});
@@ -30,7 +30,7 @@ class VerifyingScreen extends StatelessWidget {
                 height: 64,
                 decoration: const BoxDecoration(color: AppColors.warmAmberBg, shape: BoxShape.circle),
                 alignment: Alignment.center,
-                child: const Icon(LucideIcons.shieldCheck, size: 28, color: AppColors.warmAmberText),
+                child: const RbIcon(RbGlyph.shield, size: 28, color: AppColors.warmAmberText),
               ),
               const SizedBox(height: 16),
               Text(

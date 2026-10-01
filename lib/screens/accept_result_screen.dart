@@ -1,11 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../services/backend.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/two_person_connection.dart';
 import 'match_contact_screen.dart';
+import '../widgets/rb_icon.dart';
 
 enum AcceptOutcome { success, claimed, blocked }
 
@@ -53,7 +53,7 @@ class AcceptResultScreen extends StatelessWidget {
           height: 64,
           decoration: const BoxDecoration(color: AppColors.primaryLightTint, shape: BoxShape.circle),
           alignment: Alignment.center,
-          child: const Icon(LucideIcons.xCircle, size: 28, color: AppColors.primary),
+          child: const RbIcon(RbGlyph.closeCircle, size: 28, color: AppColors.primary),
         ),
         const SizedBox(height: 16),
         const Text('Already accepted', textAlign: TextAlign.center, style: TextStyle(fontSize: 19, fontWeight: FontWeight.w500, color: AppColors.textPrimaryWarm)),
@@ -73,7 +73,7 @@ class AcceptResultScreen extends StatelessWidget {
           height: 64,
           decoration: const BoxDecoration(color: AppColors.warmAmberBg, shape: BoxShape.circle),
           alignment: Alignment.center,
-          child: const Icon(LucideIcons.alertTriangle, size: 28, color: AppColors.warmAmberText),
+          child: const RbIcon(RbGlyph.alert, size: 28, color: AppColors.warmAmberText),
         ),
         const SizedBox(height: 16),
         const Text('You already have an active match', textAlign: TextAlign.center, style: TextStyle(fontSize: 19, fontWeight: FontWeight.w500, color: AppColors.textPrimaryWarm)),

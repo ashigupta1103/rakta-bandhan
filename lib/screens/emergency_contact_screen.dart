@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../services/emergency_contact_service.dart';
 import '../services/phone_privacy.dart';
 import '../theme/app_colors.dart';
 import '../widgets/loading_button.dart';
 import '../widgets/state_card.dart';
+import '../widgets/rb_icon.dart';
 
 /// Emergency contact capture.
 ///
@@ -110,7 +110,7 @@ class _EmergencyContactScreenState extends State<EmergencyContactScreen> {
                   Align(
                     alignment: Alignment.centerLeft,
                     child: IconButton(
-                      icon: const Icon(LucideIcons.arrowLeft, color: AppColors.textPrimaryWarm),
+                      icon: const RbIcon(RbGlyph.back, color: AppColors.textPrimaryWarm),
                       onPressed: () => Navigator.pop(context),
                     ),
                   ),
@@ -160,7 +160,7 @@ class _EmergencyContactScreenState extends State<EmergencyContactScreen> {
                     height: 52,
                     decoration: const BoxDecoration(color: AppColors.primaryLightTint, shape: BoxShape.circle),
                     alignment: Alignment.center,
-                    child: const Icon(LucideIcons.userRound, size: 22, color: AppColors.primary),
+                    child: const RbIcon(RbGlyph.person, size: 22, color: AppColors.primary),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
@@ -193,7 +193,7 @@ class _EmergencyContactScreenState extends State<EmergencyContactScreen> {
                     height: 32,
                     decoration: BoxDecoration(color: AppColors.dividerWarm, borderRadius: BorderRadius.circular(10)),
                     alignment: Alignment.center,
-                    child: const Icon(LucideIcons.phone, size: 15, color: AppColors.textSecondary),
+                    child: const RbIcon(RbGlyph.phone, size: 15, color: AppColors.textSecondary),
                   ),
                   const SizedBox(width: 12),
                   Text(
@@ -223,7 +223,7 @@ class _EmergencyContactScreenState extends State<EmergencyContactScreen> {
         if (_contact == null) ...[
           StateCard.empty(
             title: 'No emergency contact yet',
-            icon: LucideIcons.phone,
+            icon: RbGlyph.phone,
           ),
           const SizedBox(height: 4),
           const Padding(

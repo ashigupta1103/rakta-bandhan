@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../theme/app_colors.dart';
 import 'identity_disc.dart';
+import 'rb_icon.dart';
 
 /// The "AG ── ♡ ── RD" connector from the Donor-found moment: two identity
 /// discs joined by a hairline that resolves into a heart at the midpoint.
@@ -40,7 +40,7 @@ class HeartConnector extends StatelessWidget {
                 height: 28,
                 decoration: BoxDecoration(color: AppColors.warmGround, shape: BoxShape.circle),
                 alignment: Alignment.center,
-                child: const Icon(LucideIcons.heart, size: 16, color: AppColors.gold),
+                child: const RbIcon(RbGlyph.heart, size: 16, color: AppColors.gold),
               ),
             ],
           ),

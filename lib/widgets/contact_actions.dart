@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../screens/call_screen.dart';
 import '../screens/chat_screen.dart';
+import '../demo/demo.dart';
 import '../services/backend.dart';
 import '../theme/app_colors.dart';
+import 'rb_icon.dart';
 
 /// The matched pair's ways to reach each other: an in-app voice call and an
 /// in-app message. Phone numbers are never shown or dialled — the in-app
@@ -23,7 +24,7 @@ class ContactActions extends StatelessWidget {
   });
 
   Future<void> _call(BuildContext context) async {
-    final me = (await Backend.instance.myDonorDoc()).data();
+    final me = Demo.isDemoId(requestId) ? {'name': Demo.instance.myName} : (await Backend.instance.myDonorDoc()).data();
     if (!context.mounted) return;
     await startCallFlow(
       context,
@@ -43,14 +44,14 @@ class ContactActions extends StatelessWidget {
         ElevatedButton.icon(
           style: ElevatedButton.styleFrom(backgroundColor: AppColors.warmPageBackground, foregroundColor: AppColors.gradientEmberMid),
           onPressed: peerUid.isEmpty ? null : () => _call(context),
-          icon: const Icon(LucideIcons.phone, size: 16),
+          icon: const RbIcon(RbGlyph.phone, size: 16),
           label: Text('Call $first in the app', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
         ),
         const SizedBox(height: 10),
         OutlinedButton.icon(
           style: OutlinedButton.styleFrom(foregroundColor: AppColors.onEmber, side: const BorderSide(color: AppColors.onEmberOutline)),
           onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ChatScreen(requestId: requestId))),
-          icon: const Icon(LucideIcons.messageSquare, size: 15),
+          icon: const RbIcon(RbGlyph.message, size: 15),
           label: const Text('Message'),
         ),
       ],

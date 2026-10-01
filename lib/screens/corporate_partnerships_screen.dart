@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../preview_mode.dart';
 import '../services/backend.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/filter_chip_row.dart';
+import '../widgets/rb_icon.dart';
 
 /// Corporate partnerships — per the final artifact's "Trust & brand"
 /// section. "Start a conversation" writes a real inquiry to Firestore
@@ -38,7 +38,7 @@ class CorporatePartnershipsScreen extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: Row(
                   children: [
-                    IconButton(icon: const Icon(LucideIcons.arrowLeft, color: AppColors.textPrimaryWarm), onPressed: () => Navigator.pop(context)),
+                    IconButton(icon: const RbIcon(RbGlyph.back, color: AppColors.textPrimaryWarm), onPressed: () => Navigator.pop(context)),
                     const SizedBox(width: 4),
                     const Text('Partner with us', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
                   ],
@@ -68,17 +68,17 @@ class CorporatePartnershipsScreen extends StatelessWidget {
                       crossAxisSpacing: 10,
                       childAspectRatio: 1.5,
                       children: [
-                        _sponsorCard(LucideIcons.droplet, AppColors.red100, AppColors.brandRed, 'Sponsor a donation drive'),
-                        _sponsorCard(LucideIcons.plus, AppColors.goldTint, AppColors.goldDeep, 'Sponsor a health initiative'),
-                        _sponsorCard(LucideIcons.award, AppColors.orangeTint, AppColors.orangeDeep, 'Sponsor donor recognition'),
-                        _sponsorCard(LucideIcons.users, AppColors.successBg, AppColors.successText, 'Corporate volunteering'),
+                        _sponsorCard(RbGlyph.droplet, AppColors.red100, AppColors.brandRed, 'Sponsor a donation drive'),
+                        _sponsorCard(RbGlyph.plus, AppColors.goldTint, AppColors.goldDeep, 'Sponsor a health initiative'),
+                        _sponsorCard(RbGlyph.certificate, AppColors.orangeTint, AppColors.orangeDeep, 'Sponsor donor recognition'),
+                        _sponsorCard(RbGlyph.community, AppColors.successBg, AppColors.successText, 'Corporate volunteering'),
                       ],
                     ),
                     if (kEnablePreviewUi) ...[
                       const SizedBox(height: 22),
                       Row(
                         children: [
-                          const Icon(LucideIcons.eye, size: 13, color: AppColors.goldDeep),
+                          const RbIcon(RbGlyph.eye, size: 13, color: AppColors.goldDeep),
                           const SizedBox(width: 6),
                           const Text('Preview data — sample partner layout', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: AppColors.goldDeep)),
                         ],
@@ -163,7 +163,7 @@ class CorporatePartnershipsScreen extends StatelessWidget {
                 height: 44,
                 decoration: BoxDecoration(color: AppColors.sand, borderRadius: BorderRadius.circular(10)),
                 alignment: Alignment.center,
-                child: const Icon(LucideIcons.building2, size: 20, color: AppColors.ink2),
+                child: const RbIcon(RbGlyph.building, size: 20, color: AppColors.ink2),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -187,14 +187,14 @@ class CorporatePartnershipsScreen extends StatelessWidget {
     );
   }
 
-  Widget _sponsorCard(IconData icon, Color bg, Color fg, String label) {
+  Widget _sponsorCard(RbGlyph icon, Color bg, Color fg, String label) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(color: Colors.white, border: Border.all(color: AppColors.warmBorder), borderRadius: BorderRadius.circular(12)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(width: 30, height: 30, decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(8)), alignment: Alignment.center, child: Icon(icon, size: 16, color: fg)),
+          Container(width: 30, height: 30, decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(8)), alignment: Alignment.center, child: RbIcon(icon, size: 16, color: fg)),
           const SizedBox(height: 10),
           Text(label, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
         ],

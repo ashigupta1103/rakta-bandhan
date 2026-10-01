@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:firebase_core/firebase_core.dart' show FirebaseException;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../services/backend.dart';
 import 'location_picker_screen.dart';
@@ -12,6 +11,9 @@ import '../theme/app_text_styles.dart';
 import '../widgets/blood_group_droplet.dart';
 import 'consent_screen.dart';
 import 'login_screen.dart';
+import 'phone_verify_screen.dart';
+import '../demo/demo.dart';
+import '../widgets/rb_icon.dart';
 
 class RegistrationScreen extends StatefulWidget {
   /// Pre-fills the mobile field when known (preview gallery); the email
@@ -58,6 +60,16 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   void initState() {
     super.initState();
     _whatsappController.text = widget.phoneNumber;
+    if (Demo.on) {
+      // Demo persona, pre-filled so the presenter can tap straight through.
+      _nameController.text = Demo.instance.myName;
+      _whatsappController.text = Demo.demoPhone;
+      _selectedBloodGroup = Demo.bloodGroup;
+      _locationController.text = Demo.area;
+      _selectedLat = Demo.lat;
+      _selectedLng = Demo.lng;
+      return;
+    }
     _useCurrentLocation(silent: true);
   }
 
@@ -169,6 +181,13 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
     if (_nameError != null || _whatsappError != null || _bloodGroupError != null) return;
 
+    if (Demo.on) {
+      // Client demo: nothing is written. The demo then shows the phone
+      // check — production has no SMS provider yet (PhoneVerifyScreen).
+      Navigator.push(context, MaterialPageRoute(builder: (_) => PhoneVerifyScreen(phone: whatsapp)));
+      return;
+    }
+
     setState(() => _isSubmitting = true);
     try {
       double lat, lng;
@@ -203,26 +222,18 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _isSubmitting = false);
+      // Only the error code goes to the debug log; the person sees words.
+      debugPrint('registration failed: ${e is FirebaseException ? '${e.plugin}/${e.code}' : e.runtimeType}');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Registration failed. ${_diagnosticSuffix(e)}Please try again.',
+            e is FirebaseException && (e.code == 'unavailable' || e.code == 'deadline-exceeded')
+                ? 'We couldn’t reach Rakta Bandhan. Check your connection and try again.'
+                : 'We couldn’t complete your registration. Please try again.',
           ),
         ),
       );
     }
-  }
-
-  /// A short, safe diagnostic fragment appended to the failure message —
-  /// this is a frontend-visibility improvement only (so a screenshot or a
-  /// teammate reading over your shoulder can see *what kind* of failure
-  /// this is without a dev console), not a fix to whatever the underlying
-  /// cause turns out to be. Never echoes raw exception text — only the
-  /// stable `code`/`type` fields exceptions expose for exactly this
-  /// purpose.
-  String _diagnosticSuffix(Object e) {
-    if (e is FirebaseException) return '(${e.plugin}/${e.code}) ';
-    return '(${e.runtimeType}) ';
   }
 
   // This screen is usually reached via Navigator.pushAndRemoveUntil right
@@ -239,7 +250,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     }
     _backHandled = true;
     try {
-      await Backend.instance.signOut();
+      if (!Demo.on) await Backend.instance.signOut();
     } catch (_) {
       // Offline (or no Firebase at all, in widget tests) — still leave.
     }
@@ -266,8 +277,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           backgroundColor: Colors.transparent,
           elevation: 0,
           leading: IconButton(
-            icon: const Icon(
-              LucideIcons.arrowLeft,
+            icon: const RbIcon(
+              RbGlyph.back,
               color: AppColors.textPrimaryWarm,
             ),
             onPressed: _handleBack,
@@ -332,9 +343,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                 ],
                 const SizedBox(height: 24),
 
-                // WhatsApp Field
+                // Mobile number field
                 const Text(
-                  'Mobile number (WhatsApp)',
+                  'Mobile number',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
@@ -358,7 +369,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                   decoration: const InputDecoration(
                     hintText: '10-digit mobile number',
                     prefixText: '+91  ',
-                    helperText: 'Shared only with the person you are matched with.',
+                    helperText: 'Never shown to other users.',
                   ),
                 ),
                 if (_whatsappError != null) ...[
@@ -396,7 +407,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                               child: CircularProgressIndicator(strokeWidth: 2),
                             ),
                           )
-                        : const Icon(LucideIcons.mapPin),
+                        : const RbIcon(RbGlyph.pin),
                   ),
                 ),
                 if (_addressSuggestions.isNotEmpty)
@@ -413,8 +424,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                         for (final suggestion in _addressSuggestions)
                           ListTile(
                             dense: true,
-                            leading: const Icon(
-                              LucideIcons.mapPin,
+                            leading: const RbIcon(
+                              RbGlyph.pin,
                               size: 16,
                               color: AppColors.textSecondary,
                             ),
@@ -439,8 +450,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(
-                            LucideIcons.mapPin,
+                          const RbIcon(
+                            RbGlyph.pin,
                             size: 13,
                             color: AppColors.primary,
                           ),

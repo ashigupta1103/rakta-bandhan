@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:share_plus/share_plus.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/rb_ui.dart';
 import 'legal_reader_screen.dart';
+import '../widgets/rb_icon.dart';
 
 /// About Rakta Bandhan — mission, vision, the project's story and team, as
 /// supplied by the Rakta Bandhan / Rotary team. Team photographs are still
@@ -18,10 +18,10 @@ class AboutScreen extends StatelessWidget {
   static const shareUrl = 'https://rakta-bandhan2026.web.app/app/';
 
   static const _missionPoints = [
-    (LucideIcons.users, 'Empower', 'patients and caregivers with access to nearby blood donors.'),
-    (LucideIcons.zap, 'Enable', 'donors to respond swiftly, safely and meaningfully.'),
-    (LucideIcons.building2, 'Engage', 'hospitals, blood banks and communities to build a responsive donor network.'),
-    (LucideIcons.repeat, 'Encourage', 'responsible repeat donation through reminders and appropriate scheduling.'),
+    (RbGlyph.community, 'Empower', 'patients and caregivers with access to nearby blood donors.'),
+    (RbGlyph.flame, 'Enable', 'donors to respond swiftly, safely and meaningfully.'),
+    (RbGlyph.building, 'Engage', 'hospitals, blood banks and communities to build a responsive donor network.'),
+    (RbGlyph.retry, 'Encourage', 'responsible repeat donation through reminders and appropriate scheduling.'),
   ];
 
   static const _team = [
@@ -61,12 +61,12 @@ class AboutScreen extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: Row(
                   children: [
-                    IconButton(icon: const Icon(LucideIcons.arrowLeft, color: AppColors.textPrimaryWarm), onPressed: () => Navigator.pop(context)),
+                    IconButton(icon: const RbIcon(RbGlyph.back, color: AppColors.textPrimaryWarm), onPressed: () => Navigator.pop(context)),
                     const SizedBox(width: 4),
                     const Expanded(child: Text('About', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm))),
                     IconButton(
                       tooltip: 'Share Rakta Bandhan',
-                      icon: const Icon(LucideIcons.share2, size: 19, color: AppColors.textPrimaryWarm),
+                      icon: const RbIcon(RbGlyph.share, size: 19, color: AppColors.textPrimaryWarm),
                       onPressed: () => SharePlus.instance.share(ShareParams(
                         text: 'Rakta Bandhan helps people who urgently need blood reach willing donors nearby. Find your Bloodmate here: $shareUrl',
                       )),
@@ -167,9 +167,9 @@ class AboutScreen extends StatelessWidget {
                           RbListGroup(
                             children: [
                               for (final (icon, label, page) in [
-                                (LucideIcons.heartHandshake, 'Community guidelines', () => const LegalReaderScreen.guidelines()),
-                                (LucideIcons.shieldCheck, 'Privacy policy', () => const LegalReaderScreen.privacy()),
-                                (LucideIcons.fileText, 'Terms of use', () => const LegalReaderScreen.terms()),
+                                (RbGlyph.community, 'Community guidelines', () => const LegalReaderScreen.guidelines()),
+                                (RbGlyph.shield, 'Privacy policy', () => const LegalReaderScreen.privacy()),
+                                (RbGlyph.page, 'Terms of use', () => const LegalReaderScreen.terms()),
                               ])
                                 RbRow(icon: icon, tone: RbTone.neutral, title: label, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => page()))),
                             ],
@@ -196,7 +196,7 @@ class AboutScreen extends StatelessWidget {
 
   Widget _paragraph(String text) => Text(text, style: const TextStyle(fontSize: 14, color: AppColors.ink, height: 1.6));
 
-  Widget _missionRow(IconData icon, String verb, String rest) {
+  Widget _missionRow(RbGlyph icon, String verb, String rest) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Row(
@@ -207,7 +207,7 @@ class AboutScreen extends StatelessWidget {
             height: 30,
             decoration: BoxDecoration(color: AppColors.primaryLightTint, borderRadius: BorderRadius.circular(9)),
             alignment: Alignment.center,
-            child: Icon(icon, size: 15, color: AppColors.primary),
+            child: RbIcon(icon, size: 15, color: AppColors.primary),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -237,10 +237,19 @@ class AboutScreen extends StatelessWidget {
         .take(2)
         .map((w) => w[0].toUpperCase())
         .join();
-    final initialsDisc = Container(
-      color: AppColors.red100,
+    // Until the team supplies an approved photograph, a clearly
+    // intentional placeholder — never a generated face.
+    final placeholder = Container(
+      color: AppColors.sand,
       alignment: Alignment.center,
-      child: Text(initials, style: AppTextStyles.display(fontSize: 22, color: AppColors.brandRed)),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const RbIcon(RbGlyph.person, size: 22, color: AppColors.mutedInk),
+          const SizedBox(height: 3),
+          Text(initials, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.mutedInk)),
+        ],
+      ),
     );
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -250,13 +259,20 @@ class AboutScreen extends StatelessWidget {
           children: [
             Row(
               children: [
-                ClipOval(
-                  child: SizedBox(
-                    width: 64,
-                    height: 64,
-                    child: m.photo == null
-                        ? initialsDisc
-                        : Image.asset(m.photo!, fit: BoxFit.cover, errorBuilder: (context, error, stack) => initialsDisc),
+                Semantics(
+                  label: m.photo == null ? 'Photo to be added' : m.name,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      width: 68,
+                      height: 80,
+                      foregroundDecoration: m.photo == null
+                          ? BoxDecoration(border: Border.all(color: AppColors.warmBorder), borderRadius: BorderRadius.circular(16))
+                          : null,
+                      child: m.photo == null
+                          ? placeholder
+                          : Image.asset(m.photo!, fit: BoxFit.cover, errorBuilder: (context, error, stack) => placeholder),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 14),

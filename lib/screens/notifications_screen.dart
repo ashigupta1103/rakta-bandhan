@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../demo/demo.dart';
+import '../demo/demo_notifications.dart';
 import '../services/notifications_service.dart';
 import '../services/urgent_alert_service.dart';
 import '../theme/app_colors.dart';
@@ -7,7 +8,9 @@ import '../theme/app_text_styles.dart';
 import '../widgets/blood_group_droplet.dart';
 import '../widgets/rb_ui.dart';
 import 'match_contact_screen.dart';
+import 'request_detail_screen.dart';
 import 'tracking_screen.dart';
+import '../widgets/rb_icon.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -17,7 +20,7 @@ class NotificationsScreen extends StatefulWidget {
 }
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
-  final NotificationsService _service = FirestoreNotificationsService();
+  final NotificationsService _service = Demo.on ? DemoNotificationsService() : FirestoreNotificationsService();
   int _retryToken = 0;
 
   @override
@@ -30,7 +33,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         scrolledUnderElevation: 0,
         leading: IconButton(
           tooltip: 'Back',
-          icon: const Icon(LucideIcons.arrowLeft, color: AppColors.textPrimaryWarm),
+          icon: const RbIcon(RbGlyph.back, color: AppColors.textPrimaryWarm),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text('Notifications', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
@@ -69,7 +72,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 const Padding(
                   padding: EdgeInsets.only(top: 8),
                   child: RbStatePanel(
-                    icon: LucideIcons.bell,
+                    icon: RbGlyph.bell,
                     title: 'You’re all caught up',
                     message: 'Matches, messages and updates on your requests will appear here.',
                   ),
@@ -100,7 +103,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             const Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(LucideIcons.bellOff, size: 18, color: AppColors.goldDeep),
+                RbIcon(RbGlyph.bellOff, size: 18, color: AppColors.goldDeep),
                 SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -143,7 +146,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     final requestId = n.id.substring(0, sep);
     // A cancellation is the donor-side event; everything else in the feed
     // is about the requester's own request.
-    final screen = n.kind == NotificationKind.cancellation ? MatchContactScreen(requestId: requestId) : TrackingScreen(requestId: requestId);
+    final Widget screen = Demo.on && Demo.instance.role == DemoRole.donor
+        ? RequestDetailScreen(requestId: requestId)
+        : n.kind == NotificationKind.cancellation
+            ? MatchContactScreen(requestId: requestId)
+            : TrackingScreen(requestId: requestId);
     Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
   }
 
@@ -163,7 +170,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const BloodGroupDroplet(label: '', size: 40, centerIcon: Icon(LucideIcons.droplet, size: 16, color: AppColors.onEmber)),
+                    const BloodGroupDroplet(label: '', size: 40, centerIcon: RbIcon(RbGlyph.droplet, size: 16, color: AppColors.onEmber)),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
@@ -194,7 +201,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Widget _archivalRow(AppNotification n) {
     final isPositive = n.kind == NotificationKind.match || n.kind == NotificationKind.donationConfirmed;
     return RbRow(
-      icon: isPositive ? LucideIcons.droplet : (n.kind == NotificationKind.cancellation ? LucideIcons.circleX : LucideIcons.bell),
+      icon: isPositive ? RbGlyph.droplet : (n.kind == NotificationKind.cancellation ? RbGlyph.closeCircle : RbGlyph.bell),
       tone: isPositive ? RbTone.success : RbTone.neutral,
       title: n.title,
       subtitle: n.body,

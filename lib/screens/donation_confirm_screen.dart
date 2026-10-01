@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../demo/demo.dart';
 import '../services/backend.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/ring_field.dart';
 import 'cooldown_screen.dart';
 import 'donation_history_screen.dart';
+import '../widgets/rb_icon.dart';
 
 /// Shown once a donation is complete (both sides confirmed): ember field,
 /// ring group, a cream droplet, and the real count from
@@ -28,7 +29,7 @@ class DonationConfirmScreen extends StatelessWidget {
         ),
         child: SafeArea(
           child: FutureBuilder<int>(
-            future: Backend.instance.myDonationCount(),
+            future: Demo.on ? Future.value(Demo.instance.myDonations) : Backend.instance.myDonationCount(),
             builder: (context, snapshot) {
               final count = snapshot.data ?? 0;
               return Column(
@@ -50,7 +51,7 @@ class DonationConfirmScreen extends StatelessWidget {
                                 BoxShadow(color: Colors.black38, blurRadius: 26, offset: Offset(0, 10)),
                               ]),
                               alignment: Alignment.center,
-                              child: Icon(LucideIcons.droplet, size: 32 * px, color: AppColors.primary),
+                              child: RbIcon(RbGlyph.droplet, size: 32 * px, color: AppColors.primary),
                             ),
                           ],
                         );

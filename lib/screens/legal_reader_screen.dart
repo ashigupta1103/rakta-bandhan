@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../legal/legal_config.dart';
 import '../legal/legal_documents.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/pressable.dart';
+import '../widgets/rb_icon.dart';
 
 /// One reader for every legal document (Privacy policy, Terms of use).
 ///
@@ -87,7 +87,7 @@ class _LegalReaderScreenState extends State<LegalReaderScreen> {
                 children: [
                   IconButton(
                     tooltip: 'Back',
-                    icon: const Icon(LucideIcons.arrowLeft, color: AppColors.textPrimaryWarm),
+                    icon: const RbIcon(RbGlyph.back, color: AppColors.textPrimaryWarm),
                     onPressed: () => Navigator.pop(context),
                   ),
                   const SizedBox(width: 4),
@@ -143,12 +143,12 @@ class _LegalReaderScreenState extends State<LegalReaderScreen> {
                         decoration: BoxDecoration(color: Colors.white, border: Border.all(color: AppColors.warmBorder), borderRadius: BorderRadius.circular(12)),
                         child: Row(
                           children: [
-                            Icon(isPrivacy ? LucideIcons.fileText : LucideIcons.shield, size: 17, color: AppColors.ink2),
+                            RbIcon(isPrivacy ? RbGlyph.page : RbGlyph.shield, size: 17, color: AppColors.ink2),
                             const SizedBox(width: 12),
                             Expanded(
                               child: Text(isPrivacy ? 'Read the Terms of use' : 'Read the Privacy policy', style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w500, color: AppColors.ink)),
                             ),
-                            const Icon(LucideIcons.arrowRight, size: 16, color: AppColors.chevronMuted),
+                            const RbIcon(RbGlyph.forward, size: 16, color: AppColors.chevronMuted),
                           ],
                         ),
                       ),
@@ -174,7 +174,7 @@ class _DraftBanner extends StatelessWidget {
         child: const Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Padding(padding: EdgeInsets.only(top: 1), child: Icon(LucideIcons.fileClock, size: 15, color: AppColors.goldDeep)),
+            Padding(padding: EdgeInsets.only(top: 1), child: RbIcon(RbGlyph.pageClock, size: 15, color: AppColors.goldDeep)),
             SizedBox(width: 9),
             Expanded(
               child: Text(
@@ -210,7 +210,7 @@ class _InShort extends StatelessWidget {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Padding(padding: EdgeInsets.only(top: 2), child: Icon(LucideIcons.check, size: 15, color: AppColors.brandRed)),
+                    const Padding(padding: EdgeInsets.only(top: 2), child: RbIcon(RbGlyph.check, size: 15, color: AppColors.brandRed)),
                     const SizedBox(width: 10),
                     Expanded(child: Text(p, style: const TextStyle(fontSize: 14, color: AppColors.ink, height: 1.5))),
                   ],
@@ -243,7 +243,7 @@ class _ContentsRow extends StatelessWidget {
                 ),
               ),
               Expanded(child: Text(label, style: const TextStyle(fontSize: 14.5, color: AppColors.ink))),
-              const Icon(LucideIcons.chevronDown, size: 15, color: AppColors.chevronMuted),
+              const RbIcon(RbGlyph.chevronDown, size: 15, color: AppColors.chevronMuted),
             ],
           ),
         ),
@@ -316,7 +316,7 @@ class _ContactCard extends StatelessWidget {
           Text(
             hasContact
                 ? 'Email $kLegalContactEmail. We reply within 30 days, and sooner for account or safety issues.'
-                : 'A contact address and Grievance Officer will be listed here before public launch.',
+                : '[ORGANIZATION TO PROVIDE] Contact email for privacy requests, Grievance Officer name and contact details, and postal address — required before public launch.',
             style: const TextStyle(fontSize: 13.5, color: AppColors.ink2, height: 1.5),
           ),
         ],

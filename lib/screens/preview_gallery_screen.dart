@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../services/donation_history_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
@@ -29,7 +28,8 @@ import 'login_code_screen.dart';
 import 'registration_screen.dart';
 import 'settings_screen.dart';
 import 'testimonials_screen.dart';
-import 'tic_tac_toe_screen.dart';
+import 'word_riddle_screen.dart';
+import '../widgets/rb_icon.dart';
 
 // ═══════════════════════════════════════════════════════════════════════
 // TEMPORARY PREVIEW GALLERY — NOT PART OF THE REAL APP.
@@ -107,8 +107,8 @@ class PreviewGalleryScreen extends StatelessWidget {
                     _entry('Settings & privacy', () => const SettingsScreen()),
                   ]),
 
-                  _category(context, 'While you wait — game', [
-                    _entry('Play a round of XO', () => const TicTacToeScreen()),
+                  _category(context, 'While you recover — word riddles', [
+                    _entry('Word riddles', () => const WordRiddleScreen()),
                   ]),
 
                   _category(context, 'Notifications & More menu', [
@@ -146,7 +146,7 @@ class PreviewGalleryScreen extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       child: Row(
         children: [
-          const Icon(LucideIcons.eye, size: 13, color: Colors.white),
+          const RbIcon(RbGlyph.eye, size: 13, color: Colors.white),
           const SizedBox(width: 7),
           const Expanded(child: Text('PREVIEW MODE — sample data only, no backend connection', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white, letterSpacing: 0.3))),
           GestureDetector(onTap: () => Navigator.pop(context), child: const Text('Exit', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.gold))),
@@ -188,7 +188,7 @@ class PreviewGalleryScreen extends StatelessWidget {
                               ],
                             ),
                           ),
-                          const Icon(LucideIcons.chevronRight, size: 16, color: AppColors.chevronMuted),
+                          const RbIcon(RbGlyph.chevron, size: 16, color: AppColors.chevronMuted),
                         ],
                       ),
                     ),
@@ -240,7 +240,7 @@ class _PreviewFrame extends StatelessWidget {
                 children: [
                   GestureDetector(
                     onTap: () => Navigator.pop(context),
-                    child: const Row(mainAxisSize: MainAxisSize.min, children: [Icon(LucideIcons.arrowLeft, size: 14, color: Colors.white), SizedBox(width: 6), Text('Back to gallery', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white))]),
+                    child: const Row(mainAxisSize: MainAxisSize.min, children: [RbIcon(RbGlyph.back, size: 14, color: Colors.white), SizedBox(width: 6), Text('Back to gallery', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white))]),
                   ),
                   const Spacer(),
                   const Text('Preview · sample data', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.gold, letterSpacing: 0.3)),
@@ -270,7 +270,7 @@ class _UnavailablePreview extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(width: 52, height: 52, decoration: const BoxDecoration(color: AppColors.sand, shape: BoxShape.circle), alignment: Alignment.center, child: const Icon(LucideIcons.info, size: 22, color: AppColors.ink2)),
+              Container(width: 52, height: 52, decoration: const BoxDecoration(color: AppColors.sand, shape: BoxShape.circle), alignment: Alignment.center, child: const RbIcon(RbGlyph.info, size: 22, color: AppColors.ink2)),
               const SizedBox(height: 16),
               Text('$title can\'t be safely previewed here', textAlign: TextAlign.center, style: AppTextStyles.display(fontSize: 18, color: AppColors.ink)),
               const SizedBox(height: 8),
@@ -409,10 +409,10 @@ class _TrackingPreview extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 18, 16, 4),
             decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: AppColors.shadowHero, blurRadius: 22, offset: const Offset(0, 8))]),
             child: const StepTracker(steps: [
-              TrackerStep(label: 'Submitted', sub: 'Request created (sample)', status: StepStatus.done, icon: LucideIcons.send),
-              TrackerStep(label: 'Donor found', sub: '1 donor accepted (sample)', status: StepStatus.done, icon: LucideIcons.search),
-              TrackerStep(label: 'Matched', sub: 'Sample Donor accepted your request', status: StepStatus.current, icon: LucideIcons.handshake),
-              TrackerStep(label: 'Completed', sub: 'Marked once the donation is confirmed', status: StepStatus.pending, icon: LucideIcons.checkCircle),
+              TrackerStep(label: 'Submitted', sub: 'Request created (sample)', status: StepStatus.done, icon: RbGlyph.send),
+              TrackerStep(label: 'Donor found', sub: '1 donor accepted (sample)', status: StepStatus.done, icon: RbGlyph.search),
+              TrackerStep(label: 'Matched', sub: 'Sample Donor accepted your request', status: StepStatus.current, icon: RbGlyph.connect),
+              TrackerStep(label: 'Completed', sub: 'Marked once the donation is confirmed', status: StepStatus.pending, icon: RbGlyph.checkCircle),
             ]),
           ),
         ],

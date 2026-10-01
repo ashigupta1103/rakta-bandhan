@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:geolocator/geolocator.dart';
 import '../theme/app_colors.dart';
+import '../demo/demo.dart';
 import '../services/account_service.dart';
 import '../widgets/confirm_sheet.dart';
 import '../widgets/logout_flow.dart';
@@ -10,6 +10,7 @@ import '../widgets/rb_ui.dart';
 import '../widgets/urgent_alert_toggle.dart';
 import 'legal_reader_screen.dart';
 import 'login_screen.dart';
+import '../widgets/rb_icon.dart';
 
 /// Settings & privacy — same grouped rows as My Page, one destructive
 /// treatment.
@@ -36,8 +37,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   bool _exporting = false;
 
+  /// Data export and deletion act on a real account — not simulated.
+  bool _demoBlocked() {
+    if (!Demo.on) return false;
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Not available in the demo — there is no real account.')));
+    return true;
+  }
+
   Future<void> _downloadData() async {
-    if (_exporting) return;
+    if (_exporting || _demoBlocked()) return;
     setState(() => _exporting = true);
     String json;
     try {
@@ -86,7 +94,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     Navigator.pop(sheet);
                     messenger.showSnackBar(const SnackBar(content: Text('Copied to clipboard.')));
                   },
-                  icon: const Icon(LucideIcons.clipboardList, size: 16),
+                  icon: const RbIcon(RbGlyph.clipboard, size: 16),
                   label: const Text('Copy all'),
                 ),
               ],
@@ -98,7 +106,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _deleteAccount() async {
-    if (_deleting) return;
+    if (_deleting || _demoBlocked()) return;
     final confirmed = await ConfirmSheet.show(
       context,
       title: 'Delete your account permanently?',
@@ -139,7 +147,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         scrolledUnderElevation: 0,
         leading: IconButton(
           tooltip: 'Back',
-          icon: const Icon(LucideIcons.arrowLeft, color: AppColors.textPrimaryWarm),
+          icon: const RbIcon(RbGlyph.back, color: AppColors.textPrimaryWarm),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text('Settings & privacy', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
@@ -153,11 +161,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
             children: [
               const UrgentAlertToggle(asCard: false),
               RbRow(
-                icon: LucideIcons.bellRing,
+                icon: RbGlyph.bell,
                 tone: RbTone.gold,
                 title: 'Phone notifications',
                 subtitle: 'Messages, calls and nearby requests. Sound and banners are managed in your phone’s settings.',
-                trailing: const Icon(LucideIcons.externalLink, size: 15, color: AppColors.chevronMuted),
+                trailing: const RbIcon(RbGlyph.forward, size: 15, color: AppColors.chevronMuted),
                 onTap: () => Geolocator.openAppSettings(),
               ),
             ],
@@ -167,11 +175,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
             child: Column(
               children: [
-                _privacyLine(LucideIcons.phoneOff, 'Your phone number', 'Never shown to anyone. You see only its last three digits.'),
-                _privacyLine(LucideIcons.mapPin, 'Your location', 'Others see your neighbourhood, rounded to about 1 km — never an exact address.'),
-                _privacyLine(LucideIcons.image, 'Your profile photo', 'Visible only to you.'),
-                _privacyLine(LucideIcons.idCard, 'Your ID proof', 'Seen only by the verification team, then deleted.'),
-                _privacyLine(LucideIcons.messageSquare, 'Chats and calls', 'Only between you and the person you’re matched with. Calls are never recorded.'),
+                _privacyLine(RbGlyph.hangUp, 'Your phone number', 'Never shown to anyone. You see only its last three digits.'),
+                _privacyLine(RbGlyph.pin, 'Your location', 'Others see your neighbourhood, rounded to about 1 km — never an exact address.'),
+                _privacyLine(RbGlyph.photo, 'Your profile photo', 'Visible only to you.'),
+                _privacyLine(RbGlyph.idCard, 'Your ID proof', 'Seen only by the verification team, then deleted.'),
+                _privacyLine(RbGlyph.message, 'Chats and calls', 'Only between you and the person you’re matched with. Calls are never recorded.'),
               ],
             ),
           ),
@@ -179,14 +187,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
           RbListGroup(
             children: [
               RbRow(
-                icon: LucideIcons.download,
+                icon: RbGlyph.download,
                 title: 'Download my data',
                 subtitle: 'Everything stored against your account',
                 onTap: _exporting ? null : _downloadData,
                 trailing: _exporting ? _smallSpinner() : null,
               ),
               RbRow(
-                icon: LucideIcons.logOut,
+                icon: RbGlyph.logout,
                 tone: RbTone.neutral,
                 title: 'Log out',
                 onTap: _loggingOut ? null : _confirmLogOut,
@@ -197,9 +205,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const RbSectionLabel('Legal'),
           RbListGroup(
             children: [
-              RbRow(icon: LucideIcons.shieldCheck, tone: RbTone.neutral, title: 'Privacy policy', onTap: () => _open(const LegalReaderScreen.privacy())),
-              RbRow(icon: LucideIcons.fileText, tone: RbTone.neutral, title: 'Terms of use', onTap: () => _open(const LegalReaderScreen.terms())),
-              RbRow(icon: LucideIcons.users, tone: RbTone.neutral, title: 'Community guidelines', onTap: () => _open(const LegalReaderScreen.guidelines())),
+              RbRow(icon: RbGlyph.shield, tone: RbTone.neutral, title: 'Privacy policy', onTap: () => _open(const LegalReaderScreen.privacy())),
+              RbRow(icon: RbGlyph.page, tone: RbTone.neutral, title: 'Terms of use', onTap: () => _open(const LegalReaderScreen.terms())),
+              RbRow(icon: RbGlyph.community, tone: RbTone.neutral, title: 'Community guidelines', onTap: () => _open(const LegalReaderScreen.guidelines())),
             ],
           ),
           const RbSectionLabel('Delete account'),
@@ -207,7 +215,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             decoration: BoxDecoration(color: Colors.white, border: Border.all(color: AppColors.red200), borderRadius: BorderRadius.circular(20)),
             clipBehavior: Clip.antiAlias,
             child: RbRow(
-              icon: LucideIcons.trash2,
+              icon: RbGlyph.trash,
               destructive: true,
               title: 'Delete my account',
               subtitle: 'Permanent. Your profile, listing, photos and messages are removed.',
@@ -222,12 +230,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   void _open(Widget screen) => Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
 
-  Widget _privacyLine(IconData icon, String title, String body) => Padding(
+  Widget _privacyLine(RbGlyph icon, String title, String body) => Padding(
         padding: const EdgeInsets.only(bottom: 12),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Padding(padding: const EdgeInsets.only(top: 1), child: Icon(icon, size: 17, color: AppColors.brandRed)),
+            Padding(padding: const EdgeInsets.only(top: 1), child: RbIcon(icon, size: 17, color: AppColors.brandRed)),
             const SizedBox(width: 12),
             Expanded(
               child: Column(

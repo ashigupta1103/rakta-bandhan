@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../theme/app_colors.dart';
 import 'brand_glyph.dart';
+import 'rb_icon.dart';
 
 /// Shared icon + message (+ optional action) card for empty/error/permission
 /// states — the prototype repeats this exact shape across map, notifications,
 /// requests, and the offline Welcome screen.
 class StateCard extends StatelessWidget {
-  final IconData icon;
+  final RbGlyph icon;
   final Color iconBackground;
   final Color iconColor;
   final String title;
@@ -26,7 +26,7 @@ class StateCard extends StatelessWidget {
     this.onAction,
   });
 
-  factory StateCard.empty({required String title, IconData icon = LucideIcons.checkCircle}) => StateCard(
+  factory StateCard.empty({required String title, RbGlyph icon = RbGlyph.checkCircle}) => StateCard(
         icon: icon,
         title: title,
         iconBackground: AppColors.statusAvailableBg,
@@ -34,7 +34,7 @@ class StateCard extends StatelessWidget {
       );
 
   factory StateCard.error({required String title, String? message, VoidCallback? onRetry}) => StateCard(
-        icon: LucideIcons.wifiOff,
+        icon: RbGlyph.offline,
         title: title,
         message: message,
         iconBackground: AppColors.primaryLightTint,
@@ -50,7 +50,7 @@ class StateCard extends StatelessWidget {
     required VoidCallback onAction,
   }) =>
       StateCard(
-        icon: LucideIcons.mapPin,
+        icon: RbGlyph.pin,
         title: title,
         message: message,
         iconBackground: AppColors.primaryLightTint,

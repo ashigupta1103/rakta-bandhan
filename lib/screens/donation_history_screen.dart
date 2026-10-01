@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../demo/demo.dart';
 import '../services/backend.dart';
 import '../services/donation_history_service.dart';
 import '../theme/app_colors.dart';
@@ -7,6 +7,7 @@ import '../theme/app_text_styles.dart';
 import '../widgets/blood_group_droplet.dart';
 import '../widgets/state_card.dart';
 import 'certificate_screen.dart';
+import '../widgets/rb_icon.dart';
 
 /// Donation history — rebuilt per Visual Richness Proposal #09: "a real
 /// vertical timeline replaces the date column... the impact trail at the
@@ -24,7 +25,8 @@ class DonationHistoryScreen extends StatefulWidget {
 
 class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
   final DonationHistoryService _service = FirestoreDonationHistoryService();
-  late final Future<(int, List<DonationRecord>)> _future;
+  // Not final: "Try again" replaces it.
+  late Future<(int, List<DonationRecord>)> _future;
 
   @override
   void initState() {
@@ -33,6 +35,10 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
   }
 
   Future<(int, List<DonationRecord>)> _load() async {
+    if (Demo.on) {
+      final records = Demo.instance.donationRecords;
+      return (records.length, records);
+    }
     final count = await Backend.instance.myDonationCount();
     final history = await _service.fetchHistory();
     return (count, history);
@@ -58,7 +64,7 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
               child: Row(
                 children: [
                   IconButton(
-                    icon: const Icon(LucideIcons.arrowLeft, color: AppColors.textPrimaryWarm),
+                    icon: const RbIcon(RbGlyph.back, color: AppColors.textPrimaryWarm),
                     onPressed: () => Navigator.pop(context),
                   ),
                   const Text('Donation history', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
@@ -124,7 +130,7 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
                       ),
                       Expanded(
                         child: history.isEmpty
-                            ? Center(child: StateCard.empty(icon: LucideIcons.history, title: 'No donations recorded yet.'))
+                            ? Center(child: StateCard.empty(icon: RbGlyph.history, title: 'No donations recorded yet.'))
                             : SingleChildScrollView(
                                 padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
                                 child: Column(
@@ -189,7 +195,7 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(LucideIcons.award, size: 13, color: AppColors.primary),
+                        RbIcon(RbGlyph.certificate, size: 13, color: AppColors.primary),
                         SizedBox(width: 5),
                         Text('View certificate', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primary)),
                       ],

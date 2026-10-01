@@ -1,13 +1,15 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../demo/demo.dart';
 import '../services/backend.dart';
 import '../theme/app_colors.dart';
 import '../widgets/blood_group_droplet.dart';
 import '../widgets/place_link.dart';
 import '../widgets/loading_button.dart';
 import 'accept_result_screen.dart';
+import 'match_contact_screen.dart';
+import '../widgets/rb_icon.dart';
 
 String _timeAgo(DateTime time) {
   final diff = DateTime.now().difference(time);
@@ -33,10 +35,12 @@ class RequestDetailScreen extends StatefulWidget {
 class _RequestDetailScreenState extends State<RequestDetailScreen> {
   Position? _position;
   bool _isAccepting = false;
+  Stream<Map<String, dynamic>?> get _doc => Demo.requestDoc(widget.requestId);
 
   @override
   void initState() {
     super.initState();
+    if (Demo.isDemoId(widget.requestId)) return;
     // Distance only when we truly know where the donor is.
     Backend.instance.preciseLocation().then((p) {
       if (mounted) setState(() => _position = p);
@@ -55,6 +59,11 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
   }
 
   Future<void> _handleAccept() async {
+    if (Demo.isDemoId(widget.requestId)) {
+      Demo.instance.match();
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => MatchContactScreen(requestId: widget.requestId)));
+      return;
+    }
     setState(() => _isAccepting = true);
     final activeMatchId = await _findExistingActiveMatch();
     if (activeMatchId != null) {
@@ -101,24 +110,27 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(LucideIcons.arrowLeft, color: AppColors.textPrimaryWarm),
+          icon: const RbIcon(RbGlyph.back, color: AppColors.textPrimaryWarm),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text('Request details', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
         centerTitle: true,
       ),
       body: SafeArea(
-        child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-          stream: FirebaseFirestore.instance.collection('requests').doc(widget.requestId).snapshots(),
+        child: StreamBuilder<Map<String, dynamic>?>(
+          stream: _doc,
           builder: (context, snapshot) {
-            if (!snapshot.hasData) {
+            if (snapshot.hasError) {
+              return const Center(child: Text('Couldn’t load this request. Check your connection and try again.', textAlign: TextAlign.center, style: TextStyle(color: AppColors.textSecondary)));
+            }
+            if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator(strokeWidth: 2));
             }
-            final data = snapshot.data!.data();
+            final data = snapshot.data;
             if (data == null) {
               return const Center(child: Text('Request not found.', style: TextStyle(color: AppColors.textSecondary)));
             }
-            Backend.instance.expireIfStale(widget.requestId, data);
+            if (!Demo.isDemoId(widget.requestId)) Backend.instance.expireIfStale(widget.requestId, data);
             final status = data['status'] as String? ?? 'open';
             final bloodGroup = data['blood_group'] as String? ?? '';
             final urgency = data['urgency'] as String? ?? 'normal';
@@ -127,7 +139,9 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
             final createdAt = (data['created_at'] as Timestamp?)?.toDate();
             final lat = (data['lat'] as num?)?.toDouble();
             final lng = (data['lng'] as num?)?.toDouble();
-            final distance = (_position != null && lat != null && lng != null)
+            final distance = Demo.isDemoId(widget.requestId)
+                ? '${Demo.donorDistanceKm} km away'
+                : (_position != null && lat != null && lng != null)
                 ? '${distanceKm(_position!.latitude, _position!.longitude, lat, lng).toStringAsFixed(1)} km away'
                 : '—';
 
@@ -193,9 +207,9 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
                               spacing: 14,
                               runSpacing: 6,
                               children: [
-                                _metaChip(LucideIcons.mapPin, distance),
-                                _metaChip(LucideIcons.hourglass, '$units ${units == 1 ? 'unit' : 'units'}'),
-                                _metaChip(LucideIcons.clock, createdAt == null ? '—' : _timeAgo(createdAt)),
+                                _metaChip(RbGlyph.pin, distance),
+                                _metaChip(RbGlyph.hourglass, '$units ${units == 1 ? 'unit' : 'units'}'),
+                                _metaChip(RbGlyph.clock, createdAt == null ? '—' : _timeAgo(createdAt)),
                               ],
                             ),
                           ],
@@ -209,7 +223,7 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Icon(LucideIcons.alertTriangle, size: 16, color: AppColors.warmAmberText),
+                              const RbIcon(RbGlyph.alert, size: 16, color: AppColors.warmAmberText),
                               const SizedBox(width: 9),
                               const Expanded(
                                 child: Text(
@@ -238,11 +252,11 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
     );
   }
 
-  Widget _metaChip(IconData icon, String text) {
+  Widget _metaChip(RbGlyph icon, String text) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 13, color: AppColors.textSecondary),
+        RbIcon(icon, size: 13, color: AppColors.textSecondary),
         const SizedBox(width: 5),
         Text(text, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
       ],

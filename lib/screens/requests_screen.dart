@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../demo/demo.dart';
 import '../services/backend.dart';
 import '../services/maps_link.dart';
 import '../theme/app_colors.dart';
@@ -19,6 +19,7 @@ import 'match_contact_screen.dart';
 import 'notifications_screen.dart';
 import 'request_detail_screen.dart';
 import 'tracking_screen.dart';
+import '../widgets/rb_icon.dart';
 
 /// Request tab. "Near you": compatible open requests around the donor's
 /// registered area, most urgent first, plus any request this donor has
@@ -34,6 +35,9 @@ class RequestsScreen extends StatefulWidget {
 
 enum _Tab { nearby, yours }
 
+/// A request id and its fields — from Firestore, or from the client demo.
+typedef _Doc = ({String id, Map<String, dynamic> data});
+
 class _RequestsScreenState extends State<RequestsScreen> {
   _Tab _tab = _Tab.nearby;
   String? _myBloodGroup;
@@ -43,25 +47,55 @@ class _RequestsScreenState extends State<RequestsScreen> {
   // Created once, so a rebuild doesn't tear down and re-bill the listeners;
   // recreated by [_resubscribe] because a Firestore stream is finished
   // after an error (a bare setState would retry against a dead stream).
-  Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>>? _nearbyOpen;
-  Stream<QuerySnapshot<Map<String, dynamic>>> _mine = Backend.instance.myRequestsStream();
-  Stream<QuerySnapshot<Map<String, dynamic>>> _accepted = _acceptedStream();
+  Stream<List<_Doc>>? _nearbyOpen;
+  late Stream<List<_Doc>> _mine = _mineStream();
+  late Stream<List<_Doc>> _accepted = _acceptedStream();
 
-  static Stream<QuerySnapshot<Map<String, dynamic>>> _acceptedStream() => FirebaseFirestore.instance
-      .collection('requests')
-      .where('matched_donor_id', isEqualTo: Backend.instance.currentUser?.uid)
-      .where('status', isEqualTo: 'matched')
-      .snapshots();
+  static List<_Doc> _docs(Iterable<QueryDocumentSnapshot<Map<String, dynamic>>> docs) => [for (final d in docs) (id: d.id, data: d.data())];
+
+  // Client demo: the one simulated request, shown to whichever side the
+  // demo user is on — never mixed with real requests.
+  static List<_Doc> _demoWhere(bool Function(Map<String, dynamic> r) test) {
+    final r = Demo.instance.request;
+    return r != null && test(r) ? [(id: Demo.requestId, data: r)] : const [];
+  }
+
+  static Stream<List<_Doc>> _mineStream() => Demo.on
+      ? Demo.instance.watch(() => Demo.instance.role == DemoRole.requester ? _demoWhere((_) => true) : const <_Doc>[])
+      : Backend.instance.myRequestsStream().map((q) => _docs(q.docs));
+
+  static Stream<List<_Doc>> _acceptedStream() => Demo.on
+      ? Demo.instance.watch(() => Demo.instance.role == DemoRole.donor ? _demoWhere((r) => r['status'] == 'matched') : const <_Doc>[])
+      : FirebaseFirestore.instance
+          .collection('requests')
+          .where('matched_donor_id', isEqualTo: Backend.instance.currentUser?.uid)
+          .where('status', isEqualTo: 'matched')
+          .snapshots()
+          .map((q) => _docs(q.docs));
+
+  static Stream<List<_Doc>> _nearStream(double lat, double lng) => Demo.on
+      ? Demo.instance.watch(() => Demo.instance.role == DemoRole.donor ? _demoWhere((r) => r['status'] == 'open') : const <_Doc>[])
+      : Backend.instance.openRequestsNearStream(lat, lng).map(_docs);
 
   void _resubscribe() => setState(() {
-        _mine = Backend.instance.myRequestsStream();
+        _mine = _mineStream();
         _accepted = _acceptedStream();
-        if (_myLat != null && _myLng != null) _nearbyOpen = Backend.instance.openRequestsNearStream(_myLat!, _myLng!);
+        if (_myLat != null && _myLng != null) _nearbyOpen = _nearStream(_myLat!, _myLng!);
       });
 
   @override
   void initState() {
     super.initState();
+    if (Demo.on) {
+      // The demo donor lives ~2.4 km from the demo hospital.
+      _profileLoaded = true;
+      _myBloodGroup = Demo.bloodGroup;
+      _myLat = Demo.lat + 0.0216;
+      _myLng = Demo.lng;
+      _nearbyOpen = _nearStream(_myLat!, _myLng!);
+      if (Demo.instance.role == DemoRole.donor) _tab = _Tab.nearby;
+      return;
+    }
     Backend.instance.myDonorDoc().then((snap) {
       if (!mounted) return;
       final data = snap.data();
@@ -72,7 +106,7 @@ class _RequestsScreenState extends State<RequestsScreen> {
         _myBloodGroup = data?['blood_group'] as String?;
         _myLat = lat;
         _myLng = lng;
-        if (lat != null && lng != null) _nearbyOpen = Backend.instance.openRequestsNearStream(lat, lng);
+        if (lat != null && lng != null) _nearbyOpen = _nearStream(lat, lng);
       });
     }).catchError((_) {
       if (mounted) setState(() => _profileLoaded = true);
@@ -128,7 +162,11 @@ class _RequestsScreenState extends State<RequestsScreen> {
     );
     if (!confirmed || !mounted) return;
     try {
-      await Backend.instance.cancelRequest(requestId);
+      if (Demo.isDemoId(requestId)) {
+        Demo.instance.cancel();
+      } else {
+        await Backend.instance.cancelRequest(requestId);
+      }
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not cancel this request. Please try again.')));
@@ -149,12 +187,12 @@ class _RequestsScreenState extends State<RequestsScreen> {
         primaryAction: const MessagesButton(),
         onNotificationTap: () => _open(const NotificationsScreen()),
       ),
-      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      body: StreamBuilder<List<_Doc>>(
         stream: _mine,
         builder: (context, mineSnap) {
           // Cancelled requests are finished business for the requester.
-          final mine = mineSnap.data?.docs.where((d) => d.data()['status'] != 'cancelled').toList();
-          final activeMine = mine?.where((d) => d.data()['status'] == 'open' || d.data()['status'] == 'matched').length ?? 0;
+          final mine = mineSnap.data?.where((d) => d.data['status'] != 'cancelled').toList();
+          final activeMine = mine?.where((d) => d.data['status'] == 'open' || d.data['status'] == 'matched').length ?? 0;
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -186,47 +224,47 @@ class _RequestsScreenState extends State<RequestsScreen> {
     final compatible = _myBloodGroup == null ? const <String>[] : Backend.instance.compatibleRecipientGroups(_myBloodGroup!);
     final myUid = Backend.instance.currentUser?.uid;
 
-    return StreamBuilder<List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
+    return StreamBuilder<List<_Doc>>(
       stream: _nearbyOpen ?? Stream.value(const []),
       builder: (context, openSnap) {
-        return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        return StreamBuilder<List<_Doc>>(
           stream: _accepted,
           builder: (context, acceptedSnap) {
             if (openSnap.hasError || acceptedSnap.hasError) return _error(_resubscribe);
             if (!openSnap.hasData || !acceptedSnap.hasData) return const Center(child: CircularProgressIndicator(strokeWidth: 2));
-            final open = openSnap.data!.where((d) => d.data()['requester_uid'] != myUid && compatible.contains(d.data()['blood_group'])).toList();
+            final open = openSnap.data!.where((d) => d.data['requester_uid'] != myUid && compatible.contains(d.data['blood_group'])).toList();
             for (final d in open) {
               // Lazy stand-in for expiry — a no-op unless genuinely past due.
-              Backend.instance.expireIfStale(d.id, d.data());
+              if (!Demo.on) Backend.instance.expireIfStale(d.id, d.data);
             }
             open.sort((a, b) {
-              final ua = _urgencyRank[a.data()['urgency']] ?? 2;
-              final ub = _urgencyRank[b.data()['urgency']] ?? 2;
+              final ua = _urgencyRank[a.data['urgency']] ?? 2;
+              final ub = _urgencyRank[b.data['urgency']] ?? 2;
               if (ua != ub) return ua.compareTo(ub);
-              return (_distanceTo(a.data()) ?? double.infinity).compareTo(_distanceTo(b.data()) ?? double.infinity);
+              return (_distanceTo(a.data) ?? double.infinity).compareTo(_distanceTo(b.data) ?? double.infinity);
             });
-            final accepted = acceptedSnap.data!.docs;
+            final accepted = acceptedSnap.data!;
 
             return ListView(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
               children: [
                 if (accepted.isNotEmpty) ...[
                   _sectionLabel('You’ve accepted'),
-                  for (final doc in accepted) ...[_acceptedCard(doc.id, doc.data()), const SizedBox(height: 12)],
+                  for (final doc in accepted) ...[_acceptedCard(doc.id, doc.data), const SizedBox(height: 12)],
                   const SizedBox(height: 8),
                 ],
                 if (open.isEmpty && accepted.isEmpty)
                   const Padding(
                     padding: EdgeInsets.only(bottom: 16),
                     child: RbStatePanel(
-                      icon: LucideIcons.inbox,
+                      icon: RbGlyph.inbox,
                       tone: GlyphTone.success,
                       title: 'No requests near you right now',
                       message: 'When someone nearby needs your blood group, their request appears here and you’ll get a notification.',
                     ),
                   ),
                 if (open.isNotEmpty) _sectionLabel('${open.length} ${open.length == 1 ? 'request' : 'requests'} you can help with'),
-                for (final doc in open) ...[_nearbyCard(doc.id, doc.data()), const SizedBox(height: 12)],
+                for (final doc in open) ...[_nearbyCard(doc.id, doc.data), const SizedBox(height: 12)],
                 const SizedBox(height: 8),
                 _createRequestCta(),
               ],
@@ -268,7 +306,7 @@ class _RequestsScreenState extends State<RequestsScreen> {
           Expanded(
             child: ElevatedButton.icon(
               onPressed: () => _open(MatchContactScreen(requestId: id)),
-              icon: const Icon(LucideIcons.phone, size: 16),
+              icon: const RbIcon(RbGlyph.phone, size: 16),
               label: const Text('Contact & confirm'),
             ),
           ),
@@ -276,7 +314,7 @@ class _RequestsScreenState extends State<RequestsScreen> {
           Expanded(
             child: OutlinedButton.icon(
               onPressed: () => _open(ChatScreen(requestId: id)),
-              icon: const Icon(LucideIcons.messageSquare, size: 15),
+              icon: const RbIcon(RbGlyph.message, size: 15),
               label: const Text('Message'),
             ),
           ),
@@ -287,10 +325,10 @@ class _RequestsScreenState extends State<RequestsScreen> {
 
   // ------------------------------------------------------------- Yours
 
-  Widget _yoursList(List<QueryDocumentSnapshot<Map<String, dynamic>>>? docs) {
+  Widget _yoursList(List<_Doc>? docs) {
     if (docs == null) return const Center(child: CircularProgressIndicator(strokeWidth: 2));
     for (final d in docs) {
-      Backend.instance.expireIfStale(d.id, d.data());
+      if (!Demo.on) Backend.instance.expireIfStale(d.id, d.data);
     }
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
@@ -299,12 +337,12 @@ class _RequestsScreenState extends State<RequestsScreen> {
         const SizedBox(height: 18),
         if (docs.isEmpty)
           const RbStatePanel(
-            icon: LucideIcons.clipboardList,
+            icon: RbGlyph.clipboard,
             title: 'No requests yet',
             message: 'Requests you raise appear here, with their status and who accepted them.',
           )
         else
-          for (final doc in docs) ...[_yoursCard(doc.id, doc.data()), const SizedBox(height: 12)],
+          for (final doc in docs) ...[_yoursCard(doc.id, doc.data), const SizedBox(height: 12)],
       ],
     );
   }
@@ -336,7 +374,7 @@ class _RequestsScreenState extends State<RequestsScreen> {
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: () => _open(TrackingScreen(requestId: id)),
-                    icon: const Icon(LucideIcons.route, size: 16),
+                    icon: const RbIcon(RbGlyph.route, size: 16),
                     label: const Text('Track request'),
                   ),
                 ),
@@ -350,7 +388,7 @@ class _RequestsScreenState extends State<RequestsScreen> {
                         )
                       : OutlinedButton.icon(
                           onPressed: () => _open(ChatScreen(requestId: id)),
-                          icon: const Icon(LucideIcons.messageSquare, size: 15),
+                          icon: const RbIcon(RbGlyph.message, size: 15),
                           label: const Text('Message'),
                         ),
                 ),
@@ -443,7 +481,7 @@ class _RequestsScreenState extends State<RequestsScreen> {
                                   if (hasPoint)
                                     const Padding(
                                       padding: EdgeInsets.only(left: 8, top: 3),
-                                      child: Icon(LucideIcons.mapPinned, size: 17, color: AppColors.brandRed),
+                                      child: RbIcon(RbGlyph.pin, size: 17, color: AppColors.brandRed),
                                     ),
                                 ],
                               ),
@@ -515,7 +553,7 @@ class _RequestsScreenState extends State<RequestsScreen> {
                 height: 40,
                 decoration: const BoxDecoration(color: AppColors.red100, shape: BoxShape.circle),
                 alignment: Alignment.center,
-                child: const Icon(LucideIcons.plus, size: 18, color: AppColors.brandRed),
+                child: const RbIcon(RbGlyph.plus, size: 18, color: AppColors.brandRed),
               ),
               const SizedBox(width: 13),
               Expanded(
@@ -528,7 +566,7 @@ class _RequestsScreenState extends State<RequestsScreen> {
                   ],
                 ),
               ),
-              const Icon(LucideIcons.chevronRight, size: 18, color: AppColors.chevronMuted),
+              const RbIcon(RbGlyph.chevron, size: 18, color: AppColors.chevronMuted),
             ],
           ),
         ),

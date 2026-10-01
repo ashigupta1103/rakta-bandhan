@@ -1,28 +1,35 @@
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../demo/demo.dart';
 import '../services/donor_match_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
-import '../widgets/blood_group_droplet.dart';
 import '../widgets/contact_actions.dart';
-import '../widgets/two_person_connection.dart';
+import '../widgets/match_pair.dart';
+import '../widgets/rb_icon.dart';
+import 'donor_details_screen.dart';
+import 'tracking_screen.dart';
 
-/// Terminal screen of the matching ladder's "donor found" outcome — the
-/// "Matched" emotional peak per Product Art Direction: two avatars joined
-/// by a hairline on a dark ember field, the committed ring group at 0.90x
-/// recentred on the connection itself, both discs seated on the middle
-/// ring's own radius. The donor identity comes from
-/// FirestoreDonorMatchService, reading the real match written by
-/// Backend.acceptRequest (see donor_match_service.dart).
+/// "A donor accepted your request" — the requester's matched moment on the
+/// ember field. The donor identity comes from FirestoreDonorMatchService,
+/// reading the real match written by Backend.acceptRequest (see
+/// donor_match_service.dart); in a client demo, from the demo persona.
 class DonorFoundScreen extends StatelessWidget {
   final String requestId;
-  final DonorMatchService _service = FirestoreDonorMatchService();
 
-  DonorFoundScreen({super.key, required this.requestId});
+  const DonorFoundScreen({super.key, required this.requestId});
 
-  void _goHome(BuildContext context) {
-    Navigator.of(context).popUntil((route) => route.isFirst);
-  }
+  Future<DonorMatch> _fetch() => Demo.isDemoId(requestId)
+      ? Future.value(const DonorMatch(
+          name: Demo.donorName,
+          initials: 'AM',
+          bloodGroup: Demo.bloodGroup,
+          distance: '${Demo.donorDistanceKm} km away',
+          uid: Demo.donorUid,
+          isVerified: true,
+        ))
+      : FirestoreDonorMatchService().fetchMatch(requestId);
+
+  void _goHome(BuildContext context) => Navigator.of(context).popUntil((route) => route.isFirst);
 
   @override
   Widget build(BuildContext context) {
@@ -39,62 +46,76 @@ class DonorFoundScreen extends StatelessWidget {
         ),
         child: SafeArea(
           child: FutureBuilder<DonorMatch>(
-            future: _service.fetchMatch(requestId),
+            future: _fetch(),
             builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                return _note(context, 'Couldn’t load your donor’s details. Your request is still matched — open it from the Requests tab.');
+              }
               if (!snapshot.hasData) {
-                return const Center(child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white));
+                return const Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.onEmberAccent));
               }
               final donor = snapshot.data!;
-              return Column(
+              final first = donor.name.split(' ').first;
+              return ListView(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
                 children: [
-                  SizedBox(
-                    height: 48,
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: IconButton(
-                        icon: const Icon(LucideIcons.arrowLeft, color: Colors.white),
-                        onPressed: () => _goHome(context),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: IconButton(tooltip: 'Home', icon: const RbIcon(RbGlyph.back, color: AppColors.onEmberStrong), onPressed: () => _goHome(context)),
+                  ),
+                  const SizedBox(height: 8),
+                  Center(child: MatchPair(peerName: donor.name, bloodGroup: donor.bloodGroup)),
+                  const SizedBox(height: 22),
+                  const Text('Donor found', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.onEmberEyebrow)),
+                  const SizedBox(height: 8),
+                  Text('$first accepted\nyour request', textAlign: TextAlign.center, style: AppTextStyles.display(fontSize: 28, color: AppColors.onEmberStrong, height: 1.2)),
+                  const SizedBox(height: 10),
+                  Text(
+                    [donor.bloodGroup, donor.distance, if (donor.isVerified) 'verified donor'].where((p) => p.isNotEmpty).join(' · '),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 14, color: AppColors.onEmberMuted, height: 1.5),
+                  ),
+                  const SizedBox(height: 6),
+                  Center(
+                    child: TextButton.icon(
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => DonorDetailsScreen(
+                            donorId: donor.uid,
+                            name: donor.name,
+                            initials: donor.initials,
+                            bloodGroup: donor.bloodGroup,
+                            isVerified: donor.isVerified,
+                            distanceKm: Demo.isDemoId(requestId) ? Demo.donorDistanceKm : null,
+                            isAvailable: true,
+                            matched: true,
+                            donationCount: Demo.isDemoId(requestId) ? Demo.donorPriorDonations : null,
+                          ),
+                        ),
                       ),
+                      icon: const RbIcon(RbGlyph.person, size: 16, color: AppColors.onEmber),
+                      label: Text('View $first’s profile', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.onEmber)),
                     ),
                   ),
-                  Expanded(child: TwoPersonConnection(leftLabel: 'You', rightInitials: donor.initials)),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 28),
-                    child: Column(
-                      children: [
-                        const Text("You're connected", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.onEmberEyebrow)),
-                        const SizedBox(height: 12),
-                        Text(
-                          '${donor.name.split(' ').first} is ready\nto help you',
-                          textAlign: TextAlign.center,
-                          style: AppTextStyles.display(fontSize: 28, color: AppColors.onEmberStrong, height: 1.2),
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          '${[donor.bloodGroup, donor.distance, if (donor.isVerified) 'verified donor'].where((p) => p.isNotEmpty).join(' · ')}. Reach out and agree a time.',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(fontSize: 13.5, color: AppColors.onEmberMuted, height: 1.6),
-                        ),
-                        const SizedBox(height: 20),
-                        BloodGroupDroplet(label: donor.bloodGroup, size: 34, filled: true, color: AppColors.primary, textColor: AppColors.onEmber, fontSize: 12),
-                      ],
-                    ),
+                  const SizedBox(height: 18),
+                  ContactActions(requestId: requestId, peerUid: donor.uid, peerName: donor.name),
+                  const SizedBox(height: 10),
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(foregroundColor: AppColors.onEmber, side: const BorderSide(color: AppColors.onEmberOutline), minimumSize: const Size.fromHeight(46)),
+                    onPressed: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => TrackingScreen(requestId: requestId))),
+                    icon: const RbIcon(RbGlyph.route, size: 16),
+                    label: const Text('Track request'),
                   ),
-                  const SizedBox(height: 24),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(28, 0, 28, 16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        ContactActions(requestId: requestId, peerUid: donor.uid, peerName: donor.name),
-                        const SizedBox(height: 6),
-                        const Text('They mark it as donated afterwards.', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: AppColors.onEmberFaint)),
-                        TextButton(
-                          onPressed: () => _goHome(context),
-                          child: const Text('Back to home', style: TextStyle(fontSize: 13, color: AppColors.onEmberMuted)),
-                        ),
-                      ],
-                    ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'Your phone number stays private. After the donation, you both confirm it in the app.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 12.5, color: AppColors.onEmberFaint, height: 1.45),
+                  ),
+                  TextButton(
+                    onPressed: () => _goHome(context),
+                    child: const Text('Go home', style: TextStyle(fontSize: 13.5, color: AppColors.onEmberMuted)),
                   ),
                 ],
               );
@@ -104,4 +125,18 @@ class DonorFoundScreen extends StatelessWidget {
       ),
     );
   }
+
+  Widget _note(BuildContext context, String text) => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(text, textAlign: TextAlign.center, style: const TextStyle(fontSize: 14, color: AppColors.onEmberMuted, height: 1.5)),
+              const SizedBox(height: 14),
+              TextButton(onPressed: () => _goHome(context), child: const Text('Go home', style: TextStyle(color: AppColors.onEmber))),
+            ],
+          ),
+        ),
+      );
 }

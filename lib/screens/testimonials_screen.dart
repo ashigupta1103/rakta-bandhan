@@ -1,12 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
-import '../preview_mode.dart';
+import '../demo/demo.dart';
 import '../services/backend.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/state_card.dart';
+import '../widgets/rb_icon.dart';
 
 /// Testimonials — curated and verified by Rakta Bandhan, distinct from the
 /// anonymous-handle Community stories feed. Real quotes are published by an
@@ -32,7 +32,7 @@ class TestimonialsScreen extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: Row(
                   children: [
-                    IconButton(icon: const Icon(LucideIcons.arrowLeft, color: AppColors.textPrimaryWarm), onPressed: () => Navigator.pop(context)),
+                    IconButton(icon: const RbIcon(RbGlyph.back, color: AppColors.textPrimaryWarm), onPressed: () => Navigator.pop(context)),
                     const SizedBox(width: 4),
                     const Text('Testimonials', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
                   ],
@@ -48,15 +48,20 @@ class TestimonialsScreen extends StatelessWidget {
                     Text('Stories we\'ve been given permission to tell', style: AppTextStyles.display(fontSize: 25, color: AppColors.ink, height: 1.25)),
                     const SizedBox(height: 8),
                     const Text('Curated and verified by Rakta Bandhan. Member stories live in Community.', style: TextStyle(fontSize: 13, color: AppColors.ink2)),
-                    if (Firebase.apps.isNotEmpty) ...[
-                      const SizedBox(height: 12),
+                    if (Firebase.apps.isNotEmpty || Demo.on) ...[
+                      const SizedBox(height: 14),
                       const _ShareTestimonialButton(),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'For people who have donated or received blood through Rakta Bandhan. Our team reviews every testimonial before it appears.',
+                        style: TextStyle(fontSize: 12.5, color: AppColors.ink2, height: 1.4),
+                      ),
                     ],
                     const SizedBox(height: 20),
                     // No Firebase app (widget tests, or an init failure) means
                     // no stream to build — fall back rather than throw on
                     // FirebaseFirestore.instance.
-                    if (Firebase.apps.isEmpty)
+                    if (Firebase.apps.isEmpty || Demo.on)
                       _fallbackContent()
                     else
                       StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
@@ -95,7 +100,7 @@ class TestimonialsScreen extends StatelessWidget {
     return [
       Row(
         children: [
-          const Icon(LucideIcons.eye, size: 13, color: AppColors.goldDeep),
+          const RbIcon(RbGlyph.eye, size: 13, color: AppColors.goldDeep),
           const SizedBox(width: 6),
           const Text('Preview data — sample layout, not real testimonials', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: AppColors.goldDeep)),
         ],
@@ -106,7 +111,7 @@ class TestimonialsScreen extends StatelessWidget {
         name: 'Demo Recipient 02',
         subtitle: 'Requester · sample content',
         timeAgo: '2 weeks ago · sample',
-        avatarIcon: LucideIcons.heartHandshake,
+        avatarIcon: RbGlyph.community,
       ),
       const SizedBox(height: 12),
       _quoteCard(
@@ -114,7 +119,7 @@ class TestimonialsScreen extends StatelessWidget {
         name: 'Demo Donor 01',
         subtitle: 'Donor · sample content',
         timeAgo: '1 month ago · sample',
-        avatarIcon: LucideIcons.droplet,
+        avatarIcon: RbGlyph.droplet,
       ),
       const SizedBox(height: 12),
       _quoteCard(
@@ -122,7 +127,7 @@ class TestimonialsScreen extends StatelessWidget {
         name: 'Demo Requester 03',
         subtitle: 'Hospital coordinator · sample content',
         timeAgo: '3 weeks ago · sample',
-        avatarIcon: LucideIcons.building2,
+        avatarIcon: RbGlyph.building,
       ),
       const SizedBox(height: 10),
       const Text(
@@ -135,7 +140,8 @@ class TestimonialsScreen extends StatelessWidget {
   /// Shown when nothing is published yet (or there is no backend to ask).
   Widget _fallbackContent() => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: kEnablePreviewUi ? _previewContent() : [_productionEmptyState()],
+        // Sample testimonials exist only inside a client demo session.
+        children: Demo.on ? _previewContent() : [_productionEmptyState()],
       );
 
   Widget _publishedCard(Map<String, dynamic> data) {
@@ -145,7 +151,7 @@ class TestimonialsScreen extends StatelessWidget {
       name: data['name'] as String? ?? '',
       subtitle: (data['role'] as String?)?.trim().isNotEmpty == true ? data['role'] as String : 'Rakta Bandhan community',
       timeAgo: created == null ? '' : _timeAgo(created),
-      avatarIcon: LucideIcons.quote,
+      avatarIcon: RbGlyph.quote,
     );
   }
 
@@ -162,12 +168,12 @@ class TestimonialsScreen extends StatelessWidget {
       padding: const EdgeInsets.only(top: 20),
       child: StateCard.empty(
         title: 'Approved testimonials will appear here',
-        icon: LucideIcons.quote,
+        icon: RbGlyph.quote,
       ),
     );
   }
 
-  Widget _quoteCard({required String quote, required String name, required String subtitle, required String timeAgo, required IconData avatarIcon}) {
+  Widget _quoteCard({required String quote, required String name, required String subtitle, required String timeAgo, required RbGlyph avatarIcon}) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
@@ -179,7 +185,7 @@ class TestimonialsScreen extends StatelessWidget {
           const SizedBox(height: 14),
           Row(
             children: [
-              Container(width: 34, height: 34, decoration: const BoxDecoration(color: AppColors.goldTint, shape: BoxShape.circle), alignment: Alignment.center, child: Icon(avatarIcon, size: 15, color: AppColors.goldDeep)),
+              Container(width: 34, height: 34, decoration: const BoxDecoration(color: AppColors.goldTint, shape: BoxShape.circle), alignment: Alignment.center, child: RbIcon(avatarIcon, size: 15, color: AppColors.goldDeep)),
               const SizedBox(width: 11),
               Expanded(
                 child: Column(
@@ -207,7 +213,7 @@ class _ShareTestimonialButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return OutlinedButton.icon(
+    return ElevatedButton.icon(
       onPressed: () => showModalBottomSheet<void>(
         context: context,
         isScrollControlled: true,
@@ -215,8 +221,8 @@ class _ShareTestimonialButton extends StatelessWidget {
         shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
         builder: (_) => const _TestimonialSheet(),
       ),
-      icon: const Icon(LucideIcons.quote, size: 15),
-      label: const Text('Share your testimonial'),
+      icon: const RbIcon(RbGlyph.quote, size: 15),
+      label: const Text('Add a testimonial'),
     );
   }
 }
@@ -244,6 +250,11 @@ class _TestimonialSheetState extends State<_TestimonialSheet> {
   Future<void> _send() async {
     final navigator = Navigator.of(context);
     final messenger = ScaffoldMessenger.of(context);
+    if (Demo.on) {
+      navigator.pop();
+      messenger.showSnackBar(const SnackBar(content: Text('Demo · nothing was sent. In the app, our team reviews it before it appears.')));
+      return;
+    }
     setState(() => _sending = true);
     try {
       await Backend.instance.submitTestimonial(quote: _quote.text, role: _role.text);
@@ -282,6 +293,19 @@ class _TestimonialSheetState extends State<_TestimonialSheet> {
             controller: _role,
             maxLength: 60,
             decoration: const InputDecoration(hintText: 'Who you are, e.g. “Donor, Adyar” or “Patient’s son”'),
+          ),
+          // Testimonials are text-only today: there is no photo storage for
+          // them, so the area says so instead of pretending to upload.
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(color: AppColors.sand, borderRadius: BorderRadius.circular(12)),
+            child: const Row(
+              children: [
+                RbIcon(RbGlyph.photoOff, size: 18, color: AppColors.ink2),
+                SizedBox(width: 10),
+                Expanded(child: Text('Photos can’t be added to testimonials yet. Our team may ask you for one when we review it.', style: TextStyle(fontSize: 12.5, color: AppColors.ink2, height: 1.4))),
+              ],
+            ),
           ),
           CheckboxListTile(
             contentPadding: EdgeInsets.zero,

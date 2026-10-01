@@ -1,6 +1,5 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../demo/demo.dart';
 import '../services/backend.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
@@ -8,9 +7,10 @@ import '../widgets/blood_group_droplet.dart';
 import '../widgets/confirm_sheet.dart';
 import '../widgets/contact_actions.dart';
 import '../widgets/place_link.dart';
-import '../widgets/two_person_connection.dart';
+import '../widgets/match_pair.dart';
 import 'chat_screen.dart';
 import 'donation_confirm_screen.dart';
+import '../widgets/rb_icon.dart';
 
 /// Shows the requester's contact info for a request this donor accepted.
 /// `createRequest()` denormalizes `requester_name`/`requester_phone` onto
@@ -29,6 +29,8 @@ class MatchContactScreen extends StatefulWidget {
 
 class _MatchContactScreenState extends State<MatchContactScreen> {
   bool _markingDonated = false;
+  String? _lastStatus;
+  Stream<Map<String, dynamic>?> get _doc => Demo.requestDoc(widget.requestId);
   bool _releasing = false;
 
   /// Donor backs out. The request reopens for other donors instead of
@@ -44,7 +46,11 @@ class _MatchContactScreenState extends State<MatchContactScreen> {
     if (!confirmed || !mounted) return;
     setState(() => _releasing = true);
     try {
-      await Backend.instance.releaseMatch(widget.requestId);
+      if (Demo.isDemoId(widget.requestId)) {
+        Demo.instance.start(DemoRole.donor);
+      } else {
+        await Backend.instance.releaseMatch(widget.requestId);
+      }
       if (!mounted) return;
       Navigator.of(context).popUntil((route) => route.isFirst);
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Released. The request is open to other donors again.')));
@@ -66,7 +72,7 @@ class _MatchContactScreenState extends State<MatchContactScreen> {
     if (!confirmed || !mounted) return;
     setState(() => _markingDonated = true);
     try {
-      final completed = await Backend.instance.donorConfirmDonation(widget.requestId);
+      final completed = Demo.isDemoId(widget.requestId) ? Demo.instance.confirmMine() : await Backend.instance.donorConfirmDonation(widget.requestId);
       if (!mounted) return;
       if (completed) {
         Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const DonationConfirmScreen()));
@@ -96,26 +102,34 @@ class _MatchContactScreenState extends State<MatchContactScreen> {
           ),
         ),
         child: SafeArea(
-          child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-            stream: FirebaseFirestore.instance.collection('requests').doc(widget.requestId).snapshots(),
+          child: StreamBuilder<Map<String, dynamic>?>(
+            stream: _doc,
             builder: (context, requestSnap) {
               if (requestSnap.hasError) {
                 return _centerNote('Couldn’t load this request. Check your connection and go back to try again.');
               }
-              if (!requestSnap.hasData) {
+              if (requestSnap.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.onEmberAccent));
               }
-              final request = requestSnap.data!.data();
+              final request = requestSnap.data;
               if (request == null) return _centerNote('This request no longer exists.');
               final bloodGroup = request['blood_group'] as String? ?? '';
               final name = request['requester_name'] as String? ?? 'Requester';
               final first = name.trim().isEmpty ? 'The requester' : name.trim().split(RegExp(r'\s+')).first;
               final requesterUid = request['requester_uid'] as String? ?? '';
               final status = request['status'] as String? ?? 'matched';
-              final isLive = status == 'matched' && request['matched_donor_id'] == Backend.instance.currentUser?.uid;
+              final myUid = Demo.isDemoId(widget.requestId) ? Demo.donorUid : Backend.instance.currentUser?.uid;
+              final isLive = status == 'matched' && request['matched_donor_id'] == myUid;
               final iConfirmed = request['donor_confirmed_at'] != null;
+              // Demo: when the simulated requester completes the donation,
+              // move on to the thank-you screen as the real flow does.
+              if (Demo.isDemoId(widget.requestId) && status == 'fulfilled' && _lastStatus == 'matched' && iConfirmed) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const DonationConfirmScreen()));
+                });
+              }
+              _lastStatus = status;
               final theyConfirmed = request['requester_confirmed_at'] != null;
-              final initials = name.trim().isEmpty ? '?' : initialsOf(name.trim());
               final busy = _markingDonated || _releasing;
 
               return ListView(
@@ -125,11 +139,12 @@ class _MatchContactScreenState extends State<MatchContactScreen> {
                     alignment: Alignment.centerLeft,
                     child: IconButton(
                       tooltip: 'Back',
-                      icon: const Icon(LucideIcons.arrowLeft, color: AppColors.onEmberStrong),
+                      icon: const RbIcon(RbGlyph.back, color: AppColors.onEmberStrong),
                       onPressed: () => Navigator.pop(context),
                     ),
                   ),
-                  SizedBox(height: 170, child: TwoPersonConnection(leftLabel: 'You', rightInitials: initials)),
+                  const SizedBox(height: 4),
+                  Center(child: MatchPair(peerName: name, bloodGroup: bloodGroup)),
                   const SizedBox(height: 8),
                   Text(
                     switch (status) {
@@ -164,7 +179,7 @@ class _MatchContactScreenState extends State<MatchContactScreen> {
                         onPressed: busy ? null : _markDonated,
                         icon: _markingDonated
                             ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.onEmber))
-                            : const Icon(LucideIcons.badgeCheck, size: 16),
+                            : const RbIcon(RbGlyph.verified, size: 16),
                         label: Text(theyConfirmed ? 'Confirm my donation' : 'I’ve donated — confirm'),
                       ),
                     if (!iConfirmed)
@@ -184,7 +199,7 @@ class _MatchContactScreenState extends State<MatchContactScreen> {
                     OutlinedButton.icon(
                       style: OutlinedButton.styleFrom(foregroundColor: AppColors.onEmber, side: const BorderSide(color: AppColors.onEmberOutline)),
                       onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ChatScreen(requestId: widget.requestId))),
-                      icon: const Icon(LucideIcons.messageSquare, size: 15),
+                      icon: const RbIcon(RbGlyph.message, size: 15),
                       label: const Text('View conversation'),
                     ),
                   ],
@@ -253,7 +268,7 @@ class _MatchContactScreenState extends State<MatchContactScreen> {
     Widget step(String label, bool done) => Expanded(
           child: Row(
             children: [
-              Icon(done ? LucideIcons.circleCheck : LucideIcons.circleDashed, size: 16, color: done ? AppColors.onEmberSuccess : AppColors.onEmberFaint),
+              RbIcon(done ? RbGlyph.checkCircle : RbGlyph.clock, size: 16, color: done ? AppColors.onEmberSuccess : AppColors.onEmberFaint),
               const SizedBox(width: 6),
               Flexible(
                 child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis,

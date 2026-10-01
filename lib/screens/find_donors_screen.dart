@@ -1,12 +1,11 @@
 import 'dart:async';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart' as gm;
 import 'package:latlong2/latlong.dart' hide Path;
-import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../demo/demo.dart';
 import '../services/backend.dart';
 import '../services/nearby_donors.dart';
 import '../theme/app_colors.dart';
@@ -21,8 +20,13 @@ import '../widgets/rb_ui.dart';
 import '../widgets/state_card.dart';
 import 'donor_details_screen.dart';
 import 'location_picker_screen.dart';
+import 'matching_screen.dart';
+import '../widgets/rb_icon.dart';
 
 enum _MapPermissionState { checking, prompt, granted, denied }
+
+/// A donor id and its public listing — from Firestore, or the client demo.
+typedef _Doc = ({String id, Map<String, dynamic> data});
 
 /// Find tab root — a real tiled map with every marker projected from the
 /// donor's own real `lat`/`lng` in `donors_public` (Phase 3, per the final
@@ -73,16 +77,33 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
   NearbyDonors? _nearby;
   String? _nearbyKey;
 
-  Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>> get _donorStream {
+  Stream<List<_Doc>> get _donorStream {
     final p = _position;
     if (p == null) return Stream.value(const []);
+    if (Demo.on) {
+      // Client demo: one simulated donor (shown to the requester persona);
+      // no real donor is queried.
+      return Stream.value(Demo.instance.role == DemoRole.donor
+          ? const []
+          : [
+              (id: Demo.donorUid, data: <String, dynamic>{
+                'name': Demo.donorName,
+                'blood_group': Demo.bloodGroup,
+                'is_verified': true,
+                'is_available': true,
+                'lat': Demo.lat + 0.0216,
+                'lng': Demo.lng,
+                'area': Demo.area,
+              }),
+            ]);
+    }
     final key = '${NearbyDonors.cellOf(p.latitude, p.longitude)}#$_retryToken';
     if (key != _nearbyKey) {
       _nearby?.dispose();
       _nearby = NearbyDonors(p.latitude, p.longitude);
       _nearbyKey = key;
     }
-    return _nearby!.stream;
+    return _nearby!.stream.map((docs) => [for (final d in docs) (id: d.id, data: d.data())]);
   }
 
   static const _bloodGroups = ['All', 'A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
@@ -95,7 +116,13 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
   @override
   void initState() {
     super.initState();
-    _checkPermission();
+    if (Demo.on) {
+      // The demo stands at a fixed demo point instead of GPS.
+      _permissionState = _MapPermissionState.granted;
+      _position = Position(latitude: Demo.lat, longitude: Demo.lng, timestamp: DateTime.now(), accuracy: 1, altitude: 0, altitudeAccuracy: 0, heading: 0, headingAccuracy: 0, speed: 0, speedAccuracy: 0);
+    } else {
+      _checkPermission();
+    }
     _sheetController.addListener(() {
       if (_sheetController.isAttached) setState(() => _sheetExtent = _sheetController.size);
     });
@@ -275,6 +302,11 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
   Future<void> _sendRequestTo(Map<String, dynamic> donor) async {
     final donorId = donor['id'] as String;
     if (_sendingDonorId != null) return; // guards against a double-tap firing two requests
+    if (Demo.on) {
+      Demo.instance.createRequest(group: donor['bloodGroup'] as String, units: 1, urgency: 'urgent', label: Demo.hospital);
+      Navigator.push(context, MaterialPageRoute(builder: (_) => MatchingScreen(requestId: Demo.requestId, bloodGroup: donor['bloodGroup'] as String, urgency: 'urgent')));
+      return;
+    }
     setState(() => _sendingDonorId = donorId);
     final bloodGroup = donor['bloodGroup'] as String;
     try {
@@ -333,7 +365,7 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
       body: Stack(
         children: [
           if (_permissionState == _MapPermissionState.granted && _position != null)
-            StreamBuilder<List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
+            StreamBuilder<List<_Doc>>(
               key: ValueKey(_nearbyKey),
               stream: _donorStream,
               builder: (context, snapshot) {
@@ -413,7 +445,7 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
                   Row(
                     children: [
                       if (widget.showBackButton) ...[
-                        _floatingCircleButton(icon: LucideIcons.arrowLeft, onTap: () => Navigator.pop(context)),
+                        _floatingCircleButton(icon: RbGlyph.back, onTap: () => Navigator.pop(context)),
                         const SizedBox(width: 8),
                       ],
                       Expanded(child: _searchBar()),
@@ -450,7 +482,7 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
           if (_permissionState == _MapPermissionState.denied)
             _MapOverlay(
               child: StateCard(
-                icon: LucideIcons.alertTriangle,
+                icon: RbGlyph.alert,
                 iconBackground: AppColors.warmAmberBg,
                 iconColor: AppColors.warmAmberText,
                 title: 'Location access denied',
@@ -491,7 +523,7 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
         alignment: Alignment.center,
         child: _recentering
             ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary))
-            : const Icon(LucideIcons.locateFixed, size: 20, color: AppColors.primary),
+            : const RbIcon(RbGlyph.locate, size: 20, color: AppColors.primary),
       ),
     );
   }
@@ -526,7 +558,7 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
                 ),
               ),
               Expanded(
-                child: StreamBuilder<List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
+                child: StreamBuilder<List<_Doc>>(
                   key: ValueKey('list$_nearbyKey'),
                   stream: _donorStream,
                   builder: (context, snapshot) {
@@ -573,7 +605,7 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
                         _sheetHeader(donors.length),
                         if (donors.isEmpty)
                           RbStatePanel(
-                            icon: LucideIcons.users,
+                            icon: RbGlyph.community,
                             title: _bloodGroupFilter == 'All' ? 'No available donors here yet' : 'No $_bloodGroupFilter donors nearby',
                             message: 'Only donors who have switched on availability appear, within ${_searchRadiusKm.round()} km. Try another blood group or search a different area.',
                             actionLabel: _bloodGroupFilter == 'All' ? null : 'Show all blood groups',
@@ -617,14 +649,14 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
           ),
           if (count != null && count > 0) ...[
             const SizedBox(width: 10),
-            RbChip('$count', icon: LucideIcons.users, tone: RbTone.success),
+            RbChip('$count', icon: RbGlyph.community, tone: RbTone.success),
           ],
         ],
       ),
     );
   }
 
-  Widget _floatingCircleButton({required IconData icon, required VoidCallback onTap}) {
+  Widget _floatingCircleButton({required RbGlyph icon, required VoidCallback onTap}) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -636,7 +668,7 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
           border: Border.all(color: AppColors.cardBorderWarm),
           boxShadow: [BoxShadow(color: AppColors.shadowCard, blurRadius: 10, offset: const Offset(0, 3))],
         ),
-        child: Icon(icon, size: 18, color: AppColors.textPrimaryWarm),
+        child: RbIcon(icon, size: 18, color: AppColors.textPrimaryWarm),
       ),
     );
   }
@@ -660,11 +692,11 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
               style: const TextStyle(fontSize: 14),
               decoration: InputDecoration(
                 hintText: 'Search location',
-                prefixIcon: const Icon(LucideIcons.search, size: 19, color: AppColors.textSecondary),
+                prefixIcon: const RbIcon(RbGlyph.search, size: 19, color: AppColors.textSecondary),
                 suffixIcon: _searching
                     ? const Padding(padding: EdgeInsets.all(14), child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)))
                     : (_searchedLabel != null
-                        ? IconButton(icon: const Icon(LucideIcons.x, size: 18, color: AppColors.textSecondary), onPressed: _clearSearch)
+                        ? IconButton(icon: const RbIcon(RbGlyph.close, size: 18, color: AppColors.textSecondary), onPressed: _clearSearch)
                         : null),
                 border: InputBorder.none,
                 enabledBorder: InputBorder.none,
@@ -680,7 +712,7 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
             for (final suggestion in _suggestions)
               ListTile(
                 dense: true,
-                leading: const Icon(LucideIcons.mapPin, size: 16, color: AppColors.textSecondary),
+                leading: const RbIcon(RbGlyph.pin, size: 16, color: AppColors.textSecondary),
                 title: Text(suggestion['label'] as String, style: const TextStyle(fontSize: 12.5), maxLines: 2, overflow: TextOverflow.ellipsis),
                 onTap: () => _pickLocation(suggestion),
               ),
@@ -772,6 +804,7 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
               isVerified: isVerified,
               distanceKm: distanceKmValue,
               isAvailable: isAvailable,
+              donationCount: Demo.isDemoId(donor['id'] as String) ? Demo.donorPriorDonations : null,
             ),
           ),
         );
@@ -804,7 +837,7 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
                           Flexible(child: Text(donor['name'] as String, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppTextStyles.display(fontSize: 17, color: AppColors.ink))),
                           if (isVerified) ...[
                             const SizedBox(width: 6),
-                            const Icon(LucideIcons.badgeCheck, size: 16, color: AppColors.successText, semanticLabel: 'Verified'),
+                            const RbIcon(RbGlyph.verified, size: 16, color: AppColors.successText, semanticLabel: 'Verified'),
                           ],
                         ],
                       ),
@@ -837,7 +870,7 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
                     AnimatedRotation(
                       turns: isHighlighted ? 0.25 : 0,
                       duration: const Duration(milliseconds: 180),
-                      child: const Icon(LucideIcons.chevronRight, size: 16, color: AppColors.chevronMuted),
+                      child: const RbIcon(RbGlyph.chevron, size: 16, color: AppColors.chevronMuted),
                     ),
                   ],
                 ),
@@ -856,7 +889,7 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
                       onPressed: _sendingDonorId == null ? () => _sendRequestTo(donor) : null,
                       icon: sending
                           ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                          : const Icon(LucideIcons.droplet, size: 15),
+                          : const RbIcon(RbGlyph.droplet, size: 15),
                       label: Text('Request $bloodGroup'),
                     ),
                   ),
@@ -869,8 +902,8 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
     );
   }
 
-  Map<String, dynamic> _donorCardData(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
-    final data = doc.data();
+  Map<String, dynamic> _donorCardData(_Doc doc) {
+    final data = doc.data;
     final name = data['name'] as String? ?? 'Donor';
     final initials = name.trim().isEmpty ? '?' : initialsOf(name.trim());
     final lat = (data['lat'] as num?)?.toDouble();

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../theme/app_colors.dart';
 import 'ring_field.dart';
+import 'rb_icon.dart';
 
 /// The "Matched" emotional-peak composition, shared by Donor Found, Match
 /// Contact and Accept Result's success case: the committed ring group at
@@ -49,7 +49,7 @@ class TwoPersonConnection extends StatelessWidget {
                 height: 22 * px,
                 decoration: const BoxDecoration(color: AppColors.warmGreenBg, shape: BoxShape.circle),
                 alignment: Alignment.center,
-                child: Icon(LucideIcons.check, size: 12 * px, color: AppColors.warmGreenText),
+                child: RbIcon(RbGlyph.check, size: 12 * px, color: AppColors.warmGreenText),
               ),
               Positioned(
                 left: constraints.maxWidth / 2 - ringRadius - 38 * px,

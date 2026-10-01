@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
+
+import '../services/backend.dart' as backend show initialsOf;
 
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import 'brand_glyph.dart';
 import 'pressable.dart';
+import 'rb_icon.dart';
 
 /// The handful of building blocks every tab root and flow screen shares, so
 /// Requests, Community, Find, My Page, Settings and the rest read as one
@@ -132,7 +134,7 @@ enum RbTone { red, gold, success, neutral, orange }
 /// Small status pill: "Verified", "Urgent", "2 km away".
 class RbChip extends StatelessWidget {
   final String text;
-  final IconData? icon;
+  final RbGlyph? icon;
   final Widget? leading;
   final RbTone tone;
 
@@ -155,7 +157,7 @@ class RbChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (leading != null) ...[leading!, const SizedBox(width: 5)] else if (icon != null) ...[Icon(icon, size: 13, color: fg), const SizedBox(width: 5)],
+          if (leading != null) ...[leading!, const SizedBox(width: 5)] else if (icon != null) ...[RbIcon(icon!, size: 13, color: fg), const SizedBox(width: 5)],
           Flexible(child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: fg))),
         ],
       ),
@@ -192,13 +194,17 @@ class RbListGroup extends StatelessWidget {
 /// One settings/menu row: tinted icon tile, title, optional subtitle, and a
 /// trailing chevron, switch or value.
 class RbRow extends StatelessWidget {
-  final IconData icon;
+  final RbGlyph icon;
   final String title;
   final String? subtitle;
   final Widget? trailing;
   final VoidCallback? onTap;
   final bool destructive;
   final RbTone tone;
+
+  /// Menu-style row: the glyph stands on its own (no tinted tile), so a
+  /// list of plain destinations doesn't read as a stack of icon boxes.
+  final bool bare;
 
   const RbRow({
     super.key,
@@ -209,6 +215,7 @@ class RbRow extends StatelessWidget {
     this.onTap,
     this.destructive = false,
     this.tone = RbTone.red,
+    this.bare = false,
   });
 
   @override
@@ -220,13 +227,16 @@ class RbRow extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(14, 13, 12, 13),
         child: Row(
           children: [
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10)),
-              alignment: Alignment.center,
-              child: Icon(icon, size: 16, color: fg),
-            ),
+            if (bare)
+              SizedBox(width: 32, child: Center(child: RbIcon(icon, size: 21, color: destructive ? AppColors.red700 : AppColors.brandRed)))
+            else
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10)),
+                alignment: Alignment.center,
+                child: RbIcon(icon, size: 16, color: fg),
+              ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -241,7 +251,7 @@ class RbRow extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            trailing ?? (onTap == null ? const SizedBox.shrink() : const Icon(LucideIcons.chevronRight, size: 16, color: AppColors.chevronMuted)),
+            trailing ?? (onTap == null ? const SizedBox.shrink() : const RbIcon(RbGlyph.chevron, size: 16, color: AppColors.chevronMuted)),
           ],
         ),
       ),
@@ -269,7 +279,7 @@ class RbSwitch extends StatelessWidget {
 /// Empty / error / info panel inside a scrolling list: droplet glyph,
 /// serif title, explanation, optional action.
 class RbStatePanel extends StatelessWidget {
-  final IconData icon;
+  final RbGlyph icon;
   final String title;
   final String message;
   final GlyphTone tone;
@@ -287,7 +297,7 @@ class RbStatePanel extends StatelessWidget {
   });
 
   factory RbStatePanel.error({required String title, required String message, required VoidCallback onRetry}) => RbStatePanel(
-        icon: LucideIcons.cloudOff,
+        icon: RbGlyph.offline,
         title: title,
         message: message,
         tone: GlyphTone.red,
@@ -315,7 +325,7 @@ class RbStatePanel extends StatelessWidget {
                 foregroundColor: AppColors.brandRed,
               ),
               onPressed: onAction,
-              icon: const Icon(LucideIcons.rotateCw, size: 15),
+              icon: const RbIcon(RbGlyph.retry, size: 15),
               label: Text(actionLabel!),
             ),
           ],
@@ -346,12 +356,8 @@ class RbAvatar extends StatelessWidget {
 
   const RbAvatar({super.key, required this.name, this.photoUrl, this.size = 44, this.gold = false});
 
-  static String initialsOf(String name) {
-    final parts = name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
-    if (parts.isEmpty) return '?';
-    if (parts.length == 1) return parts.first.characters.first.toUpperCase();
-    return (parts.first.characters.first + parts.last.characters.first).toUpperCase();
-  }
+  /// Punctuation-safe initials — the shared helper in backend.dart.
+  static String initialsOf(String name) => backend.initialsOf(name);
 
   @override
   Widget build(BuildContext context) {

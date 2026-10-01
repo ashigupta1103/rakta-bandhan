@@ -2,11 +2,12 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../demo/demo.dart';
 import '../services/backend.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/dashed_border.dart';
+import '../widgets/rb_icon.dart';
 
 /// "Share an experience" — posts a real story to `community_stories`, shown
 /// on the Community → Stories tab, optionally with one photo. The photo is
@@ -40,12 +41,12 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(LucideIcons.image),
+              leading: const RbIcon(RbGlyph.photo),
               title: const Text('Choose from gallery'),
               onTap: () => Navigator.pop(sheet, ImageSource.gallery),
             ),
             ListTile(
-              leading: const Icon(LucideIcons.camera),
+              leading: const RbIcon(RbGlyph.camera),
               title: const Text('Take a photo'),
               onTap: () => Navigator.pop(sheet, ImageSource.camera),
             ),
@@ -97,6 +98,13 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
       );
       return;
     }
+    if (Demo.on) {
+      // Kept in the demo's own feed only — never posted.
+      Demo.instance.addStory(body, _topic);
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Demo · added to the demo feed only. Nothing was posted.')));
+      return;
+    }
     setState(() => _submitting = true);
     try {
       final donor = (await Backend.instance.myDonorDoc()).data();
@@ -134,7 +142,7 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
               height: 48,
               child: Row(
                 children: [
-                  IconButton(icon: const Icon(LucideIcons.x, color: AppColors.textPrimaryWarm), onPressed: () => Navigator.pop(context)),
+                  IconButton(icon: const RbIcon(RbGlyph.close, color: AppColors.textPrimaryWarm), onPressed: () => Navigator.pop(context)),
                   const Text('Share an experience', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
                 ],
               ),
@@ -184,7 +192,21 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
                       ),
                     ),
                     const SizedBox(height: 14),
-                    if (_photoBytes != null)
+                    if (Demo.on)
+                      // Honest unavailable state: a demo never uploads.
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
+                        decoration: BoxDecoration(color: AppColors.sand, borderRadius: BorderRadius.circular(12)),
+                        child: const Row(
+                          children: [
+                            RbIcon(RbGlyph.photoOff, size: 17, color: AppColors.ink2),
+                            SizedBox(width: 10),
+                            Expanded(child: Text('Photo upload is off in the demo.', style: TextStyle(fontSize: 13.5, color: AppColors.ink2))),
+                          ],
+                        ),
+                      )
+                    else if (_photoBytes != null)
                       // Preview exactly as the feed will show it.
                       ClipRRect(
                         borderRadius: BorderRadius.circular(14),
@@ -197,7 +219,7 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
                               child: IconButton.filled(
                                 tooltip: 'Remove photo',
                                 style: IconButton.styleFrom(backgroundColor: Colors.black54),
-                                icon: const Icon(LucideIcons.x, size: 16, color: Colors.white),
+                                icon: const RbIcon(RbGlyph.close, size: 16, color: Colors.white),
                                 onPressed: () => setState(() {
                                   _photo = null;
                                   _photoBytes = null;
@@ -210,7 +232,7 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
                               child: TextButton.icon(
                                 style: TextButton.styleFrom(backgroundColor: Colors.black54, foregroundColor: Colors.white),
                                 onPressed: _pickPhoto,
-                                icon: const Icon(LucideIcons.refreshCw, size: 14),
+                                icon: const RbIcon(RbGlyph.retry, size: 14),
                                 label: const Text('Change'),
                               ),
                             ),
@@ -229,7 +251,7 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
                             child: const Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(LucideIcons.imagePlus, size: 16, color: AppColors.ink2),
+                                RbIcon(RbGlyph.photoAdd, size: 16, color: AppColors.ink2),
                                 SizedBox(width: 8),
                                 Text('Add a photo (optional)', style: TextStyle(fontSize: 13.5, color: AppColors.ink2)),
                               ],

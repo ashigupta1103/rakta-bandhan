@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../services/backend.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
@@ -13,6 +12,7 @@ import 'create_request_screen.dart';
 import 'find_donors_screen.dart';
 import 'notifications_screen.dart';
 import 'request_detail_screen.dart';
+import '../widgets/rb_icon.dart';
 
 /// Home — rebuilt to the Product Art Direction / Visual Richness Proposal
 /// spec: one raised object (the live nearby request, with a face, a group
@@ -115,7 +115,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               child: Stack(
                                 clipBehavior: Clip.none,
                                 children: [
-                                  const Icon(LucideIcons.bell, size: 21, color: AppColors.textPrimaryWarm),
+                                  const RbIcon(RbGlyph.bell, size: 21, color: AppColors.textPrimaryWarm),
                                   Positioned(
                                     top: 0,
                                     right: -2,
@@ -219,7 +219,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                               Row(
                                                 mainAxisSize: MainAxisSize.min,
                                                 children: [
-                                                  const Icon(LucideIcons.flame, size: 13, color: AppColors.primary),
+                                                  const RbIcon(RbGlyph.flame, size: 13, color: AppColors.primary),
                                                   const SizedBox(width: 6),
                                                   Text(urgency == 'critical' ? 'Critical' : 'Urgent', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.1, color: AppColors.primary)),
                                                 ],
@@ -298,11 +298,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(LucideIcons.droplet, size: 14, color: AppColors.primary),
+                        RbIcon(RbGlyph.droplet, size: 14, color: AppColors.primary),
                         SizedBox(width: 7),
                         Text('Need blood yourself?', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.primary)),
                         SizedBox(width: 4),
-                        Icon(LucideIcons.chevronRight, size: 14, color: AppColors.primary),
+                        RbIcon(RbGlyph.chevron, size: 14, color: AppColors.primary),
                       ],
                     ),
                   ),

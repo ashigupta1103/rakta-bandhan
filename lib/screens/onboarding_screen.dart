@@ -1,13 +1,13 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../services/onboarding_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/blood_group_droplet.dart';
 import '../widgets/ring_field.dart';
 import 'login_screen.dart';
+import '../widgets/rb_icon.dart';
 
 /// First-run value proposition — four pages built to the approved
 /// "Onboarding Art Direction, revision 2" spec: one ring group (three
@@ -215,8 +215,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> with SingleTickerPr
               child: _PressableCircle(
                 onTap: _next,
                 background: AppColors.primary,
-                child: Icon(
-                  _index == _pages.length - 1 ? LucideIcons.check : LucideIcons.chevronRight,
+                child: RbIcon(
+                  _index == _pages.length - 1 ? RbGlyph.check : RbGlyph.chevron,
                   size: 22,
                   color: AppColors.whiteTextOnPrimary,
                 ),
@@ -589,7 +589,7 @@ class _OnboardingPageView extends StatelessWidget {
             BoxShadow(color: AppColors.shadowButton, blurRadius: 30, offset: Offset(0, 12)),
           ]),
           alignment: Alignment.center,
-          child: Icon(LucideIcons.lock, size: 32 * px, color: AppColors.whiteTextOnPrimary),
+          child: RbIcon(RbGlyph.lock, size: 32 * px, color: AppColors.whiteTextOnPrimary),
         ),
       ),
       card(offset: const Offset(-164, -89), km: '1.8 km', primary: true),

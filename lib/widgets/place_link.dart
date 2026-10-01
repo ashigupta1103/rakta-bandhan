@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../services/maps_link.dart';
 import '../theme/app_colors.dart';
+import 'rb_icon.dart';
 
 /// A request's place as readable text that opens Google Maps when tapped.
 /// Coordinates are used only inside the link, never shown. Without a
@@ -37,7 +37,7 @@ class PlaceLink extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Flexible(child: text),
-            Padding(padding: const EdgeInsets.only(left: 8, top: 3), child: Icon(LucideIcons.mapPinned, size: 17, color: iconColor)),
+            Padding(padding: const EdgeInsets.only(left: 8, top: 3), child: RbIcon(RbGlyph.pin, size: 17, color: iconColor)),
           ],
         ),
       ),

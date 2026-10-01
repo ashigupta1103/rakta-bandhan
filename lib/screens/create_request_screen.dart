@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../demo/demo.dart';
 import '../services/backend.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
@@ -10,6 +10,7 @@ import '../widgets/blood_group_droplet.dart';
 import '../widgets/loading_button.dart';
 import 'matching_screen.dart';
 import 'location_picker_screen.dart';
+import '../widgets/rb_icon.dart';
 
 enum _LocationState { idle, checking, denied, error }
 
@@ -60,6 +61,13 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
     // Approved flow pre-fills location from GPS when available — start the
     // lookup immediately so it's usually resolved by the time the location
     // question is reached, without blocking the group/urgency questions.
+    if (Demo.on) {
+      // Client demo: a fixed demo hospital instead of GPS.
+      _locationController.text = Demo.hospital;
+      _selectedLat = Demo.lat;
+      _selectedLng = Demo.lng;
+      return;
+    }
     _useCurrentLocation(silent: true);
   }
 
@@ -160,6 +168,11 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
 
   Future<void> _handleSubmit() async {
     if (!_canSubmit || _isSubmitting) return;
+    if (Demo.on) {
+      Demo.instance.createRequest(group: _bloodGroup!, units: _units, urgency: _urgency!, label: _locationController.text.trim());
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => MatchingScreen(requestId: Demo.requestId, bloodGroup: _bloodGroup!, urgency: _urgency!)));
+      return;
+    }
     setState(() => _isSubmitting = true);
     try {
       double lat, lng;
@@ -186,7 +199,9 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
         locationLabel: _locationController.text.trim(),
       );
       if (!mounted) return;
-      Navigator.push(
+      // Replace the form: once sent, going back must lead home, not to a
+      // filled-in form that could be submitted a second time.
+      Navigator.pushReplacement(
         context,
         MaterialPageRoute(
           builder: (context) => MatchingScreen(requestId: requestId, bloodGroup: _bloodGroup!, urgency: _urgency!),
@@ -217,7 +232,7 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(LucideIcons.arrowLeft, color: AppColors.textPrimaryWarm),
+          icon: const RbIcon(RbGlyph.back, color: AppColors.textPrimaryWarm),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text('New request', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
@@ -261,9 +276,9 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            _stepperButton(LucideIcons.minus, () => setState(() => _units = _units > 1 ? _units - 1 : 1)),
+                            _stepperButton(RbGlyph.minus, () => setState(() => _units = _units > 1 ? _units - 1 : 1)),
                             const SizedBox(width: 6),
-                            _stepperButton(LucideIcons.plus, () => setState(() => _units = _units < 10 ? _units + 1 : 10)),
+                            _stepperButton(RbGlyph.plus, () => setState(() => _units = _units < 10 ? _units + 1 : 10)),
                           ],
                         ),
                       ),
@@ -362,7 +377,7 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
             height: 18,
             decoration: const BoxDecoration(color: AppColors.warmGreenText, shape: BoxShape.circle),
             alignment: Alignment.center,
-            child: const Icon(LucideIcons.check, size: 11, color: Colors.white),
+            child: const RbIcon(RbGlyph.check, size: 11, color: Colors.white),
           ),
           const SizedBox(width: 11),
           if (leading != null) ...[leading, const SizedBox(width: 12)],
@@ -376,7 +391,7 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
               ],
             ),
           ),
-          trailing ?? const Icon(LucideIcons.chevronRight, size: 15, color: AppColors.textSecondary),
+          trailing ?? const RbIcon(RbGlyph.chevron, size: 15, color: AppColors.textSecondary),
         ],
       ),
     );
@@ -394,7 +409,7 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(LucideIcons.alertCircle, size: 15, color: AppColors.red700),
+          const RbIcon(RbGlyph.alertCircle, size: 15, color: AppColors.red700),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -419,14 +434,14 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
       children: [
         const Text('Units', style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary)),
         const Spacer(),
-        _stepperButton(LucideIcons.minus, () => setState(() => _units = _units > 1 ? _units - 1 : 1)),
+        _stepperButton(RbGlyph.minus, () => setState(() => _units = _units > 1 ? _units - 1 : 1)),
         SizedBox(width: 30, child: Text('$_units', textAlign: TextAlign.center, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimaryWarm))),
-        _stepperButton(LucideIcons.plus, () => setState(() => _units = _units < 10 ? _units + 1 : 10)),
+        _stepperButton(RbGlyph.plus, () => setState(() => _units = _units < 10 ? _units + 1 : 10)),
       ],
     );
   }
 
-  Widget _stepperButton(IconData icon, VoidCallback onTap) {
+  Widget _stepperButton(RbGlyph icon, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -434,7 +449,7 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
         height: 30,
         decoration: BoxDecoration(color: Colors.white, border: Border.all(color: AppColors.dividerWarm), borderRadius: BorderRadius.circular(10)),
         alignment: Alignment.center,
-        child: Icon(icon, size: 13, color: AppColors.textPrimaryWarm),
+        child: RbIcon(icon, size: 13, color: AppColors.textPrimaryWarm),
       ),
     );
   }
@@ -507,7 +522,7 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
       return _answeredRow(
         label: 'Where',
         onTap: () => setState(() => _locationEditing = true),
-        leading: const Icon(LucideIcons.mapPin, size: 17, color: AppColors.textSecondary),
+        leading: const RbIcon(RbGlyph.pin, size: 17, color: AppColors.textSecondary),
         value: _locationController.text,
       );
     }
@@ -571,7 +586,7 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 14),
             child: Row(
               children: [
-                const Icon(LucideIcons.mapPin, size: 16, color: AppColors.textSecondary),
+                const RbIcon(RbGlyph.pin, size: 16, color: AppColors.textSecondary),
                 const SizedBox(width: 10),
                 Expanded(
                   child: TextField(
@@ -600,7 +615,7 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
                   for (final suggestion in _suggestions)
                     ListTile(
                       dense: true,
-                      leading: const Icon(LucideIcons.mapPin, size: 16, color: AppColors.textSecondary),
+                      leading: const RbIcon(RbGlyph.pin, size: 16, color: AppColors.textSecondary),
                       title: Text(suggestion['label'] as String, style: const TextStyle(fontSize: 12.5), maxLines: 2, overflow: TextOverflow.ellipsis),
                       onTap: () => _pickAddress(suggestion),
                     ),
@@ -618,7 +633,7 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
                   child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(LucideIcons.locateFixed, size: 13, color: AppColors.primary),
+                      RbIcon(RbGlyph.locate, size: 13, color: AppColors.primary),
                       SizedBox(width: 6),
                       Text('Use current location', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.primary)),
                     ],
@@ -629,7 +644,7 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
                 child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(LucideIcons.mapPin, size: 13, color: AppColors.primary),
+                    RbIcon(RbGlyph.pin, size: 13, color: AppColors.primary),
                     SizedBox(width: 6),
                     Text('Pin exact spot on map', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.primary)),
                   ],
@@ -644,7 +659,7 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(LucideIcons.mapPin, size: 13, color: AppColors.primary),
+                  RbIcon(RbGlyph.pin, size: 13, color: AppColors.primary),
                   SizedBox(width: 6),
                   Text('Turn on location instead', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.primary)),
                 ],

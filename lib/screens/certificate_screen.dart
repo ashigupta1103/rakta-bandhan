@@ -5,20 +5,21 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:gal/gal.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:share_plus/share_plus.dart';
+import '../demo/demo.dart';
 import '../services/backend.dart';
 import '../services/donation_history_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/blood_group_droplet.dart';
 import 'about_screen.dart';
+import '../widgets/rb_icon.dart';
 
 /// Donation certificate, opened from Donation history. Every field is real:
 /// the donor's name (their profile), and hospital/date/blood group/donation
 /// number from the [DonationRecord]. "Save" writes a high-resolution PNG to
-/// the photo gallery; "Share" hands the same image to WhatsApp, Instagram
-/// and the rest.
+/// the photo gallery; "Share" opens the phone's share sheet with the same
+/// image.
 class CertificateScreen extends StatefulWidget {
   final DonationRecord record;
   final int donationNumber;
@@ -104,7 +105,7 @@ class _CertificateScreenState extends State<CertificateScreen> {
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: IconButton(
-                    icon: const Icon(LucideIcons.x, color: AppColors.onEmberWarm),
+                    icon: const RbIcon(RbGlyph.close, color: AppColors.onEmberWarm),
                     onPressed: () => Navigator.pop(context),
                   ),
                 ),
@@ -117,7 +118,7 @@ class _CertificateScreenState extends State<CertificateScreen> {
                       const Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(LucideIcons.checkCircle, size: 15, color: AppColors.onEmberSuccess),
+                          RbIcon(RbGlyph.checkCircle, size: 15, color: AppColors.onEmberSuccess),
                           SizedBox(width: 7),
                           Text('Donation complete', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.onEmberSuccess)),
                         ],
@@ -130,7 +131,7 @@ class _CertificateScreenState extends State<CertificateScreen> {
                       ),
                       const SizedBox(height: 22),
                       FutureBuilder<Map<String, dynamic>?>(
-                        future: Backend.instance.myDonorDoc().then((d) => d.data()),
+                        future: Demo.on ? Future.value(Demo.instance.myProfile) : Backend.instance.myDonorDoc().then((d) => d.data()),
                         builder: (context, snapshot) {
                           final name = snapshot.data?['name'] as String? ?? 'A Rakta Bandhan donor';
                           return RepaintBoundary(key: _certificateKey, child: _certificateCard(name));
@@ -143,7 +144,7 @@ class _CertificateScreenState extends State<CertificateScreen> {
                             child: OutlinedButton.icon(
                               style: OutlinedButton.styleFrom(foregroundColor: AppColors.onEmber, side: const BorderSide(color: AppColors.onEmberOutline)),
                               onPressed: _busy ? null : _save,
-                              icon: const Icon(LucideIcons.download, size: 16),
+                              icon: const RbIcon(RbGlyph.download, size: 16),
                               label: const Text('Save'),
                             ),
                           ),
@@ -152,7 +153,7 @@ class _CertificateScreenState extends State<CertificateScreen> {
                             child: ElevatedButton.icon(
                               style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: AppColors.brandRed),
                               onPressed: _busy ? null : _share,
-                              icon: const Icon(LucideIcons.share2, size: 16),
+                              icon: const RbIcon(RbGlyph.share, size: 16),
                               label: const Text('Share'),
                             ),
                           ),
@@ -226,17 +227,13 @@ class _CertificateScreenState extends State<CertificateScreen> {
                 ),
               ),
               const SizedBox(height: 14),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  for (var i = 0; i < 4; i++) ...[
-                    if (i > 0) const SizedBox(width: 5),
-                    BloodGroupDroplet(label: '', size: 15, filled: true, color: AppColors.brandRed),
-                  ],
-                ],
-              ),
+              const BloodGroupDroplet(label: '', size: 18, filled: true, color: AppColors.brandRed),
               const SizedBox(height: 7),
-              Text('${_ordinal(donationNumber)} donation', style: const TextStyle(fontSize: 11, color: AppColors.ink2)),
+              Text('${_ordinal(donationNumber)} donation', style: const TextStyle(fontSize: 11.5, color: AppColors.ink2)),
+              if (Demo.on) ...[
+                const SizedBox(height: 6),
+                const Text('Demo certificate — sample data, not issued', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: AppColors.goldDeep)),
+              ],
               Container(height: 1, color: const Color(0xFFEFCE8C), margin: const EdgeInsets.fromLTRB(24, 16, 24, 12)),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -249,7 +246,7 @@ class _CertificateScreenState extends State<CertificateScreen> {
                       height: 26,
                       decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.goldTint),
                       alignment: Alignment.center,
-                      child: const Icon(LucideIcons.award, size: 14, color: AppColors.goldDeep),
+                      child: const RbIcon(RbGlyph.certificate, size: 14, color: AppColors.goldDeep),
                     ),
                     const SizedBox(width: 10),
                     Flexible(

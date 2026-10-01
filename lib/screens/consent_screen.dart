@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
+import '../demo/demo.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/brand_glyph.dart';
 import 'legal_reader_screen.dart';
 import 'location_permission_screen.dart';
 import 'verifying_screen.dart';
+import '../widgets/rb_icon.dart';
 
 class ConsentScreen extends StatefulWidget {
   const ConsentScreen({super.key});
@@ -22,11 +23,13 @@ class _ConsentScreenState extends State<ConsentScreen> {
     if (!_agreed) return;
     // Registration usually already asked for location (to fill in the
     // area). Don't ask a second time — go straight on if it's granted.
-    var granted = false;
-    try {
-      final p = await Geolocator.checkPermission();
-      granted = p == LocationPermission.always || p == LocationPermission.whileInUse;
-    } catch (_) {}
+    var granted = Demo.on;
+    if (!granted) {
+      try {
+        final p = await Geolocator.checkPermission();
+        granted = p == LocationPermission.always || p == LocationPermission.whileInUse;
+      } catch (_) {}
+    }
     if (!mounted) return;
     Navigator.push(
       context,
@@ -42,7 +45,7 @@ class _ConsentScreenState extends State<ConsentScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(LucideIcons.arrowLeft, color: AppColors.textPrimaryWarm),
+          icon: const RbIcon(RbGlyph.back, color: AppColors.textPrimaryWarm),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -52,7 +55,7 @@ class _ConsentScreenState extends State<ConsentScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const BrandGlyph(icon: LucideIcons.lock),
+              const BrandGlyph(icon: RbGlyph.lock),
               const SizedBox(height: 16),
               Text('Your data, handled carefully', style: AppTextStyles.display(fontSize: 21, color: AppColors.textPrimaryWarm)),
               const SizedBox(height: 8),
@@ -63,7 +66,7 @@ class _ConsentScreenState extends State<ConsentScreen> {
               const SizedBox(height: 22),
               _infoCard(
                 'Your phone number is never public',
-                'Only shared with a requester after you accept their request.',
+                'No one sees it — matched people talk through in-app messages and calls.',
               ),
               const SizedBox(height: 12),
               _infoCard(
@@ -72,8 +75,8 @@ class _ConsentScreenState extends State<ConsentScreen> {
               ),
               const SizedBox(height: 12),
               _infoCard(
-                'You can request deletion anytime',
-                'Settings › Delete my account removes it, in line with the DPDP Act, 2023.',
+                'You can delete your account anytime',
+                'Settings › Delete my account removes your account and personal data.',
               ),
               const SizedBox(height: 20),
               GestureDetector(

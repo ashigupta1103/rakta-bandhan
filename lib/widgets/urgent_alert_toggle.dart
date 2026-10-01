@@ -1,12 +1,12 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../demo/demo.dart';
 import '../services/backend.dart';
 import '../services/urgent_alert_service.dart';
 import '../theme/app_colors.dart';
 import 'rb_ui.dart';
 import 'brand_glyph.dart';
+import 'rb_icon.dart';
 
 /// "Ring me for urgent requests" — the donor's opt-in to the full-screen,
 /// sounding alert. Off by default. Turning it on first explains exactly
@@ -41,7 +41,7 @@ class _UrgentAlertToggleState extends State<UrgentAlertToggle> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const BrandGlyph(icon: LucideIcons.bell, size: 48),
+              const BrandGlyph(icon: RbGlyph.bell, size: 48),
               const SizedBox(height: 16),
               const Text('Ring me for urgent requests', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.ink)),
               const SizedBox(height: 8),
@@ -50,10 +50,10 @@ class _UrgentAlertToggleState extends State<UrgentAlertToggle> {
                 style: TextStyle(fontSize: 13.5, color: AppColors.ink2, height: 1.5),
               ),
               const SizedBox(height: 14),
-              _point(LucideIcons.flame, 'Only urgent and critical requests'),
-              _point(LucideIcons.mapPin, 'Only within ${UrgentAlertService.radiusKm.round()} km of your registered area'),
-              _point(LucideIcons.bellOff, 'Never while you’re unavailable or already matched'),
-              _point(LucideIcons.info, 'Rings while Rakta Bandhan is open. Alerts with the app closed arrive in an upcoming update.'),
+              _point(RbGlyph.flame, 'Only urgent and critical requests'),
+              _point(RbGlyph.pin, 'Only within ${UrgentAlertService.radiusKm.round()} km of your registered area'),
+              _point(RbGlyph.bellOff, 'Never while you’re unavailable or already matched'),
+              _point(RbGlyph.info, 'Rings while Rakta Bandhan is open. Alerts with the app closed arrive in an upcoming update.'),
               const SizedBox(height: 18),
               SizedBox(
                 width: double.infinity,
@@ -101,10 +101,10 @@ class _UrgentAlertToggleState extends State<UrgentAlertToggle> {
     }
   }
 
-  Widget _point(IconData icon, String text) => Padding(
+  Widget _point(RbGlyph icon, String text) => Padding(
         padding: const EdgeInsets.only(top: 9),
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Padding(padding: const EdgeInsets.only(top: 1), child: Icon(icon, size: 15, color: AppColors.brandRed)),
+          Padding(padding: const EdgeInsets.only(top: 1), child: RbIcon(icon, size: 15, color: AppColors.brandRed)),
           const SizedBox(width: 10),
           Expanded(child: Text(text, style: const TextStyle(fontSize: 13, color: AppColors.ink, height: 1.4))),
         ]),
@@ -113,19 +113,19 @@ class _UrgentAlertToggleState extends State<UrgentAlertToggle> {
   @override
   Widget build(BuildContext context) {
     // Signed out (e.g. the preview gallery): nothing to toggle.
-    if (Backend.instance.currentUser == null) return const SizedBox.shrink();
-    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-      stream: Backend.instance.myDonorDocStream(),
+    if (!Demo.on && Backend.instance.currentUser == null) return const SizedBox.shrink();
+    return StreamBuilder<Map<String, dynamic>?>(
+      stream: Demo.on ? Demo.instance.watch(() => Demo.instance.myProfile) : Backend.instance.myDonorDocStream().map((s) => s.data()),
       builder: (context, snap) {
-        final on = snap.data?.data()?['urgent_alerts'] == true;
+        final on = snap.data?['urgent_alerts'] == true;
         final row = RbRow(
-          icon: on ? LucideIcons.bellRing : LucideIcons.bellOff,
+          icon: on ? RbGlyph.bell : RbGlyph.bellOff,
           tone: on ? RbTone.red : RbTone.neutral,
           title: 'Ring me for urgent requests',
           subtitle: on ? 'Full-screen alert with sound for urgent needs nearby' : 'Off — you’ll still see requests in the Requests tab',
           trailing: _busy
               ? const Padding(padding: EdgeInsets.all(14), child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)))
-              : RbSwitch(value: on, onChanged: snap.hasData ? ((v) => v ? _turnOn() : _turnOff()) : null),
+              : RbSwitch(value: on, onChanged: Demo.on ? Demo.instance.setUrgentAlerts : snap.hasData ? ((v) => v ? _turnOn() : _turnOff()) : null),
         );
         if (!widget.asCard) return row;
         return RbListGroup(children: [row]);

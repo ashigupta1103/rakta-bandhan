@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../theme/app_colors.dart';
+import 'rb_icon.dart';
 
 /// The animated Rakta Bandhan mark: concentric hairline rings expanding
 /// behind a droplet.
@@ -42,7 +42,7 @@ class BrandMark extends StatelessWidget {
             opacity: t,
             child: Transform.scale(
               scale: 0.9 + 0.1 * t,
-              child: Icon(LucideIcons.droplet, size: size * 0.32, color: color),
+              child: RbIcon(RbGlyph.droplet, size: size * 0.32, color: color),
             ),
           ),
         ],

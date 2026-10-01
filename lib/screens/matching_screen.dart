@@ -2,16 +2,16 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../demo/demo.dart';
 import '../services/backend.dart';
 import '../services/nearby_donors.dart';
 import '../theme/app_colors.dart';
-import '../widgets/blood_group_droplet.dart';
 import '../widgets/confirm_sheet.dart';
-import '../widgets/ring_field.dart';
+import '../widgets/radar_search.dart';
 import 'cancel_confirm_screen.dart';
 import 'donor_found_screen.dart';
 import 'no_donor_found_screen.dart';
+import '../widgets/rb_icon.dart';
 
 /// Matching / searching — the final artifact's ember-field emotional-peak
 /// state. Everything shown here is real: the request document itself
@@ -35,7 +35,8 @@ class MatchingScreen extends StatefulWidget {
 }
 
 class _MatchingScreenState extends State<MatchingScreen> {
-  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _requestSub;
+  StreamSubscription<Map<String, dynamic>?>? _requestSub;
+  Timer? _demoAccept;
   Timer? _countTimer;
   bool _countStarted = false;
   Timer? _tick;
@@ -54,7 +55,16 @@ class _MatchingScreenState extends State<MatchingScreen> {
     _searchPhaseTimer = Timer(const Duration(seconds: 15), () {
       if (mounted) setState(() => _searchPhaseOver = true);
     });
-    _requestSub = FirebaseFirestore.instance.collection('requests').doc(widget.requestId).snapshots().listen(_onRequestUpdate);
+    _requestSub = Demo.requestDoc(widget.requestId).listen(_onRequestUpdate);
+    if (Demo.isDemoId(widget.requestId)) {
+      // Client demo: one simulated donor nearby, who accepts after a short,
+      // predictable search (the Demo tab can also skip ahead).
+      _compatibleAvailableCount = 1;
+      _countStarted = true;
+      _demoAccept = Timer(const Duration(seconds: 6), () {
+        if (Demo.instance.request?['status'] == 'open') Demo.instance.match();
+      });
+    }
 
 
     // Real elapsed-time display and a real expiry check — no fixed-delay
@@ -65,9 +75,8 @@ class _MatchingScreenState extends State<MatchingScreen> {
     });
   }
 
-  void _onRequestUpdate(DocumentSnapshot<Map<String, dynamic>> snap) {
+  void _onRequestUpdate(Map<String, dynamic>? data) {
     if (!mounted) return;
-    final data = snap.data();
     if (data == null) return;
     setState(() {
       _createdAt = (data['created_at'] as Timestamp?)?.toDate();
@@ -143,7 +152,11 @@ class _MatchingScreenState extends State<MatchingScreen> {
     _navigated = true;
     await _requestSub?.cancel();
     try {
-      await Backend.instance.cancelRequest(widget.requestId);
+      if (Demo.isDemoId(widget.requestId)) {
+        Demo.instance.cancel();
+      } else {
+        await Backend.instance.cancelRequest(widget.requestId);
+      }
     } catch (_) {
       // Already terminal server-side (matched/expired) — fine to proceed to
       // the cancel-confirmation screen either way from the requester's view.
@@ -155,6 +168,7 @@ class _MatchingScreenState extends State<MatchingScreen> {
   @override
   void dispose() {
     _requestSub?.cancel();
+    _demoAccept?.cancel();
     _countTimer?.cancel();
     _tick?.cancel();
     _searchPhaseTimer?.cancel();
@@ -192,20 +206,7 @@ class _MatchingScreenState extends State<MatchingScreen> {
                   child: Column(
                     children: [
                       const SizedBox(height: 10),
-                      SizedBox(
-                        width: 220,
-                        height: 220,
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            const Positioned.fill(
-                              child: RingField(scale: 1.0, referenceWidth: 390, color: AppColors.onEmber, outerOpacity: 0.16, middleOpacity: 0.26, innerOpacity: 0, strokeWidth: 1),
-                            ),
-                            ..._compatibleDots(),
-                            BloodGroupDroplet(label: widget.bloodGroup, size: 60, filled: true, color: AppColors.primary, textColor: AppColors.onEmber, fontSize: 20, serif: true),
-                          ],
-                        ),
-                      ),
+                      RadarSearch(bloodGroup: widget.bloodGroup, found: _compatibleAvailableCount, size: 228),
                       const SizedBox(height: 22),
                       Text(_searchPhaseOver ? 'Still waiting' : 'Searching', style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, letterSpacing: 0.2, color: AppColors.onEmberEyebrow)),
                       const SizedBox(height: 10),
@@ -250,7 +251,7 @@ class _MatchingScreenState extends State<MatchingScreen> {
                     ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(backgroundColor: AppColors.warmPageBackground, foregroundColor: AppColors.gradientEmberMid),
                       onPressed: _cancelling ? null : _keepWaitingInBackground,
-                      icon: const Icon(LucideIcons.hourglass, size: 16),
+                      icon: const RbIcon(RbGlyph.hourglass, size: 16),
                       label: const Text('Keep waiting in background'),
                     ),
                     const SizedBox(height: 6),
@@ -274,34 +275,6 @@ class _MatchingScreenState extends State<MatchingScreen> {
     );
   }
 
-  /// A static, non-animated echo of the real compatible-available-donor
-  /// count fetched above — capped for legibility, never incremented on a
-  /// timer.
-  List<Widget> _compatibleDots() {
-    final count = (_compatibleAvailableCount ?? 0).clamp(0, 4);
-    const positions = [
-      (dx: -72.0, dy: -84.0, size: 44.0, opacity: 0.95),
-      (dx: 44.0, dy: -96.0, size: 38.0, opacity: 0.8),
-      (dx: -96.0, dy: 44.0, size: 30.0, opacity: 0.65),
-      (dx: 76.0, dy: 56.0, size: 26.0, opacity: 0.5),
-    ];
-    return [
-      for (var i = 0; i < count; i++)
-        Positioned(
-          left: 110 + positions[i].dx,
-          top: 110 + positions[i].dy,
-          child: Opacity(
-            opacity: positions[i].opacity,
-            child: Container(
-              width: positions[i].size,
-              height: positions[i].size,
-              decoration: const BoxDecoration(color: AppColors.onEmber, shape: BoxShape.circle),
-            ),
-          ),
-        ),
-    ];
-  }
-
   Widget _stageRow(String label, {required bool done, required bool showDivider, bool showSpinner = true}) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10),
@@ -314,12 +287,12 @@ class _MatchingScreenState extends State<MatchingScreen> {
               height: 22,
               decoration: const BoxDecoration(color: Color.fromRGBO(90, 180, 110, 0.2), shape: BoxShape.circle),
               alignment: Alignment.center,
-              child: const Icon(LucideIcons.check, size: 12, color: AppColors.onEmberSuccess),
+              child: const RbIcon(RbGlyph.check, size: 12, color: AppColors.onEmberSuccess),
             )
           else if (showSpinner)
             const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.onEmberAccent))
           else
-            const Icon(LucideIcons.clock, size: 18, color: AppColors.onEmberAccent),
+            const RbIcon(RbGlyph.clock, size: 18, color: AppColors.onEmberAccent),
           const SizedBox(width: 10),
           Text(label, style: TextStyle(fontSize: 13, color: Colors.white.withValues(alpha: 0.85))),
         ],

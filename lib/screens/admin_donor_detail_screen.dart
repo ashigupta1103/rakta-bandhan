@@ -170,7 +170,7 @@ class _VerificationChecklistState extends State<_VerificationChecklist> {
     ('ID photo is clear and readable', 'Aadhaar, PAN, driving licence, voter ID or passport'),
     ('Name on the ID matches the profile', 'Minor spelling differences are fine'),
     ('Donor is 18 or older', 'Check the date of birth on the ID'),
-    ('Phone number answered and confirmed', 'Call or WhatsApp the number and confirm they registered'),
+    ('Phone number answered and confirmed', 'Call the number and confirm they registered'),
     ('Blood group confirmed with the donor', 'Ask how they know it — donor card, lab report or earlier donation'),
   ];
   final _checked = List<bool>.filled(_steps.length, false);

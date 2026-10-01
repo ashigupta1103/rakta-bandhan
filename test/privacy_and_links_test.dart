@@ -9,8 +9,8 @@ import 'package:rakta_bandhan/services/phone_privacy.dart';
 void main() {
   group('maskPhone', () {
     test('shows only the last three digits', () {
-      expect(maskPhone('9876543940'), '•••••• •940');
-      expect(maskPhone('+91 98765 43940'), '•••••• •940');
+      expect(maskPhone('9876543940'), '••••• ••940');
+      expect(maskPhone('+91 98765 43940'), '••••• ••940');
     });
 
     test('never leaks more than three digits', () {
@@ -19,9 +19,9 @@ void main() {
     });
 
     test('short or missing numbers show no digits', () {
-      expect(maskPhone(null), '••••••');
-      expect(maskPhone(''), '••••••');
-      expect(maskPhone('12'), '••••••');
+      expect(maskPhone(null), '••••• ••');
+      expect(maskPhone(''), '••••• ••');
+      expect(maskPhone('12'), '••••• ••');
     });
   });
 

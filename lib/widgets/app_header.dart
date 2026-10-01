@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../screens/about_screen.dart';
 import '../screens/corporate_partnerships_screen.dart';
 import '../screens/help_support_screen.dart';
@@ -8,6 +7,7 @@ import '../screens/legal_reader_screen.dart';
 import '../screens/testimonials_screen.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
+import 'rb_icon.dart';
 
 /// Shared tab-root header from the final artifact's "One header, one live
 /// state strip" pattern: brand/title on the left, at most two actions
@@ -56,12 +56,12 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
                 const Spacer(),
                 primaryAction ??
                     _HeaderIconButton(
-                      icon: LucideIcons.bell,
+                      icon: RbGlyph.bell,
                       showDot: hasUnreadNotifications,
                       onTap: onNotificationTap ?? () {},
                     ),
                 _HeaderIconButton(
-                  icon: LucideIcons.ellipsis,
+                  icon: RbGlyph.more,
                   onTap: onMoreTap ?? () => showMoreSheet(context),
                 ),
               ],
@@ -75,7 +75,7 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
 }
 
 class _HeaderIconButton extends StatelessWidget {
-  final IconData icon;
+  final RbGlyph icon;
   final VoidCallback onTap;
   final bool showDot;
 
@@ -88,7 +88,7 @@ class _HeaderIconButton extends StatelessWidget {
       icon: Stack(
         clipBehavior: Clip.none,
         children: [
-          Icon(icon, size: 22, color: AppColors.ink2),
+          RbIcon(icon, size: 22, color: AppColors.ink2),
           if (showDot)
             Positioned(
               right: -1,
@@ -136,15 +136,15 @@ void showMoreSheet(BuildContext context) {
                 ),
               ),
               _moreGroup(sheetContext, [
-                (LucideIcons.handHeart, AppColors.goldTint, AppColors.goldDeep, 'About Rakta Bandhan', (ctx) => const AboutScreen()),
-                (LucideIcons.quote, AppColors.red100, AppColors.brandRed, 'Testimonials', (ctx) => const TestimonialsScreen()),
-                (LucideIcons.building2, AppColors.orangeTint, AppColors.orangeDeep, 'Corporate partnerships', (ctx) => const CorporatePartnershipsScreen()),
+                (RbGlyph.heart, AppColors.goldTint, AppColors.goldDeep, 'About Rakta Bandhan', (ctx) => const AboutScreen()),
+                (RbGlyph.quote, AppColors.red100, AppColors.brandRed, 'Testimonials', (ctx) => const TestimonialsScreen()),
+                (RbGlyph.building, AppColors.orangeTint, AppColors.orangeDeep, 'Corporate partnerships', (ctx) => const CorporatePartnershipsScreen()),
               ]),
               const SizedBox(height: 10),
               _moreGroup(sheetContext, [
-                (LucideIcons.circleHelp, AppColors.warmBorder, AppColors.ink2, 'Help & support', (ctx) => const HelpSupportScreen()),
-                (LucideIcons.shield, AppColors.warmBorder, AppColors.ink2, 'Privacy policy', (ctx) => const LegalReaderScreen(title: 'Privacy policy')),
-                (LucideIcons.fileText, AppColors.warmBorder, AppColors.ink2, 'Terms of use', (ctx) => const LegalReaderScreen(title: 'Terms of use')),
+                (RbGlyph.info, AppColors.warmBorder, AppColors.ink2, 'Help & support', (ctx) => const HelpSupportScreen()),
+                (RbGlyph.shield, AppColors.warmBorder, AppColors.ink2, 'Privacy policy', (ctx) => const LegalReaderScreen(title: 'Privacy policy')),
+                (RbGlyph.page, AppColors.warmBorder, AppColors.ink2, 'Terms of use', (ctx) => const LegalReaderScreen(title: 'Terms of use')),
               ]),
               const SizedBox(height: 16),
               const Text('Rakta Bandhan · version placeholder', textAlign: TextAlign.center, style: TextStyle(fontSize: 11.5, color: AppColors.disabledTint)),
@@ -157,7 +157,7 @@ void showMoreSheet(BuildContext context) {
   );
 }
 
-Widget _moreGroup(BuildContext context, List<(IconData, Color, Color, String, WidgetBuilder)> rows) {
+Widget _moreGroup(BuildContext context, List<(RbGlyph, Color, Color, String, WidgetBuilder)> rows) {
   return Padding(
     padding: const EdgeInsets.symmetric(horizontal: 12),
     child: Container(
@@ -191,11 +191,11 @@ Widget _moreGroup(BuildContext context, List<(IconData, Color, Color, String, Wi
                       height: 32,
                       decoration: BoxDecoration(color: rows[i].$2, borderRadius: BorderRadius.circular(10)),
                       alignment: Alignment.center,
-                      child: Icon(rows[i].$1, size: 16, color: rows[i].$3),
+                      child: RbIcon(rows[i].$1, size: 16, color: rows[i].$3),
                     ),
                     const SizedBox(width: 12),
                     Expanded(child: Text(rows[i].$4, style: GoogleFonts.barlow(fontSize: 14.5, fontWeight: FontWeight.w500, color: AppColors.ink))),
-                    const Icon(LucideIcons.chevronRight, size: 16, color: AppColors.disabledTint),
+                    const RbIcon(RbGlyph.chevron, size: 16, color: AppColors.disabledTint),
                   ],
                 ),
               ),

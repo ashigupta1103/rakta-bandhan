@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../services/backend.dart';
 import '../services/chat_service.dart';
@@ -10,6 +9,7 @@ import '../widgets/pressable.dart';
 import '../widgets/state_card.dart';
 import 'call_screen.dart';
 import 'chat_screen.dart';
+import '../widgets/rb_icon.dart';
 
 /// Messages inbox — every person this user has been matched with, newest
 /// activity first. One row = one request: who, what it's about, the last
@@ -36,7 +36,7 @@ class ConversationsScreen extends StatelessWidget {
                 children: [
                   IconButton(
                     tooltip: 'Back',
-                    icon: const Icon(LucideIcons.arrowLeft, color: AppColors.ink),
+                    icon: const RbIcon(RbGlyph.back, color: AppColors.ink),
                     onPressed: () => Navigator.pop(context),
                   ),
                   Text('Messages', style: AppTextStyles.display(fontSize: 22, color: AppColors.ink)),
@@ -57,7 +57,7 @@ class ConversationsScreen extends StatelessWidget {
                       child: Padding(
                         padding: EdgeInsets.symmetric(horizontal: 24),
                         child: StateCard(
-                          icon: LucideIcons.messageSquare,
+                          icon: RbGlyph.message,
                           title: 'No conversations yet',
                           message: 'When a donor accepts your request — or you accept someone’s — you can message and call each other here. Phone numbers stay private.',
                         ),
@@ -215,7 +215,7 @@ class _ConversationRow extends StatelessWidget {
             if (c.isOpen && c.peerUid.isNotEmpty)
               IconButton(
                 tooltip: 'Voice call ${c.peerName}',
-                icon: const Icon(LucideIcons.phone, size: 19, color: AppColors.brandRed),
+                icon: const RbIcon(RbGlyph.phone, size: 19, color: AppColors.brandRed),
                 onPressed: () => _call(context),
               )
             else

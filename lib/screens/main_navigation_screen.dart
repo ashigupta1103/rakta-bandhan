@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../demo/demo.dart';
 import '../services/backend.dart';
 import '../services/chat_service.dart';
 import '../services/push_service.dart';
@@ -9,6 +9,7 @@ import 'community_screen.dart';
 import 'find_donors_screen.dart';
 import 'profile_screen.dart';
 import 'requests_screen.dart';
+import '../widgets/rb_icon.dart';
 
 /// The four-tab consumer shell from the final artifact ("The four-tab
 /// shell"): Request / Find / Community / My Page — replacing the previous
@@ -17,18 +18,23 @@ import 'requests_screen.dart';
 /// RequestsScreen); Home itself is left in place, unreferenced, rather than
 /// deleted.
 class MainNavigationScreen extends StatefulWidget {
-  const MainNavigationScreen({super.key});
+  /// Tab to open on (0 Request, 1 Find, 2 Community, 3 My Page).
+  final int initialTab;
+
+  const MainNavigationScreen({super.key, this.initialTab = 0});
 
   @override
   State<MainNavigationScreen> createState() => _MainNavigationScreenState();
 }
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
-  int _currentIndex = 0;
+  late int _currentIndex = widget.initialTab;
 
   @override
   void initState() {
     super.initState();
+    // Client demo: no push registration, no live call/alert listeners.
+    if (Demo.on) return;
     // Push token + topics for this signed-in phone (asks for notification
     // permission the first time). Needs the blood group for its topic.
     Backend.instance.myDonorDoc().then((snap) {
@@ -44,10 +50,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   ];
 
   static const _tabs = [
-    (icon: LucideIcons.droplet, label: 'Request'),
-    (icon: LucideIcons.radar, label: 'Find'),
-    (icon: LucideIcons.heartHandshake, label: 'Community'),
-    (icon: LucideIcons.user, label: 'My Page'),
+    (icon: RbGlyph.droplet, label: 'Request'),
+    (icon: RbGlyph.radar, label: 'Find'),
+    (icon: RbGlyph.community, label: 'Community'),
+    (icon: RbGlyph.person, label: 'My Page'),
   ];
 
   // No unread-activity source exists yet (Community has no backend feed in
@@ -62,7 +68,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     return Scaffold(
       // LiveEventsHost: incoming in-app calls and opted-in urgent alerts
       // interrupt from here, whichever tab or pushed screen is showing.
-      body: LiveEventsHost(child: IndexedStack(index: _currentIndex, children: _screens)),
+      body: Demo.on
+          ? IndexedStack(index: _currentIndex, children: _screens)
+          : LiveEventsHost(child: IndexedStack(index: _currentIndex, children: _screens)),
       // Unread messages put a dot on the Request tab (where the Messages
       // inbox lives), so a reply is noticed from any tab.
       bottomNavigationBar: StreamBuilder<int>(
@@ -72,7 +80,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     );
   }
 
-  late final Stream<int> _unread = ChatService.instance.watchUnreadCount();
+  late final Stream<int> _unread = Demo.on ? Stream.value(0) : ChatService.instance.watchUnreadCount();
 
   Widget _bottomNav({required bool requestHasUnread}) {
     return Container(
@@ -121,7 +129,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               child: Stack(
                 clipBehavior: Clip.none,
                 children: [
-                  Icon(tab.icon, size: 21, color: isActive ? AppColors.brandRed : AppColors.ink2),
+                  RbIcon(tab.icon, size: 21, color: isActive ? AppColors.brandRed : AppColors.ink2),
                   if (showUnreadDot)
                     Positioned(
                       right: -3,

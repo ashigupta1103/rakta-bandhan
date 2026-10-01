@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:rakta_bandhan/theme/app_theme.dart';
+import 'package:rakta_bandhan/widgets/rb_icon.dart';
 import 'package:rakta_bandhan/widgets/rb_ui.dart';
 
 /// The shared building blocks must lay out at a small phone width (360px)
@@ -27,16 +27,16 @@ void main() {
                   RbListGroup(
                     children: [
                       RbRow(
-                        icon: LucideIcons.bellRing,
+                        icon: RbGlyph.bell,
                         title: 'A very long settings row title that would overflow a naive Row layout',
                         subtitle: 'And an equally long subtitle explaining exactly what this setting does on the phone',
                         trailing: RbSwitch(value: true, onChanged: (_) {}),
                       ),
-                      RbRow(icon: LucideIcons.trash2, destructive: true, title: 'Delete my account', onTap: () {}),
+                      RbRow(icon: RbGlyph.trash, destructive: true, title: 'Delete my account', onTap: () {}),
                     ],
                   ),
                   const SizedBox(height: 12),
-                  const Wrap(spacing: 6, children: [RbChip('Verified donor', icon: LucideIcons.badgeCheck, tone: RbTone.success), RbChip('Available now')]),
+                  const Wrap(spacing: 6, children: [RbChip('Verified donor', icon: RbGlyph.verified, tone: RbTone.success), RbChip('Available now')]),
                   const SizedBox(height: 12),
                   RbStatePanel.error(title: "Couldn't load stories", message: 'Check your connection and try again.', onRetry: () => retried = true),
                   const RbAvatar(name: 'Radhika Dhruv'),

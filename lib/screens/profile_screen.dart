@@ -3,11 +3,10 @@ import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../demo/demo.dart';
 import '../services/backend.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
-import '../theme/app_theme.dart';
 import '../widgets/app_header.dart';
 import '../widgets/blood_group_droplet.dart';
 import '../widgets/impact_trail.dart';
@@ -18,9 +17,11 @@ import '../widgets/rb_ui.dart';
 import 'cooldown_screen.dart';
 import 'donation_history_screen.dart';
 import 'emergency_contact_screen.dart';
+import 'legal_reader_screen.dart';
 import 'notifications_screen.dart';
 import 'personal_information_screen.dart';
 import 'settings_screen.dart';
+import '../widgets/rb_icon.dart';
 
 /// My Page — the donor's own identity and the one place availability is
 /// switched. Order follows what a donor checks: who I am (photo, name,
@@ -34,7 +35,7 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  late final Future<String?> _publicArea = Backend.instance.myPublicArea();
+  late final Future<String?> _publicArea = Demo.on ? Future.value(Demo.area) : Backend.instance.myPublicArea();
   bool _photoBusy = false;
   bool _loggingOut = false;
   bool? _pendingAvailability;
@@ -42,6 +43,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
+    if (Demo.on) return;
     // A donation the requester completed while this app was closed: start
     // the recovery period now if the server hasn't already.
     Backend.instance.completeMyDonationIfConfirmed().catchError((_) => false);
@@ -69,6 +71,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   // ------------------------------------------------------------- photo
 
   Future<void> _changePhoto({required bool hasPhoto}) async {
+    if (Demo.on) {
+      // Honest unavailable state: nothing would be stored in a demo.
+      _showSnackBar('Photo upload isn’t available in the demo.');
+      return;
+    }
     final choice = await showModalBottomSheet<String>(
       context: context,
       backgroundColor: AppColors.warmGround,
@@ -79,11 +86,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              ListTile(leading: const Icon(LucideIcons.camera, size: 20), title: const Text('Take a photo'), onTap: () => Navigator.pop(ctx, 'camera')),
-              ListTile(leading: const Icon(LucideIcons.image, size: 20), title: const Text('Choose from gallery'), onTap: () => Navigator.pop(ctx, 'gallery')),
+              ListTile(leading: const RbIcon(RbGlyph.camera, size: 20), title: const Text('Take a photo'), onTap: () => Navigator.pop(ctx, 'camera')),
+              ListTile(leading: const RbIcon(RbGlyph.photo, size: 20), title: const Text('Choose from gallery'), onTap: () => Navigator.pop(ctx, 'gallery')),
               if (hasPhoto)
                 ListTile(
-                  leading: const Icon(LucideIcons.trash2, size: 20, color: AppColors.red700),
+                  leading: const RbIcon(RbGlyph.trash, size: 20, color: AppColors.red700),
                   title: const Text('Remove photo', style: TextStyle(color: AppColors.red700)),
                   onTap: () => Navigator.pop(ctx, 'remove'),
                 ),
@@ -147,7 +154,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _setAvailability(bool value) async {
     setState(() => _pendingAvailability = value);
     try {
-      await Backend.instance.setAvailability(value);
+      if (Demo.on) {
+        Demo.instance.setAvailable(value);
+      } else {
+        await Backend.instance.setAvailability(value);
+      }
       _showSnackBar(value ? 'You’re available to donate' : 'You’re marked as not available');
     } on DonorOnCooldownException catch (e) {
       _showSnackBar(e.toString());
@@ -169,16 +180,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
         onNotificationTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const NotificationsScreen())),
       ),
       body: SafeArea(
-        child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-          stream: Backend.instance.myDonorDocStream(),
+        child: StreamBuilder<Map<String, dynamic>>(
+          stream: Demo.on ? Demo.instance.watch(() => Demo.instance.myProfile) : Backend.instance.myDonorDocStream().map((s) => s.data() ?? {}),
           builder: (context, snapshot) {
             if (snapshot.hasError) {
-              return _message(LucideIcons.cloudOff, 'Couldn’t load your profile', 'Check your connection and try again.');
+              return _message(RbGlyph.offline, 'Couldn’t load your profile', 'Check your connection and try again.');
             }
             if (!snapshot.hasData) {
               return const Center(child: CircularProgressIndicator(strokeWidth: 2));
             }
-            final data = snapshot.data!.data() ?? {};
+            final data = snapshot.data!;
             final name = (data['name'] as String? ?? '').trim();
             final bloodGroup = data['blood_group'] as String?;
             final isVerified = data['is_verified'] as bool? ?? false;
@@ -188,7 +199,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             final photoUrl = data['photo_url'] as String?;
 
             return FutureBuilder<int>(
-              future: Backend.instance.myDonationCount(),
+              future: Demo.on ? Future.value(Demo.instance.myDonations) : Backend.instance.myDonationCount(),
               builder: (context, donationSnap) {
                 final donationCount = donationSnap.data ?? 0;
                 return ListView(
@@ -201,13 +212,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       photoUrl: photoUrl,
                       locationLabel: data['location_label'] as String?,
                     ),
-                    const RbSectionLabel('Availability'),
+                    const RbSectionLabel('Available to donate'),
                     RbListGroup(
                       children: [
                         _availabilityCard(isAvailable: isAvailable, resting: resting, reactivateAt: reactivateAt),
                         const UrgentAlertToggle(asCard: false),
                       ],
                     ),
+                    // Recovery is its own thing: it follows a recorded
+                    // donation and ends by itself — not a setting.
+                    if (resting && reactivateAt != null) ...[
+                      const RbSectionLabel('Donation recovery'),
+                      _recoveryCard(reactivateAt),
+                    ],
                     const RbSectionLabel('Your impact'),
                     ImpactTrail(
                       count: donationCount,
@@ -215,17 +232,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ? 'No donations recorded yet'
                           : '${donationCount == 1 ? '1 donation' : '$donationCount donations'} recorded through Rakta Bandhan',
                     ),
-                    if (reactivateAt != null && reactivateAt.isAfter(DateTime.now())) ...[
-                      const SizedBox(height: 14),
-                      _cooldownRow(reactivateAt),
-                    ],
                     const RbSectionLabel('Account'),
                     RbListGroup(
                       children: [
-                        RbRow(icon: LucideIcons.user, title: 'Personal information', onTap: () => _push(const PersonalInformationScreen())),
-                        RbRow(icon: LucideIcons.history, title: 'Donation history & certificates', onTap: () => _push(const DonationHistoryScreen())),
-                        RbRow(icon: LucideIcons.heartHandshake, title: 'Emergency contact', onTap: () => _push(const EmergencyContactScreen())),
-                        RbRow(icon: LucideIcons.slidersHorizontal, title: 'Settings & privacy', onTap: () => _push(const SettingsScreen())),
+                        RbRow(icon: RbGlyph.certificate, bare: true, title: 'Donation history & certificates', onTap: () => _push(const DonationHistoryScreen())),
+                        RbRow(icon: RbGlyph.person, bare: true, title: 'Personal information', onTap: () => _push(const PersonalInformationScreen())),
+                        RbRow(icon: RbGlyph.phoneHeart, bare: true, title: 'Emergency contact', onTap: () => _push(const EmergencyContactScreen())),
+                      ],
+                    ),
+                    const RbSectionLabel('Privacy'),
+                    RbListGroup(
+                      children: [
+                        RbRow(icon: RbGlyph.settings, bare: true, title: 'Settings, your data & account', onTap: () => _push(const SettingsScreen())),
+                        RbRow(icon: RbGlyph.shield, bare: true, title: 'Privacy policy', onTap: () => _push(const LegalReaderScreen.privacy())),
+                        RbRow(icon: RbGlyph.page, bare: true, title: 'Terms of use', onTap: () => _push(const LegalReaderScreen.terms())),
                       ],
                     ),
                     const SizedBox(height: 6),
@@ -236,7 +256,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         onPressed: _loggingOut ? null : _logOut,
                         icon: _loggingOut
                             ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                            : const Icon(LucideIcons.logOut, size: 17),
+                            : const RbIcon(RbGlyph.logout, size: 17),
                         label: Text(_loggingOut ? 'Logging out…' : 'Log out'),
                       ),
                     ),
@@ -288,7 +308,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         fg: AppColors.red700,
                       ),
                     _chip(
-                      leading: Icon(isVerified ? LucideIcons.badgeCheck : LucideIcons.clock, size: 13, color: isVerified ? AppColors.successText : AppColors.goldDeep),
+                      leading: RbIcon(isVerified ? RbGlyph.verified : RbGlyph.clock, size: 13, color: isVerified ? AppColors.successText : AppColors.goldDeep),
                       text: isVerified ? 'Verified' : 'Verification pending',
                       bg: isVerified ? AppColors.warmGreenBg : AppColors.goldTint,
                       fg: isVerified ? AppColors.successText : AppColors.goldDeep,
@@ -303,7 +323,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     final text = area != null ? 'Approx. area: $area' : Backend.shortPlace(locationLabel, fallback: 'Area not set');
                     return Row(
                       children: [
-                        const Icon(LucideIcons.mapPin, size: 14, color: AppColors.ink2),
+                        const RbIcon(RbGlyph.pin, size: 14, color: AppColors.ink2),
                         const SizedBox(width: 6),
                         Expanded(child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, color: AppColors.ink2))),
                       ],
@@ -369,7 +389,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   height: 30,
                   decoration: BoxDecoration(color: AppColors.brandRed, shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 2.5)),
                   alignment: Alignment.center,
-                  child: const Icon(LucideIcons.camera, size: 14, color: Colors.white),
+                  child: const RbIcon(RbGlyph.camera, size: 14, color: Colors.white),
                 ),
               ),
             ],
@@ -414,7 +434,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 const SizedBox(height: 2),
                 Text(
                   resting && reactivateAt != null
-                      ? 'Resting after your donation · you can turn this on in ${_eligibleInDays(reactivateAt)} days'
+                      ? 'Paused during your recovery — it switches back on its own'
                       : isAvailable
                           ? 'On — nearby requesters can find you and alerts can reach you'
                           : 'Off — you’re hidden from the donor map and alerts',
@@ -431,38 +451,51 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _cooldownRow(DateTime reactivateAt) => Material(
-        color: AppColors.goldTint,
-        borderRadius: BorderRadius.circular(AppTheme.controlRadius),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(AppTheme.controlRadius),
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const CooldownScreen())),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-            child: Row(
-              children: [
-                const Icon(LucideIcons.hourglass, size: 16, color: AppColors.goldDeep),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text('Recovering · eligible again in ${_eligibleInDays(reactivateAt)} days',
-                      style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.goldDeep)),
+  /// The 90 days after a recorded donation: how far along, and the way in
+  /// to the recovery screen (and its word riddles).
+  Widget _recoveryCard(DateTime reactivateAt) {
+    final left = _eligibleInDays(reactivateAt);
+    final progress = ((90 - left) / 90).clamp(0.0, 1.0);
+    return RbCard(
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const CooldownScreen())),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const RbIcon(RbGlyph.hourglass, size: 22, color: AppColors.goldDeep),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('$left days to go', style: AppTextStyles.display(fontSize: 19, color: AppColors.ink)),
+                    const Text('Your body is replenishing after your donation', style: TextStyle(fontSize: 13, color: AppColors.ink2)),
+                  ],
                 ),
-                const Icon(LucideIcons.chevronRight, size: 16, color: AppColors.goldDeep),
-              ],
-            ),
+              ),
+              const RbIcon(RbGlyph.chevron, size: 16, color: AppColors.chevronMuted),
+            ],
           ),
-        ),
-      );
+          const SizedBox(height: 14),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(99),
+            child: LinearProgressIndicator(value: progress, minHeight: 6, color: AppColors.gold, backgroundColor: AppColors.goldTint),
+          ),
+        ],
+      ),
+    );
+  }
 
   void _push(Widget screen) => Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
 
-  Widget _message(IconData icon, String title, String body) => Center(
+  Widget _message(RbGlyph icon, String title, String body) => Center(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 32),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 28, color: AppColors.ink2),
+              RbIcon(icon, size: 28, color: AppColors.ink2),
               const SizedBox(height: 12),
               Text(title, textAlign: TextAlign.center, style: AppTextStyles.display(fontSize: 20, color: AppColors.ink)),
               const SizedBox(height: 6),

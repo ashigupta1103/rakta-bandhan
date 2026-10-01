@@ -2,10 +2,10 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import '../demo/demo.dart';
 import '../services/backend.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../services/alert_sound.dart';
 import '../services/call_service.dart';
@@ -15,6 +15,7 @@ import '../widgets/identity_disc.dart';
 import '../widgets/pressable.dart';
 import '../widgets/ring_field.dart';
 import 'chat_screen.dart';
+import '../widgets/rb_icon.dart';
 
 /// Opens the call screen immediately and lets it place the call. Every
 /// entry point (chat header, contact sheet, donor-found, match-contact,
@@ -88,7 +89,9 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
   String get _requestId => _call?.requestId ?? widget.requestId!;
   String get _peerName => _call?.peerName ?? widget.peerName ?? '';
 
-  late final Future<DocumentSnapshot<Map<String, dynamic>>> _request = FirebaseFirestore.instance.collection('requests').doc(_requestId).get();
+  late final Future<Map<String, dynamic>?> _request = Demo.isDemoId(_requestId)
+      ? Future.value(Demo.instance.request)
+      : FirebaseFirestore.instance.collection('requests').doc(_requestId).get().then((s) => s.data());
 
   @override
   void initState() {
@@ -109,6 +112,10 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
       _failure = null;
       _showHint = false;
     });
+    if (Demo.isDemoId(widget.requestId)) {
+      _attach(ActiveCall.simulated(requestId: widget.requestId!, peerName: widget.peerName!, isCaller: true));
+      return;
+    }
     try {
       final call = await CallService.instance.startCall(requestId: widget.requestId!, peerUid: widget.peerUid!, peerName: widget.peerName!, myName: widget.myName);
       if (!mounted) {
@@ -267,7 +274,7 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
                           alignment: Alignment.centerLeft,
                           child: IconButton(
                             tooltip: 'Close',
-                            icon: const Icon(LucideIcons.x, color: AppColors.onEmberMuted, size: 20),
+                            icon: const RbIcon(RbGlyph.close, color: AppColors.onEmberMuted, size: 20),
                             onPressed: () => Navigator.of(context).maybePop(),
                           ),
                         ),
@@ -277,7 +284,7 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
                 // Invisible, but required: on web this element is what
                 // actually plays the other person's voice. Unmounted as soon
                 // as the call ends — the renderer is disposed right after.
-                SizedBox(width: 1, height: 1, child: live ? RTCVideoView(call.remoteRenderer) : null),
+                SizedBox(width: 1, height: 1, child: live && !call.simulated ? RTCVideoView(call.remoteRenderer) : null),
                 Expanded(
                   // Scrolls instead of overflowing on short phones or with
                   // large system text.
@@ -315,10 +322,10 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
                               ),
                             ),
                             const SizedBox(height: 16),
-                            FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                            FutureBuilder<Map<String, dynamic>?>(
                               future: _request,
                               builder: (context, snap) {
-                                final r = snap.data?.data();
+                                final r = snap.data;
                                 if (r == null) return const SizedBox(height: 28);
                                 final place = (r['location_label'] as String? ?? '').split(',').first.trim();
                                 return _ContextChip(text: '${r['blood_group'] ?? ''} request${place.isEmpty ? '' : ' · $place'}');
@@ -353,21 +360,21 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
       case _Stage.starting:
         return const SizedBox(width: 13, height: 13, child: CircularProgressIndicator(strokeWidth: 1.6, color: AppColors.onEmberAccent));
       case _Stage.failed:
-        return const Icon(LucideIcons.circleAlert, size: size, color: AppColors.onEmberAccent);
+        return const RbIcon(RbGlyph.alertCircle, size: size, color: AppColors.onEmberAccent);
       case _Stage.noAnswer:
-        return const Icon(LucideIcons.phoneMissed, size: size, color: AppColors.onEmberAccent);
+        return const RbIcon(RbGlyph.phoneMissed, size: size, color: AppColors.onEmberAccent);
       case _Stage.live:
         break;
     }
     return switch (call!.phase) {
       CallPhase.connecting => const SizedBox(width: 13, height: 13, child: CircularProgressIndicator(strokeWidth: 1.6, color: AppColors.onEmberAccent)),
-      CallPhase.ringing => const Icon(LucideIcons.phoneOutgoing, size: size, color: AppColors.onEmberAccent),
+      CallPhase.ringing => const RbIcon(RbGlyph.phone, size: size, color: AppColors.onEmberAccent),
       CallPhase.active => Container(
         width: 8,
         height: 8,
         decoration: const BoxDecoration(color: AppColors.onEmberSuccess, shape: BoxShape.circle),
       ),
-      CallPhase.ended => const Icon(LucideIcons.phoneOff, size: size, color: AppColors.onEmberFaint),
+      CallPhase.ended => const RbIcon(RbGlyph.hangUp, size: size, color: AppColors.onEmberFaint),
     };
   }
 
@@ -401,13 +408,13 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
               _RoundControl(
-                icon: (call?.muted ?? false) ? LucideIcons.micOff : LucideIcons.mic,
+                icon: (call?.muted ?? false) ? RbGlyph.micOff : RbGlyph.mic,
                 label: (call?.muted ?? false) ? 'Unmute' : 'Mute',
                 active: call?.muted ?? false,
                 onTap: enabled ? call.toggleMute : null,
               ),
-              _RoundControl(icon: LucideIcons.volume2, label: 'Speaker', active: call?.speakerOn ?? false, onTap: enabled ? call.toggleSpeaker : null),
-              _RoundControl(icon: LucideIcons.messageSquare, label: 'Message', active: false, onTap: _openChat),
+              _RoundControl(icon: RbGlyph.speaker, label: 'Speaker', active: call?.speakerOn ?? false, onTap: enabled ? call.toggleSpeaker : null),
+              _RoundControl(icon: RbGlyph.message, label: 'Message', active: false, onTap: _openChat),
             ],
           ),
         ),
@@ -444,7 +451,7 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
           ElevatedButton.icon(
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.warmPageBackground, foregroundColor: AppColors.gradientEmberMid),
             onPressed: () => _openChat(replace: true),
-            icon: const Icon(LucideIcons.messageSquare, size: 16),
+            icon: const RbIcon(RbGlyph.message, size: 16),
             label: Text('Message $_firstName', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
           ),
           const SizedBox(height: 10),
@@ -455,7 +462,7 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
                 side: const BorderSide(color: AppColors.onEmberOutline),
               ),
               onPressed: _place,
-              icon: const Icon(LucideIcons.phone, size: 15),
+              icon: const RbIcon(RbGlyph.phone, size: 15),
               label: const Text('Call again in the app'),
             ),
           const SizedBox(height: 4),
@@ -492,6 +499,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> with SingleTick
   void initState() {
     super.initState();
     AlertSound.incomingCall.start();
+    if (Demo.isDemoId(incoming.requestId)) return;
     _sub = FirebaseFirestore.instance.collection('requests').doc(incoming.requestId).collection('calls').doc(incoming.callId).snapshots().listen((snap) {
       final status = snap.data()?['status'];
       if (status != 'ringing' && !_busy && mounted) {
@@ -523,6 +531,13 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> with SingleTick
     final navigator = Navigator.of(context);
     final messenger = ScaffoldMessenger.of(context);
     await AlertSound.incomingCall.stop();
+    if (Demo.isDemoId(incoming.requestId)) {
+      navigator.pushReplacement(MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => CallScreen(call: ActiveCall.simulated(requestId: incoming.requestId, peerName: incoming.callerName, isCaller: false)),
+      ));
+      return;
+    }
     try {
       final call = await CallService.instance.answer(incoming);
       navigator.pushReplacement(MaterialPageRoute(fullscreenDialog: true, builder: (_) => CallScreen(call: call)));
@@ -540,7 +555,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> with SingleTick
     if (_busy) return;
     setState(() => _busy = true);
     await AlertSound.incomingCall.stop();
-    await CallService.instance.decline(incoming);
+    if (!Demo.isDemoId(incoming.requestId)) await CallService.instance.decline(incoming);
     if (!mounted) return;
     if (thenMessage) {
       Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => ChatScreen(requestId: incoming.requestId)));
@@ -582,15 +597,15 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> with SingleTick
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _AnswerButton(icon: LucideIcons.phoneOff, label: 'Decline', color: AppColors.brandRed, onTap: _busy ? null : () => _decline()),
-                      _AnswerButton(icon: LucideIcons.phone, label: 'Accept', color: AppColors.successText, onTap: _busy ? null : _accept),
+                      _AnswerButton(icon: RbGlyph.hangUp, label: 'Decline', color: AppColors.brandRed, onTap: _busy ? null : () => _decline()),
+                      _AnswerButton(icon: RbGlyph.phone, label: 'Accept', color: AppColors.successText, onTap: _busy ? null : _accept),
                     ],
                   ),
                 ),
                 const SizedBox(height: 18),
                 TextButton.icon(
                   onPressed: _busy ? null : () => _decline(thenMessage: true),
-                  icon: const Icon(LucideIcons.messageSquare, size: 15, color: AppColors.onEmberMuted),
+                  icon: const RbIcon(RbGlyph.message, size: 15, color: AppColors.onEmberMuted),
                   label: const Text('Can’t talk — send a message', style: TextStyle(fontSize: 13.5, color: AppColors.onEmberMuted)),
                 ),
                 const SizedBox(height: 20),
@@ -629,7 +644,7 @@ class _TrustLine extends StatelessWidget {
   Widget build(BuildContext context) => Row(
     mainAxisAlignment: MainAxisAlignment.center,
     children: [
-      Icon(LucideIcons.lock, size: 12, color: AppColors.onEmber.withValues(alpha: 0.55)),
+      RbIcon(RbGlyph.lock, size: 12, color: AppColors.onEmber.withValues(alpha: 0.55)),
       const SizedBox(width: 6),
       Text('Rakta Bandhan call · encrypted, never recorded', style: TextStyle(fontSize: 11.5, color: AppColors.onEmber.withValues(alpha: 0.55))),
     ],
@@ -691,7 +706,7 @@ class _ContextChip extends StatelessWidget {
 }
 
 class _RoundControl extends StatelessWidget {
-  final IconData icon;
+  final RbGlyph icon;
   final String label;
   final bool active;
   final VoidCallback? onTap;
@@ -716,7 +731,7 @@ class _RoundControl extends StatelessWidget {
               height: 62,
               decoration: BoxDecoration(color: active ? AppColors.onEmber : Colors.white.withValues(alpha: 0.1), shape: BoxShape.circle),
               alignment: Alignment.center,
-              child: Icon(icon, size: 22, color: active ? AppColors.gradientEmberMid : AppColors.onEmber),
+              child: RbIcon(icon, size: 22, color: active ? AppColors.gradientEmberMid : AppColors.onEmber),
             ),
             const SizedBox(height: 8),
             Text(label, style: const TextStyle(fontSize: 12, color: AppColors.onEmberMuted)),
@@ -745,13 +760,13 @@ class _EndButton extends StatelessWidget {
         boxShadow: const [BoxShadow(color: AppColors.shadowDark, blurRadius: 18, offset: Offset(0, 6))],
       ),
       alignment: Alignment.center,
-      child: const Icon(LucideIcons.phoneOff, size: 26, color: Colors.white),
+      child: const RbIcon(RbGlyph.hangUp, size: 26, color: Colors.white),
     ),
   );
 }
 
 class _AnswerButton extends StatelessWidget {
-  final IconData icon;
+  final RbGlyph icon;
   final String label;
   final Color color;
   final VoidCallback? onTap;
@@ -771,7 +786,7 @@ class _AnswerButton extends StatelessWidget {
           height: 72,
           decoration: BoxDecoration(color: color, shape: BoxShape.circle),
           alignment: Alignment.center,
-          child: Icon(icon, size: 26, color: Colors.white),
+          child: RbIcon(icon, size: 26, color: Colors.white),
         ),
         const SizedBox(height: 10),
         Text(label, style: const TextStyle(fontSize: 13, color: AppColors.onEmberMuted)),

@@ -6,13 +6,13 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart' as gm;
 import 'package:latlong2/latlong.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../services/backend.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/map_tiles.dart';
 import '../widgets/pressable.dart';
+import '../widgets/rb_icon.dart';
 
 @immutable
 class PickedLocation {
@@ -306,7 +306,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                       children: [
                         IconButton(
                           tooltip: 'Back',
-                          icon: const Icon(LucideIcons.arrowLeft, size: 20, color: AppColors.ink),
+                          icon: const RbIcon(RbGlyph.back, size: 20, color: AppColors.ink),
                           onPressed: () => Navigator.of(context).pop(),
                         ),
                         Expanded(
@@ -345,7 +345,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                         separatorBuilder: (_, _) => const Divider(height: 1, color: AppColors.warmDivider),
                         itemBuilder: (_, i) => ListTile(
                           dense: true,
-                          leading: const Icon(LucideIcons.mapPin, size: 17, color: AppColors.ink2),
+                          leading: const RbIcon(RbGlyph.pin, size: 17, color: AppColors.ink2),
                           title: Text(_results[i]['label'] as String, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13.5, color: AppColors.ink)),
                           onTap: () => _pickResult(_results[i]),
                         ),
@@ -380,7 +380,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                       alignment: Alignment.center,
                       child: _locating
                           ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                          : const Icon(LucideIcons.locateFixed, size: 20, color: AppColors.brandRed),
+                          : const RbIcon(RbGlyph.locate, size: 20, color: AppColors.brandRed),
                     ),
                   ),
                 ),
@@ -400,7 +400,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Padding(padding: EdgeInsets.only(top: 2), child: Icon(LucideIcons.mapPin, size: 17, color: AppColors.brandRed)),
+                          const Padding(padding: EdgeInsets.only(top: 2), child: RbIcon(RbGlyph.pin, size: 17, color: AppColors.brandRed)),
                           const SizedBox(width: 10),
                           Expanded(
                             child: AnimatedSwitcher(

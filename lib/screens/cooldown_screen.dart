@@ -2,12 +2,13 @@ import 'dart:math' as math;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../demo/demo.dart';
 import '../services/backend.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import 'community_screen.dart';
-import 'tic_tac_toe_screen.dart';
+import 'word_riddle_screen.dart';
+import '../widgets/rb_icon.dart';
 
 /// Real cooldown status — `donors/{uid}`'s `last_donation_date` and
 /// `reactivation_scheduled_at` are already written by the existing
@@ -30,22 +31,25 @@ class CooldownScreen extends StatelessWidget {
                   Align(
                     alignment: Alignment.centerLeft,
                     child: IconButton(
-                      icon: const Icon(LucideIcons.arrowLeft, color: AppColors.textPrimaryWarm),
+                      icon: const RbIcon(RbGlyph.back, color: AppColors.textPrimaryWarm),
                       onPressed: () => Navigator.of(context).maybePop(),
                     ),
                   ),
-                  const Text('Your recovery', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
+                  const Text('Donation recovery', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
                 ],
               ),
             ),
             Expanded(
-              child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                stream: Backend.instance.myDonorDocStream(),
+              child: StreamBuilder<Map<String, dynamic>>(
+                stream: Demo.on ? Demo.instance.watch(() => Demo.instance.myProfile) : Backend.instance.myDonorDocStream().map((s) => s.data() ?? {}),
                 builder: (context, snapshot) {
+                  if (snapshot.hasError) {
+                    return const Center(child: Text('Couldn’t load your recovery details. Check your connection and try again.', textAlign: TextAlign.center, style: TextStyle(color: AppColors.textSecondary)));
+                  }
                   if (!snapshot.hasData) {
                     return const Center(child: CircularProgressIndicator(strokeWidth: 2));
                   }
-                  final data = snapshot.data!.data() ?? {};
+                  final data = snapshot.data!;
                   final reactivateAt = (data['reactivation_scheduled_at'] as Timestamp?)?.toDate();
                   final lastDonation = (data['last_donation_date'] as Timestamp?)?.toDate();
                   final isAvailable = data['is_available'] as bool? ?? true;
@@ -72,7 +76,8 @@ class CooldownScreen extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(20),
-                            boxShadow: [BoxShadow(color: AppColors.shadowHero, blurRadius: 22, offset: const Offset(0, 8))],
+                            border: Border.all(color: AppColors.warmBorder.withValues(alpha: 0.7)),
+                            boxShadow: const [BoxShadow(color: AppColors.shadowCard, blurRadius: 18, offset: Offset(0, 6))],
                           ),
                           child: Column(
                             children: [
@@ -109,7 +114,7 @@ class CooldownScreen extends StatelessWidget {
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  const Icon(LucideIcons.clock, size: 14, color: AppColors.goldDeep),
+                                  const RbIcon(RbGlyph.clock, size: 14, color: AppColors.goldDeep),
                                   const SizedBox(width: 8),
                                   Text.rich(
                                     TextSpan(
@@ -128,12 +133,12 @@ class CooldownScreen extends StatelessWidget {
                         const SizedBox(height: 22),
                         const Align(
                           alignment: Alignment.centerLeft,
-                          child: Text('While you wait', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.1, color: AppColors.textSecondary)),
+                          child: Text('While you recover', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
                         ),
                         const SizedBox(height: 10),
                         InkWell(
                           borderRadius: BorderRadius.circular(12),
-                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const TicTacToeScreen())),
+                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const WordRiddleScreen())),
                           child: Container(
                             padding: const EdgeInsets.all(14),
                             decoration: BoxDecoration(color: Colors.white, border: Border.all(color: AppColors.warmBorder), borderRadius: BorderRadius.circular(12)),
@@ -144,19 +149,19 @@ class CooldownScreen extends StatelessWidget {
                                   height: 42,
                                   decoration: BoxDecoration(color: AppColors.goldTint, borderRadius: BorderRadius.circular(12)),
                                   alignment: Alignment.center,
-                                  child: const Icon(LucideIcons.grid3x3, size: 19, color: AppColors.goldDeep),
+                                  child: const RbIcon(RbGlyph.pen, size: 19, color: AppColors.goldDeep),
                                 ),
                                 const SizedBox(width: 13),
                                 const Expanded(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Text('Play a round of XO', style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
-                                      Text('A small thing to pass the time. Nothing to win.', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                                      Text('Word riddles', style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
+                                      Text('Six short stages about blood and community. Nothing to win.', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                                     ],
                                   ),
                                 ),
-                                const Icon(LucideIcons.chevronRight, size: 16, color: AppColors.chevronMuted),
+                                const RbIcon(RbGlyph.chevron, size: 16, color: AppColors.chevronMuted),
                               ],
                             ),
                           ),
@@ -175,7 +180,7 @@ class CooldownScreen extends StatelessWidget {
                                   height: 42,
                                   decoration: BoxDecoration(color: AppColors.red100, borderRadius: BorderRadius.circular(12)),
                                   alignment: Alignment.center,
-                                  child: const Icon(LucideIcons.heartHandshake, size: 19, color: AppColors.brandRed),
+                                  child: const RbIcon(RbGlyph.community, size: 19, color: AppColors.brandRed),
                                 ),
                                 const SizedBox(width: 13),
                                 const Expanded(
@@ -187,7 +192,7 @@ class CooldownScreen extends StatelessWidget {
                                     ],
                                   ),
                                 ),
-                                const Icon(LucideIcons.chevronRight, size: 16, color: AppColors.chevronMuted),
+                                const RbIcon(RbGlyph.chevron, size: 16, color: AppColors.chevronMuted),
                               ],
                             ),
                           ),
@@ -223,7 +228,7 @@ class CooldownScreen extends StatelessWidget {
             height: 56,
             decoration: const BoxDecoration(color: AppColors.warmGreenBg, shape: BoxShape.circle),
             alignment: Alignment.center,
-            child: const Icon(LucideIcons.checkCircle, size: 24, color: AppColors.warmGreenText),
+            child: const RbIcon(RbGlyph.checkCircle, size: 24, color: AppColors.warmGreenText),
           ),
           const SizedBox(height: 16),
           const Text("You're eligible to donate again", textAlign: TextAlign.center, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500, color: AppColors.textPrimaryWarm)),

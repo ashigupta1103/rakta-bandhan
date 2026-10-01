@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/app_header.dart';
@@ -9,6 +8,7 @@ import '../widgets/identity_disc.dart';
 import '../widgets/impact_trail.dart';
 import '../widgets/status_badge.dart';
 import 'notifications_screen.dart';
+import '../widgets/rb_icon.dart';
 
 // ═══════════════════════════════════════════════════════════════════════
 // TEMPORARY PREVIEW UI — NOT PART OF THE REAL APP.
@@ -33,10 +33,10 @@ class _PreviewUiScreenState extends State<PreviewUiScreen> {
   int _tab = 0;
 
   static const _tabs = [
-    (icon: LucideIcons.droplet, label: 'Request'),
-    (icon: LucideIcons.radar, label: 'Find'),
-    (icon: LucideIcons.heartHandshake, label: 'Community'),
-    (icon: LucideIcons.user, label: 'My Page'),
+    (icon: RbGlyph.droplet, label: 'Request'),
+    (icon: RbGlyph.radar, label: 'Find'),
+    (icon: RbGlyph.community, label: 'Community'),
+    (icon: RbGlyph.person, label: 'My Page'),
   ];
 
   void _previewOnly(String label) {
@@ -79,7 +79,7 @@ class _PreviewUiScreenState extends State<PreviewUiScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       child: Row(
         children: [
-          const Icon(LucideIcons.eye, size: 13, color: Colors.white),
+          const RbIcon(RbGlyph.eye, size: 13, color: Colors.white),
           const SizedBox(width: 7),
           const Expanded(
             child: Text(
@@ -130,7 +130,7 @@ class _PreviewUiScreenState extends State<PreviewUiScreen> {
               child: isActive ? DecoratedBox(decoration: BoxDecoration(color: AppColors.brandRed, borderRadius: BorderRadius.circular(999))) : null,
             ),
             const SizedBox(height: 3),
-            Icon(tab.icon, size: 22, color: isActive ? AppColors.brandRed : AppColors.ink2),
+            RbIcon(tab.icon, size: 22, color: isActive ? AppColors.brandRed : AppColors.ink2),
             const SizedBox(height: 3),
             Text(tab.label, style: TextStyle(fontSize: 10.5, fontWeight: isActive ? FontWeight.w600 : FontWeight.w400, color: isActive ? AppColors.brandRed : AppColors.ink2)),
           ],
@@ -212,7 +212,7 @@ class _PreviewRequestTab extends StatelessWidget {
                         ],
                       ),
                     ),
-                    const Icon(LucideIcons.chevronRight, size: 16, color: AppColors.disabledTint),
+                    const RbIcon(RbGlyph.chevron, size: 16, color: AppColors.disabledTint),
                   ],
                 ),
               ),
@@ -225,7 +225,7 @@ class _PreviewRequestTab extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 15),
                     child: Row(
                       children: [
-                        Container(width: 42, height: 42, decoration: const BoxDecoration(color: AppColors.red100, shape: BoxShape.circle), alignment: Alignment.center, child: const Icon(LucideIcons.plus, size: 17, color: AppColors.brandRed)),
+                        Container(width: 42, height: 42, decoration: const BoxDecoration(color: AppColors.red100, shape: BoxShape.circle), alignment: Alignment.center, child: const RbIcon(RbGlyph.plus, size: 17, color: AppColors.brandRed)),
                         const SizedBox(width: 13),
                         Expanded(
                           child: Column(
@@ -265,7 +265,7 @@ class _PreviewFindTab extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(color: Colors.white, border: Border.all(color: AppColors.cardBorderWarm), borderRadius: BorderRadius.circular(15)),
-            child: const Row(children: [Icon(LucideIcons.search, size: 16, color: AppColors.textSecondary), SizedBox(width: 10), Text('Search location (preview)', style: TextStyle(fontSize: 14, color: AppColors.disabledTint))]),
+            child: const Row(children: [RbIcon(RbGlyph.search, size: 16, color: AppColors.textSecondary), SizedBox(width: 10), Text('Search location (preview)', style: TextStyle(fontSize: 14, color: AppColors.disabledTint))]),
           ),
         ),
         Expanded(
@@ -366,7 +366,7 @@ class _PreviewCommunityTabState extends State<_PreviewCommunityTab> {
           onTap: () => onAction('Share an experience'),
           child: Row(
             children: [
-              Container(width: 38, height: 38, decoration: const BoxDecoration(color: AppColors.goldTint, shape: BoxShape.circle), alignment: Alignment.center, child: const Icon(LucideIcons.penLine, size: 16, color: AppColors.goldDeep)),
+              Container(width: 38, height: 38, decoration: const BoxDecoration(color: AppColors.goldTint, shape: BoxShape.circle), alignment: Alignment.center, child: const RbIcon(RbGlyph.pen, size: 16, color: AppColors.goldDeep)),
               const SizedBox(width: 11),
               Expanded(
                 child: Container(
@@ -415,7 +415,7 @@ class _PreviewCommunityTabState extends State<_PreviewCommunityTab> {
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: AppColors.shadowCard, blurRadius: 20, offset: const Offset(0, 6))]),
       child: Column(
         children: [
-          Container(width: 52, height: 52, decoration: const BoxDecoration(color: AppColors.goldTint, shape: BoxShape.circle), alignment: Alignment.center, child: const Icon(LucideIcons.megaphone, size: 22, color: AppColors.goldDeep)),
+          Container(width: 52, height: 52, decoration: const BoxDecoration(color: AppColors.goldTint, shape: BoxShape.circle), alignment: Alignment.center, child: const RbIcon(RbGlyph.megaphone, size: 22, color: AppColors.goldDeep)),
           const SizedBox(height: 16),
           Text('Sample announcement', textAlign: TextAlign.center, style: AppTextStyles.display(fontSize: 18, color: AppColors.ink)),
           const SizedBox(height: 8),
@@ -518,7 +518,7 @@ class _PreviewMyPageTabState extends State<_PreviewMyPageTab> {
                         child: Container(
                           padding: const EdgeInsets.all(14),
                           decoration: BoxDecoration(border: row != 'Settings' ? const Border(bottom: BorderSide(color: AppColors.dividerWarm)) : null),
-                          child: Row(children: [Expanded(child: Text(row, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm))), const Icon(LucideIcons.chevronRight, size: 16, color: AppColors.chevronMuted)]),
+                          child: Row(children: [Expanded(child: Text(row, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm))), const RbIcon(RbGlyph.chevron, size: 16, color: AppColors.chevronMuted)]),
                         ),
                       ),
                   ],
@@ -528,7 +528,7 @@ class _PreviewMyPageTabState extends State<_PreviewMyPageTab> {
                 onTap: () => widget.onAction('Log out'),
                 child: const Padding(
                   padding: EdgeInsets.symmetric(vertical: 16, horizontal: 4),
-                  child: Row(children: [Icon(LucideIcons.logOut, color: AppColors.textMuted, size: 17), SizedBox(width: 10), Text('Log out', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.textMuted))]),
+                  child: Row(children: [RbIcon(RbGlyph.logout, color: AppColors.textMuted, size: 17), SizedBox(width: 10), Text('Log out', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.textMuted))]),
                 ),
               ),
             ],

@@ -4,8 +4,8 @@ import 'dart:math' as math;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../demo/demo.dart';
 import '../services/backend.dart';
 import '../services/call_service.dart';
 import '../services/chat_service.dart';
@@ -16,6 +16,7 @@ import '../widgets/confirm_sheet.dart';
 import '../widgets/identity_disc.dart';
 import '../widgets/pressable.dart';
 import 'call_screen.dart';
+import '../widgets/rb_icon.dart';
 
 /// In-app chat between the requester and the donor on one matched request.
 ///
@@ -51,7 +52,18 @@ class _ChatScreenState extends State<ChatScreen> {
   /// marker is written once per new message, not on every rebuild.
   String? _markedReadUpTo;
 
-  String get _myUid => Backend.instance.currentUser?.uid ?? '';
+  bool get _demo => Demo.isDemoId(widget.requestId);
+  String get _myUid => _demo ? Demo.instance.myUid : Backend.instance.currentUser?.uid ?? '';
+  Stream<Map<String, dynamic>?> get _doc => Demo.requestDoc(widget.requestId);
+  Stream<List<ChatMessage>> get _messages =>
+      _demo ? Demo.instance.watch(() => Demo.instance.messages) : ChatService.instance.watchMessages(widget.requestId);
+
+  /// Actions that would write moderation records — not simulated.
+  bool _notInDemo() {
+    if (!_demo) return false;
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reporting and blocking aren’t part of the demo.')));
+    return true;
+  }
 
   @override
   void initState() {
@@ -75,7 +87,11 @@ class _ChatScreenState extends State<ChatScreen> {
     try {
       if (preset == null) _controller.clear();
       HapticFeedback.selectionClick();
-      await ChatService.instance.sendText(widget.requestId, text, amRequester: _amRequester);
+      if (_demo) {
+        Demo.instance.send(text);
+      } else {
+        await ChatService.instance.sendText(widget.requestId, text, amRequester: _amRequester);
+      }
     } catch (_) {
       if (!mounted) return;
       // Put the text back so nothing typed is lost.
@@ -87,7 +103,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _callInApp(_Peer peer) async {
-    final me = (await Backend.instance.myDonorDoc()).data();
+    final me = _demo ? {'name': Demo.instance.myName} : (await Backend.instance.myDonorDoc()).data();
     if (!mounted) return;
     await startCallFlow(
       context,
@@ -114,9 +130,9 @@ class _ChatScreenState extends State<ChatScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (hospitalLat != null && hospitalLng != null)
-                _sheetRow(sheet, 'hospital', LucideIcons.building2, 'Send the hospital location',
+                _sheetRow(sheet, 'hospital', RbGlyph.building, 'Send the hospital location',
                     hospitalLabel.isEmpty ? 'Where the blood is needed' : hospitalLabel),
-              _sheetRow(sheet, 'me', LucideIcons.locateFixed, 'Send my current location', 'Only to this person, just this once'),
+              _sheetRow(sheet, 'me', RbGlyph.locate, 'Send my current location', 'Only to this person, just this once'),
             ],
           ),
         ),
@@ -124,6 +140,11 @@ class _ChatScreenState extends State<ChatScreen> {
     );
     if (choice == null || !mounted) return;
     final messenger = ScaffoldMessenger.of(context);
+    if (_demo) {
+      // The demo always shares the fixed demo hospital — never real GPS.
+      Demo.instance.sendLocation(choice == 'hospital' ? hospitalLabel : 'My current location (demo)', Demo.lat, Demo.lng);
+      return;
+    }
     try {
       if (choice == 'hospital') {
         await ChatService.instance.sendLocation(widget.requestId, lat: hospitalLat!, lng: hospitalLng!, label: hospitalLabel, amRequester: _amRequester);
@@ -141,10 +162,10 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  Widget _sheetRow(BuildContext sheet, String value, IconData icon, String title, String subtitle) => ListTile(
+  Widget _sheetRow(BuildContext sheet, String value, RbGlyph icon, String title, String subtitle) => ListTile(
         onTap: () => Navigator.pop(sheet, value),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        leading: Icon(icon, size: 20, color: AppColors.brandRed),
+        leading: RbIcon(icon, size: 20, color: AppColors.brandRed),
         title: Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: AppColors.ink)),
         subtitle: Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12.5, color: AppColors.ink2)),
       );
@@ -184,12 +205,12 @@ class _ChatScreenState extends State<ChatScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
                   if (open && peer.uid.isNotEmpty)
-                    _SheetAction(icon: LucideIcons.phone, label: 'Voice call', onTap: () {
+                    _SheetAction(icon: RbGlyph.phone, label: 'Voice call', onTap: () {
                       Navigator.pop(sheet);
                       _callInApp(peer);
                     }),
                   if (location.isNotEmpty && request['lat'] != null)
-                    _SheetAction(icon: LucideIcons.mapPin, label: 'Directions', onTap: () {
+                    _SheetAction(icon: RbGlyph.pin, label: 'Directions', onTap: () {
                       Navigator.pop(sheet);
                       openInMaps((request['lat'] as num).toDouble(), (request['lng'] as num).toDouble());
                     }),
@@ -199,7 +220,7 @@ class _ChatScreenState extends State<ChatScreen> {
               const Divider(color: AppColors.warmDivider, height: 1),
               ListTile(
                 contentPadding: EdgeInsets.zero,
-                leading: const Icon(LucideIcons.flag, size: 18, color: AppColors.ink2),
+                leading: const RbIcon(RbGlyph.flag, size: 18, color: AppColors.ink2),
                 title: const Text('Report', style: TextStyle(fontSize: 14.5, color: AppColors.ink)),
                 onTap: () {
                   Navigator.pop(sheet);
@@ -209,7 +230,7 @@ class _ChatScreenState extends State<ChatScreen> {
               if (open)
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: const Icon(LucideIcons.xCircle, size: 18, color: AppColors.red700),
+                  leading: const RbIcon(RbGlyph.closeCircle, size: 18, color: AppColors.red700),
                   title: const Text('Block and close chat', style: TextStyle(fontSize: 14.5, color: AppColors.red700)),
                   onTap: () {
                     Navigator.pop(sheet);
@@ -248,7 +269,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: AppColors.warmDivider))),
                     child: Row(children: [
                       Expanded(child: Text(r, style: const TextStyle(fontSize: 14.5, color: AppColors.ink))),
-                      const Icon(LucideIcons.chevronRight, size: 16, color: AppColors.chevronMuted),
+                      const RbIcon(RbGlyph.chevron, size: 16, color: AppColors.chevronMuted),
                     ]),
                   ),
                 ),
@@ -257,7 +278,7 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
       ),
     );
-    if (reason == null || !mounted) return;
+    if (reason == null || !mounted || _notInDemo()) return;
     try {
       await ChatService.instance.report(requestId: widget.requestId, reportedUid: peer.uid, reason: reason);
       if (!mounted) return;
@@ -276,7 +297,7 @@ class _ChatScreenState extends State<ChatScreen> {
       confirmLabel: 'Block and close',
       cancelLabel: 'Not now',
     );
-    if (!confirmed || !mounted) return;
+    if (!confirmed || !mounted || _notInDemo()) return;
     try {
       await ChatService.instance.closeChat(widget.requestId);
     } catch (_) {
@@ -290,16 +311,16 @@ class _ChatScreenState extends State<ChatScreen> {
     return Scaffold(
       backgroundColor: AppColors.warmPageBackground,
       body: SafeArea(
-        child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-          stream: FirebaseFirestore.instance.collection('requests').doc(widget.requestId).snapshots(),
+        child: StreamBuilder<Map<String, dynamic>?>(
+          stream: _doc,
           builder: (context, reqSnap) {
-            final request = reqSnap.data?.data();
+            final request = reqSnap.data;
             if (request == null) {
               return Column(children: [
                 _BackOnlyHeader(onBack: () => Navigator.pop(context)),
                 Expanded(
                   child: Center(
-                    child: reqSnap.hasData
+                    child: reqSnap.connectionState != ConnectionState.waiting
                         ? const Text('This conversation is no longer available.', style: TextStyle(color: AppColors.ink2))
                         : const CircularProgressIndicator(strokeWidth: 2),
                   ),
@@ -355,7 +376,7 @@ class _ChatScreenState extends State<ChatScreen> {
         children: [
           IconButton(
             tooltip: 'Back',
-            icon: const Icon(LucideIcons.arrowLeft, size: 20, color: AppColors.ink),
+            icon: const RbIcon(RbGlyph.back, size: 20, color: AppColors.ink),
             onPressed: () => Navigator.pop(context),
           ),
           Expanded(
@@ -392,12 +413,12 @@ class _ChatScreenState extends State<ChatScreen> {
           if (open && peer.uid.isNotEmpty)
             IconButton(
               tooltip: 'Voice call',
-              icon: const Icon(LucideIcons.phone, size: 20, color: AppColors.brandRed),
+              icon: const RbIcon(RbGlyph.phone, size: 20, color: AppColors.brandRed),
               onPressed: () => _callInApp(peer),
             ),
           PopupMenuButton<String>(
             tooltip: 'More',
-            icon: const Icon(LucideIcons.ellipsis, size: 20, color: AppColors.ink),
+            icon: const RbIcon(RbGlyph.more, size: 20, color: AppColors.ink),
             color: Colors.white,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: AppColors.warmBorder)),
             onSelected: (v) => switch (v) {
@@ -406,8 +427,8 @@ class _ChatScreenState extends State<ChatScreen> {
               _ => null,
             },
             itemBuilder: (_) => [
-              _menuItem('report', LucideIcons.flag, 'Report'),
-              if (open) _menuItem('block', LucideIcons.xCircle, 'Block and close chat', danger: true),
+              _menuItem('report', RbGlyph.flag, 'Report'),
+              if (open) _menuItem('block', RbGlyph.closeCircle, 'Block and close chat', danger: true),
             ],
           ),
         ],
@@ -415,12 +436,12 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  PopupMenuItem<String> _menuItem(String value, IconData icon, String label, {bool danger = false}) {
+  PopupMenuItem<String> _menuItem(String value, RbGlyph icon, String label, {bool danger = false}) {
     final color = danger ? AppColors.red700 : AppColors.ink;
     return PopupMenuItem(
       value: value,
       child: Row(children: [
-        Icon(icon, size: 16, color: color),
+        RbIcon(icon, size: 16, color: color),
         const SizedBox(width: 10),
         Text(label, style: TextStyle(fontSize: 14, color: color)),
       ]),
@@ -429,7 +450,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Widget _thread(Map<String, dynamic> request, _Peer peer, bool amRequester) {
     return StreamBuilder<List<ChatMessage>>(
-      stream: ChatService.instance.watchMessages(widget.requestId),
+      stream: _messages,
       builder: (context, snap) {
         if (!snap.hasData) return const Center(child: CircularProgressIndicator(strokeWidth: 2));
         final messages = snap.data!;
@@ -448,7 +469,7 @@ class _ChatScreenState extends State<ChatScreen> {
             newestFromPeer.id != _markedReadUpTo &&
             (myReadAt == null || newestFromPeer.sentAt!.isAfter(myReadAt))) {
           _markedReadUpTo = newestFromPeer.id;
-          ChatService.instance.markRead(widget.requestId, amRequester: amRequester).catchError((_) {});
+          if (!_demo) ChatService.instance.markRead(widget.requestId, amRequester: amRequester).catchError((_) {});
         }
 
         // "Seen" sits under my newest message once the other person's read
@@ -543,7 +564,7 @@ class _ChatScreenState extends State<ChatScreen> {
           IconButton(
             tooltip: 'Share a location',
             onPressed: () => _shareLocation(request),
-            icon: const Icon(LucideIcons.mapPin, size: 21, color: AppColors.ink2),
+            icon: const RbIcon(RbGlyph.pin, size: 21, color: AppColors.ink2),
           ),
           Expanded(
             child: Container(
@@ -583,7 +604,7 @@ class _ChatScreenState extends State<ChatScreen> {
               height: 46,
               decoration: BoxDecoration(color: canSend ? AppColors.brandRed : AppColors.sand, shape: BoxShape.circle),
               alignment: Alignment.center,
-              child: Icon(LucideIcons.send, size: 18, color: canSend ? AppColors.whiteTextOnPrimary : AppColors.mutedInk),
+              child: RbIcon(RbGlyph.send, size: 18, color: canSend ? AppColors.whiteTextOnPrimary : AppColors.mutedInk),
             ),
           ),
         ],
@@ -597,7 +618,7 @@ class _ChatScreenState extends State<ChatScreen> {
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
       decoration: const BoxDecoration(color: AppColors.sand, border: Border(top: BorderSide(color: AppColors.warmBorder))),
       child: Row(children: [
-        const Icon(LucideIcons.lock, size: 15, color: AppColors.ink2),
+        const RbIcon(RbGlyph.lock, size: 15, color: AppColors.ink2),
         const SizedBox(width: 10),
         Expanded(child: Text(reason, style: const TextStyle(fontSize: 13, color: AppColors.ink2, height: 1.4))),
       ]),
@@ -633,7 +654,7 @@ class _BackOnlyHeader extends StatelessWidget {
         height: 60,
         child: Align(
           alignment: Alignment.centerLeft,
-          child: IconButton(icon: const Icon(LucideIcons.arrowLeft, size: 20, color: AppColors.ink), onPressed: onBack),
+          child: IconButton(icon: const RbIcon(RbGlyph.back, size: 20, color: AppColors.ink), onPressed: onBack),
         ),
       );
 }
@@ -670,7 +691,7 @@ class _ContextCard extends StatelessWidget {
             child: const Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Padding(padding: EdgeInsets.only(top: 1), child: Icon(LucideIcons.shieldCheck, size: 15, color: AppColors.goldDeep)),
+                Padding(padding: EdgeInsets.only(top: 1), child: RbIcon(RbGlyph.shield, size: 15, color: AppColors.goldDeep)),
                 SizedBox(width: 9),
                 Expanded(
                   child: Text(
@@ -778,7 +799,7 @@ class _Bubble extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (pending) ...[
-                    const Icon(LucideIcons.clock, size: 11, color: AppColors.mutedInk),
+                    const RbIcon(RbGlyph.clock, size: 11, color: AppColors.mutedInk),
                     const SizedBox(width: 4),
                     const Text('Sending', style: TextStyle(fontSize: 11, color: AppColors.mutedInk)),
                   ] else ...[
@@ -814,7 +835,7 @@ class _CallLogRow extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
           decoration: BoxDecoration(border: Border.all(color: AppColors.warmBorder), borderRadius: BorderRadius.circular(999)),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
-            Icon(answered ? LucideIcons.phone : LucideIcons.phoneMissed, size: 13, color: color),
+            RbIcon(answered ? RbGlyph.phone : RbGlyph.phoneMissed, size: 13, color: color),
             const SizedBox(width: 7),
             Text(label, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: color, fontFeatures: const [FontFeature.tabularFigures()])),
             const SizedBox(width: 6),
@@ -891,7 +912,7 @@ class _LocationBubble extends StatelessWidget {
                         borderRadius: BorderRadius.circular(10),
                       ),
                       alignment: Alignment.center,
-                      child: Icon(LucideIcons.mapPin, size: 18, color: mine ? AppColors.whiteTextOnPrimary : AppColors.brandRed),
+                      child: RbIcon(RbGlyph.pin, size: 18, color: mine ? AppColors.whiteTextOnPrimary : AppColors.brandRed),
                     ),
                     const SizedBox(width: 11),
                     Flexible(
@@ -923,7 +944,7 @@ class _LocationBubble extends StatelessWidget {
 }
 
 class _SheetAction extends StatelessWidget {
-  final IconData icon;
+  final RbGlyph icon;
   final String label;
   final VoidCallback onTap;
   const _SheetAction({required this.icon, required this.label, required this.onTap});
@@ -941,7 +962,7 @@ class _SheetAction extends StatelessWidget {
                 height: 52,
                 decoration: const BoxDecoration(color: AppColors.red100, shape: BoxShape.circle),
                 alignment: Alignment.center,
-                child: Icon(icon, size: 20, color: AppColors.brandRed),
+                child: RbIcon(icon, size: 20, color: AppColors.brandRed),
               ),
               const SizedBox(height: 7),
               Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: AppColors.ink)),
@@ -996,7 +1017,7 @@ class _OnCallBarState extends State<_OnCallBar> {
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
                   child: Row(
                     children: [
-                      const Icon(LucideIcons.phone, size: 14, color: Colors.white),
+                      const RbIcon(RbGlyph.phone, size: 14, color: Colors.white),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(

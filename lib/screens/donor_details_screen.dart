@@ -1,8 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../demo/demo.dart';
 import '../services/backend.dart';
 import 'location_picker_screen.dart';
+import 'matching_screen.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../theme/app_theme.dart';
@@ -10,10 +11,11 @@ import '../widgets/blood_group_droplet.dart';
 import '../widgets/identity_disc.dart';
 import '../widgets/rb_ui.dart';
 import '../widgets/loading_button.dart';
+import '../widgets/rb_icon.dart';
 
 /// Pre-match donor discovery screen — the final artifact's "Donor details"
 /// section: "built around trust and disclosure". Deliberately has no
-/// Call/WhatsApp actions — contact details are only real once a request is
+/// call or message actions — contact details are only real once a request is
 /// accepted (see MatchContactScreen). Showing them here would be
 /// fabricating access to sensitive donor information the donor hasn't
 /// agreed to share yet.
@@ -31,6 +33,16 @@ class DonorDetailsScreen extends StatefulWidget {
   final double? distanceKm;
   final bool isAvailable;
 
+  /// Opened from a match: this donor already accepted, so there is no
+  /// "request" action.
+  final bool matched;
+
+  /// Donations recorded through the app, when the caller can actually know
+  /// it. Other donors' history isn't readable under the rules, so real
+  /// screens pass null and no number is shown; the client demo passes its
+  /// persona's fixture.
+  final int? donationCount;
+
   const DonorDetailsScreen({
     super.key,
     required this.donorId,
@@ -40,6 +52,8 @@ class DonorDetailsScreen extends StatefulWidget {
     required this.isVerified,
     required this.distanceKm,
     required this.isAvailable,
+    this.matched = false,
+    this.donationCount,
   });
 
   @override
@@ -50,6 +64,11 @@ class _DonorDetailsScreenState extends State<DonorDetailsScreen> {
   bool _isSending = false;
 
   Future<void> _sendRequest() async {
+    if (Demo.on) {
+      Demo.instance.createRequest(group: widget.bloodGroup, units: 1, urgency: 'urgent', label: Demo.hospital);
+      Navigator.push(context, MaterialPageRoute(builder: (_) => MatchingScreen(requestId: Demo.requestId, bloodGroup: widget.bloodGroup, urgency: 'urgent')));
+      return;
+    }
     setState(() => _isSending = true);
     try {
       // The request's location is where donors will travel — real GPS or
@@ -96,8 +115,9 @@ class _DonorDetailsScreenState extends State<DonorDetailsScreen> {
 
   /// The public listing: neighbourhood name and when it was last updated.
   /// Contact details are never read here.
-  late final Future<DocumentSnapshot<Map<String, dynamic>>> _public =
-      FirebaseFirestore.instance.collection('donors_public').doc(widget.donorId).get();
+  late final Future<Map<String, dynamic>?> _public = Demo.isDemoId(widget.donorId)
+      ? Future.value({'area': Demo.area, 'updated_at': Timestamp.now()})
+      : FirebaseFirestore.instance.collection('donors_public').doc(widget.donorId).get().then((s) => s.data());
 
   String _updatedLabel(Timestamp? updatedAt) {
     if (updatedAt == null) return '';
@@ -119,13 +139,13 @@ class _DonorDetailsScreenState extends State<DonorDetailsScreen> {
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: IconButton(
-          icon: const Icon(LucideIcons.arrowLeft, color: AppColors.textPrimaryWarm),
+          icon: const RbIcon(RbGlyph.back, color: AppColors.textPrimaryWarm),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text('Donor profile', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
         centerTitle: false,
       ),
-      bottomNavigationBar: SafeArea(
+      bottomNavigationBar: widget.matched ? null : SafeArea(
         minimum: const EdgeInsets.fromLTRB(20, 8, 20, 16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -146,10 +166,10 @@ class _DonorDetailsScreenState extends State<DonorDetailsScreen> {
           ],
         ),
       ),
-      body: FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      body: FutureBuilder<Map<String, dynamic>?>(
         future: _public,
         builder: (context, snapshot) {
-          final pub = snapshot.data?.data();
+          final pub = snapshot.data;
           final area = (pub?['area'] as String?)?.trim();
           final updatedAt = pub?['updated_at'] as Timestamp?;
           return ListView(
@@ -178,12 +198,15 @@ class _DonorDetailsScreenState extends State<DonorDetailsScreen> {
                       children: [
                         RbChip(
                           widget.isVerified ? 'Verified donor' : 'Not yet verified',
-                          icon: widget.isVerified ? LucideIcons.badgeCheck : LucideIcons.shieldQuestion,
+                          icon: widget.isVerified ? RbGlyph.verified : RbGlyph.shield,
                           tone: widget.isVerified ? RbTone.success : RbTone.neutral,
                         ),
+                        if (widget.matched)
+                          const RbChip('Accepted your request', icon: RbGlyph.connect, tone: RbTone.red)
+                        else
                         RbChip(
                           widget.isAvailable ? 'Available now' : 'Not available',
-                          icon: widget.isAvailable ? LucideIcons.circleCheck : LucideIcons.circlePause,
+                          icon: widget.isAvailable ? RbGlyph.checkCircle : RbGlyph.clock,
                           tone: widget.isAvailable ? RbTone.success : RbTone.neutral,
                         ),
                       ],
@@ -203,25 +226,40 @@ class _DonorDetailsScreenState extends State<DonorDetailsScreen> {
                     Text(km == null ? '—' : (km < 10 ? km.toStringAsFixed(1) : '${km.round()}'), style: AppTextStyles.display(fontSize: 24, color: AppColors.ink, height: 1.2)),
                     km == null ? 'Distance unknown' : 'km away',
                   ),
+                  if (widget.donationCount != null) ...[
+                    const SizedBox(width: 10),
+                    _statTile(
+                      Text('${widget.donationCount}', style: AppTextStyles.display(fontSize: 24, color: AppColors.ink, height: 1.2)),
+                      widget.donationCount == 1 ? 'donation' : 'donations',
+                    ),
+                  ],
                 ],
               ),
+              if (widget.donationCount != null && widget.donationCount! > 0) ...[
+                const SizedBox(height: 14),
+                Text(
+                  '$firstName has donated ${widget.donationCount == 1 ? 'once' : '${widget.donationCount} times'} through Rakta Bandhan.',
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.display(fontSize: 16, color: AppColors.ink2, height: 1.4),
+                ),
+              ],
               const RbSectionLabel('About this donor'),
               RbListGroup(
                 children: [
                   RbRow(
-                    icon: LucideIcons.mapPin,
+                    icon: RbGlyph.pin,
                     title: snapshot.connectionState == ConnectionState.waiting
                         ? 'Loading area…'
                         : (area == null || area.isEmpty ? 'Area not shared' : 'Approx. area: $area'),
                     subtitle: 'Shown to about 1 km — never an exact address',
                   ),
                   RbRow(
-                    icon: LucideIcons.droplet,
+                    icon: RbGlyph.droplet,
                     title: '${widget.bloodGroup} donor',
                     subtitle: 'Can give to ${[for (final e in bloodCompatibility.entries) if (e.value.contains(widget.bloodGroup)) e.key].join(', ')}',
                   ),
                   if (updatedAt != null)
-                    RbRow(icon: LucideIcons.clock, tone: RbTone.neutral, title: _updatedLabel(updatedAt)),
+                    RbRow(icon: RbGlyph.clock, tone: RbTone.neutral, title: _updatedLabel(updatedAt)),
                 ],
               ),
               const RbSectionLabel('Privacy'),
@@ -230,7 +268,7 @@ class _DonorDetailsScreenState extends State<DonorDetailsScreen> {
                 child: const Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(LucideIcons.shieldCheck, size: 18, color: AppColors.goldDeep),
+                    RbIcon(RbGlyph.shield, size: 18, color: AppColors.goldDeep),
                     SizedBox(width: 12),
                     Expanded(
                       child: Text(

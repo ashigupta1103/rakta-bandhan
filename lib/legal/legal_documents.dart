@@ -47,8 +47,8 @@ const privacyPolicy = LegalDocument(
     ]),
     LegalSection('collect', 'What we collect', [
       'Account and profile — what you give us:',
-      '- Your email address and a password, used to sign in and to recover your account. The password is stored by Google Firebase Authentication in hashed form; we never see it.',
-      '- Your name and mobile number.',
+      '- Your email address, used to sign in. There is no password: each time you sign in we email you a 6-digit code that works once and expires after a few minutes.',
+      '- Your name and mobile number. Your number is never shown to other users — matched people reach each other through in-app messages and calls.',
       '- Your blood group.',
       '- The area you register from: a location label you choose and its map coordinates.',
       '- Whether you are available to donate, and the date of your last donation recorded in the app.',
@@ -96,7 +96,7 @@ const privacyPolicy = LegalDocument(
       '- Community posts stay until you or an administrator delete them; deleting a post deletes its photo.',
       '- A profile photo stays until you remove or replace it in My Page.',
       '- When you delete your account, we delete your sign-in account, your profile, your public listing, any ID photo, your profile photo, and every chat message you sent. Requests you raised are cancelled if still open, and your name and phone number are removed from them. If you were matched as a donor on an open request, that request is released back to other donors. A record that a donation happened is kept without anything that identifies you.',
-      '- Analytics data is kept according to Firebase Analytics retention settings, up to 14 months.',
+      '- Analytics data is kept for the retention period set in Firebase Analytics: [ORGANIZATION TO PROVIDE — confirm the configured period].',
     ]),
     LegalSection('rights', 'Your rights', [
       'Under the DPDP Act you have the right to:',

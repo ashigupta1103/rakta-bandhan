@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../demo/demo.dart';
 import '../services/backend.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
@@ -14,6 +14,7 @@ import 'call_screen.dart';
 import 'cancel_confirm_screen.dart';
 import 'chat_screen.dart';
 import 'create_request_screen.dart';
+import '../widgets/rb_icon.dart';
 
 /// Real request-status timeline. Watches the actual Firestore request
 /// document created by CreateRequestScreen directly (same pattern already
@@ -35,6 +36,8 @@ class TrackingScreen extends StatefulWidget {
 class _TrackingScreenState extends State<TrackingScreen> {
   bool _cancelling = false;
   bool _confirming = false;
+  bool get _demo => Demo.isDemoId(widget.requestId);
+  Stream<Map<String, dynamic>?> get _doc => Demo.requestDoc(widget.requestId);
 
   /// Requester's half of the two-sided completion ("I received it").
   Future<void> _confirmReceived(String donorName) async {
@@ -48,7 +51,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
     if (!confirmed || !mounted) return;
     setState(() => _confirming = true);
     try {
-      final closed = await Backend.instance.requesterConfirmDonation(widget.requestId);
+      final closed = _demo ? Demo.instance.confirmMine() : await Backend.instance.requesterConfirmDonation(widget.requestId);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(closed ? 'Donation completed. Thank you for using Rakta Bandhan.' : 'Thanks. We’ve asked $donorName to confirm as well.'),
@@ -72,7 +75,11 @@ class _TrackingScreenState extends State<TrackingScreen> {
     if (!confirmed || !mounted) return;
     setState(() => _cancelling = true);
     try {
-      await Backend.instance.cancelRequest(widget.requestId);
+      if (_demo) {
+        Demo.instance.cancel();
+      } else {
+        await Backend.instance.cancelRequest(widget.requestId);
+      }
       if (!mounted) return;
       Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => CancelConfirmScreen(requestId: widget.requestId)));
     } catch (e) {
@@ -83,7 +90,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
   }
 
   Future<void> _call(Map<String, dynamic> request) async {
-    final me = (await Backend.instance.myDonorDoc()).data();
+    final me = _demo ? {'name': Demo.instance.myName} : (await Backend.instance.myDonorDoc()).data();
     if (!mounted) return;
     await startCallFlow(
       context,
@@ -102,7 +109,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
         backgroundColor: AppColors.warmPageBackground,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(LucideIcons.arrowLeft, color: AppColors.textPrimaryWarm),
+          icon: const RbIcon(RbGlyph.back, color: AppColors.textPrimaryWarm),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text('Your request', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
@@ -110,8 +117,8 @@ class _TrackingScreenState extends State<TrackingScreen> {
       ),
       body: SafeArea(
         top: false,
-        child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-          stream: FirebaseFirestore.instance.collection('requests').doc(widget.requestId).snapshots(),
+        child: StreamBuilder<Map<String, dynamic>?>(
+          stream: _doc,
           builder: (context, snapshot) {
             if (snapshot.hasError) {
               return ListView(
@@ -125,15 +132,15 @@ class _TrackingScreenState extends State<TrackingScreen> {
                 ],
               );
             }
-            if (!snapshot.hasData) return const RbLoading(height: 240);
-            final data = snapshot.data!.data();
+            if (snapshot.connectionState == ConnectionState.waiting) return const RbLoading(height: 240);
+            final data = snapshot.data;
             if (data == null) {
               return ListView(
                 padding: const EdgeInsets.all(20),
-                children: const [RbStatePanel(icon: LucideIcons.searchX, title: 'Request not found', message: 'It may have been removed. Your other requests are on the Requests tab.')],
+                children: const [RbStatePanel(icon: RbGlyph.search, title: 'Request not found', message: 'It may have been removed. Your other requests are on the Requests tab.')],
               );
             }
-            Backend.instance.expireIfStale(widget.requestId, data);
+            if (!_demo) Backend.instance.expireIfStale(widget.requestId, data);
             final status = data['status'] as String? ?? 'open';
             final bloodGroup = data['blood_group'] as String? ?? '';
             final units = data['units_needed'] ?? 1;
@@ -150,21 +157,21 @@ class _TrackingScreenState extends State<TrackingScreen> {
             final canCancel = status == 'open' || status == 'matched';
 
             final steps = [
-              const TrackerStep(label: 'Submitted', sub: 'Request created', status: StepStatus.done, icon: LucideIcons.send),
+              const TrackerStep(label: 'Submitted', sub: 'Request created', status: StepStatus.done, icon: RbGlyph.send),
               TrackerStep(
-                label: 'Donor found',
-                sub: isTerminalBad ? (status == 'cancelled' ? 'Cancelled before a match was found' : 'No donor found in time') : (isMatched ? '${donorName ?? 'A donor'} accepted' : 'Searching nearby donors'),
+                label: 'Searching',
+                sub: isTerminalBad ? (status == 'cancelled' ? 'Cancelled before a donor accepted' : 'No donor accepted in time') : (isMatched ? 'Compatible donors nearby were alerted' : 'Alerting compatible donors nearby'),
                 status: isTerminalBad ? StepStatus.pending : (isMatched ? StepStatus.done : StepStatus.current),
-                icon: LucideIcons.search,
+                icon: RbGlyph.radar,
               ),
               TrackerStep(
-                label: 'Matched',
-                sub: isMatched ? '${donorName ?? 'A donor'} accepted your request' : 'Waiting for a donor to accept',
+                label: 'Donor accepted',
+                sub: isMatched ? '${donorName ?? 'A donor'} accepted · message or call in the app' : 'Waiting for a donor to accept',
                 status: isTerminalBad ? StepStatus.pending : (isFulfilled ? StepStatus.done : (isMatched ? StepStatus.current : StepStatus.pending)),
-                icon: LucideIcons.handshake,
+                icon: RbGlyph.connect,
               ),
               TrackerStep(
-                label: 'Completed',
+                label: 'Donation completed',
                 sub: isFulfilled
                     ? 'Donation completed — thank you'
                     : iConfirmed
@@ -173,7 +180,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                             ? '${donorName ?? 'The donor'} says they donated · please confirm'
                             : 'Completed once you and the donor both confirm',
                 status: isFulfilled ? StepStatus.done : StepStatus.pending,
-                icon: LucideIcons.checkCircle,
+                icon: RbGlyph.checkCircle,
               ),
             ];
 
@@ -202,6 +209,8 @@ class _TrackingScreenState extends State<TrackingScreen> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 14),
+                  Align(alignment: Alignment.centerLeft, child: _statusPill(status)),
                   const SizedBox(height: 22),
                   RbCard(
                     padding: const EdgeInsets.fromLTRB(16, 18, 16, 4),
@@ -237,7 +246,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                               Expanded(
                                 child: OutlinedButton.icon(
                                   onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ChatScreen(requestId: widget.requestId))),
-                                  icon: const Icon(LucideIcons.messageSquare, size: 16),
+                                  icon: const RbIcon(RbGlyph.message, size: 16),
                                   label: const Text('Message'),
                                 ),
                               ),
@@ -246,7 +255,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                                 Expanded(
                                   child: ElevatedButton.icon(
                                     onPressed: () => _call(data),
-                                    icon: const Icon(LucideIcons.phone, size: 16),
+                                    icon: const RbIcon(RbGlyph.phone, size: 16),
                                     label: const Text('Call in app'),
                                   ),
                                 ),
@@ -264,7 +273,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                         onPressed: _confirming ? null : () => _confirmReceived(donorName),
                         icon: _confirming
                             ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                            : const Icon(LucideIcons.badgeCheck, size: 16),
+                            : const RbIcon(RbGlyph.verified, size: 16),
                         label: const Text('Confirm donation received'),
                       )
                     else
@@ -272,7 +281,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                         onPressed: _confirming ? null : () => _confirmReceived(donorName),
                         icon: _confirming
                             ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
-                            : const Icon(LucideIcons.badgeCheck, size: 16),
+                            : const RbIcon(RbGlyph.verified, size: 16),
                         label: const Text('Mark donation received'),
                       ),
                   ],
@@ -287,7 +296,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                             height: 32,
                             decoration: BoxDecoration(color: AppColors.dividerWarm, borderRadius: BorderRadius.circular(10)),
                             alignment: Alignment.center,
-                            child: const Icon(LucideIcons.alertTriangle, size: 15, color: AppColors.textSecondary),
+                            child: const RbIcon(RbGlyph.alert, size: 15, color: AppColors.textSecondary),
                           ),
                           const SizedBox(width: 10),
                           Expanded(
@@ -311,7 +320,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                     RbListGroup(
                       children: [
                         RbRow(
-                          icon: LucideIcons.circleX,
+                          icon: RbGlyph.closeCircle,
                           destructive: true,
                           title: _cancelling ? 'Cancelling…' : 'Cancel this request',
                           subtitle: 'Donors stop seeing it straight away',
@@ -329,6 +338,16 @@ class _TrackingScreenState extends State<TrackingScreen> {
       ),
     );
   }
+
+  /// One unmistakable word for where the request is.
+  Widget _statusPill(String status) => switch (status) {
+        'open' => const RbChip('Searching for a donor', icon: RbGlyph.radar, tone: RbTone.orange),
+        'matched' => const RbChip('Donor accepted', icon: RbGlyph.connect, tone: RbTone.red),
+        'fulfilled' => const RbChip('Completed', icon: RbGlyph.checkCircle, tone: RbTone.success),
+        'cancelled' => const RbChip('Cancelled', icon: RbGlyph.closeCircle, tone: RbTone.neutral),
+        'expired' => const RbChip('Expired', icon: RbGlyph.hourglass, tone: RbTone.neutral),
+        _ => RbChip(status),
+      };
 
   String _initials(String name) {
     final trimmed = name.trim();

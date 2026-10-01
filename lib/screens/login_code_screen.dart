@@ -2,13 +2,15 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../demo/demo.dart';
 import '../services/backend.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/loading_button.dart';
+import 'login_screen.dart';
 import 'main_navigation_screen.dart';
 import 'registration_screen.dart';
+import '../widgets/rb_icon.dart';
 
 /// "Enter the code we emailed you." Six boxes over one real text field, so
 /// typing, pasting the whole code, and the keyboard's one-time-code
@@ -69,6 +71,25 @@ class _LoginCodeScreenState extends State<LoginCodeScreen> {
       _verifying = true;
       _error = null;
     });
+    if (Demo.on) {
+      // Simulated check against the fixed demo code — production sign-in
+      // never accepts it (this branch can't run outside a demo session).
+      if (code != Demo.emailCode) {
+        HapticFeedback.mediumImpact();
+        setState(() {
+          _verifying = false;
+          _error = 'That code isn’t right. In the demo the code is ${Demo.emailCode}.';
+          _code.clear();
+        });
+        return;
+      }
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => Demo.instance.registered ? const MainNavigationScreen() : const RegistrationScreen()),
+        (route) => false,
+      );
+      return;
+    }
     try {
       await Backend.instance.verifyLoginCode(widget.email, code);
       final hasProfile = await Backend.instance.hasProfile();
@@ -83,7 +104,7 @@ class _LoginCodeScreenState extends State<LoginCodeScreen> {
       HapticFeedback.mediumImpact();
       setState(() {
         _verifying = false;
-        _error = Backend.authErrorMessage(e);
+        _error = friendlyAuthError(e);
         _code.clear();
       });
       _focus.requestFocus();
@@ -91,6 +112,10 @@ class _LoginCodeScreenState extends State<LoginCodeScreen> {
   }
 
   Future<void> _resend() async {
+    if (Demo.on) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Demo: nothing is sent. The code is ${Demo.emailCode}.')));
+      return;
+    }
     setState(() {
       _resending = true;
       _error = null;
@@ -102,7 +127,7 @@ class _LoginCodeScreenState extends State<LoginCodeScreen> {
       _startCountdown(wait);
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('A new code is on its way. The old one no longer works.')));
     } catch (e) {
-      if (mounted) setState(() => _error = Backend.authErrorMessage(e));
+      if (mounted) setState(() => _error = friendlyAuthError(e));
     } finally {
       if (mounted) setState(() => _resending = false);
     }
@@ -117,7 +142,7 @@ class _LoginCodeScreenState extends State<LoginCodeScreen> {
         elevation: 0,
         leading: IconButton(
           tooltip: 'Change email',
-          icon: const Icon(LucideIcons.arrowLeft, color: AppColors.textPrimaryWarm),
+          icon: const RbIcon(RbGlyph.back, color: AppColors.textPrimaryWarm),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -134,7 +159,7 @@ class _LoginCodeScreenState extends State<LoginCodeScreen> {
                   height: 60,
                   decoration: const BoxDecoration(color: AppColors.primaryLightTint, shape: BoxShape.circle),
                   alignment: Alignment.center,
-                  child: const Icon(LucideIcons.mailCheck, size: 24, color: AppColors.primary),
+                  child: const RbIcon(RbGlyph.mail, size: 24, color: AppColors.primary),
                 ),
               ),
               const SizedBox(height: 16),
@@ -151,7 +176,7 @@ class _LoginCodeScreenState extends State<LoginCodeScreen> {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 28),
-              _CodeBoxes(controller: _code, focusNode: _focus, length: _length, hasError: _error != null, onCompleted: _verify),
+              CodeBoxes(controller: _code, focusNode: _focus, length: _length, hasError: _error != null, onCompleted: _verify),
               if (_error != null) ...[
                 const SizedBox(height: 12),
                 Text(_error!, textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, color: AppColors.primary, height: 1.4)),
@@ -171,15 +196,17 @@ class _LoginCodeScreenState extends State<LoginCodeScreen> {
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(color: Colors.white, border: Border.all(color: AppColors.cardBorderWarm), borderRadius: BorderRadius.circular(12)),
-                child: const Row(
+                child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(LucideIcons.inbox, size: 15, color: AppColors.textSecondary),
-                    SizedBox(width: 10),
+                    const RbIcon(RbGlyph.inbox, size: 15, color: AppColors.textSecondary),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        'The code shows in the email’s subject line. Not there after a minute? Check Spam or Promotions. It works for 10 minutes.',
-                        style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary, height: 1.45),
+                        Demo.on
+                            ? 'Demo · nothing was emailed. Enter ${Demo.emailCode} to continue.'
+                            : 'The code shows in the email’s subject line. Not there after a minute? Check Spam or Promotions. It works for 10 minutes.',
+                        style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary, height: 1.45),
                       ),
                     ),
                   ],
@@ -193,15 +220,16 @@ class _LoginCodeScreenState extends State<LoginCodeScreen> {
   }
 }
 
-/// Six digit boxes drawn over a single hidden TextField.
-class _CodeBoxes extends StatelessWidget {
+/// Six digit boxes drawn over a single hidden TextField (sign-in code and
+/// the demo phone check share it).
+class CodeBoxes extends StatelessWidget {
   final TextEditingController controller;
   final FocusNode focusNode;
   final int length;
   final bool hasError;
   final VoidCallback onCompleted;
 
-  const _CodeBoxes({required this.controller, required this.focusNode, required this.length, required this.hasError, required this.onCompleted});
+  const CodeBoxes({super.key, required this.controller, required this.focusNode, required this.length, required this.hasError, required this.onCompleted});
 
   @override
   Widget build(BuildContext context) {

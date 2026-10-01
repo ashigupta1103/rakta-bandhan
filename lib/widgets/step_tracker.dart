@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../theme/app_colors.dart';
+import 'rb_icon.dart';
 
 enum StepStatus { done, current, pending }
 
@@ -8,13 +8,13 @@ class TrackerStep {
   final String label;
   final String sub;
   final StepStatus status;
-  final IconData icon;
+  final RbGlyph icon;
 
   const TrackerStep({
     required this.label,
     required this.sub,
     required this.status,
-    this.icon = LucideIcons.clock,
+    this.icon = RbGlyph.clock,
   });
 }
 
@@ -43,7 +43,7 @@ class StepTracker extends StatelessWidget {
           height: 30,
           decoration: const BoxDecoration(color: AppColors.statusAvailableText, shape: BoxShape.circle),
           alignment: Alignment.center,
-          child: const Icon(LucideIcons.check, size: 14, color: Colors.white),
+          child: const RbIcon(RbGlyph.check, size: 14, color: Colors.white),
         );
       case StepStatus.current:
         circle = Container(
@@ -55,7 +55,7 @@ class StepTracker extends StatelessWidget {
             border: Border.all(color: AppColors.primary, width: 2),
           ),
           alignment: Alignment.center,
-          child: Icon(step.icon, size: 13, color: AppColors.primary),
+          child: RbIcon(step.icon, size: 13, color: AppColors.primary),
         );
       case StepStatus.pending:
         circle = Container(
@@ -63,7 +63,7 @@ class StepTracker extends StatelessWidget {
           height: 30,
           decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: AppColors.cardBorderWarm, width: 2)),
           alignment: Alignment.center,
-          child: Icon(step.icon, size: 13, color: AppColors.borderStrong),
+          child: RbIcon(step.icon, size: 13, color: AppColors.borderStrong),
         );
     }
 

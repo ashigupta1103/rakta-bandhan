@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../demo/demo.dart';
 import '../screens/login_screen.dart';
 import '../services/backend.dart';
 import '../services/push_service.dart';
@@ -34,6 +35,13 @@ Future<void> confirmAndLogOut(
   );
   if (confirmed != true) return;
 
+  if (Demo.on) {
+    // Leaving a client demo: clear the local demo state, nothing else.
+    Demo.instance.stop();
+    if (!context.mounted) return;
+    Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (context) => const LoginScreen()), (route) => false);
+    return;
+  }
   setLoading(true);
   try {
     // Stop this phone receiving that account's pushes first — clearing the

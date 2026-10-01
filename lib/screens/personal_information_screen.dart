@@ -2,13 +2,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../demo/demo.dart';
 import '../services/backend.dart';
 import '../services/phone_privacy.dart';
 import 'location_picker_screen.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/blood_group_droplet.dart';
+import '../widgets/rb_icon.dart';
 
 /// The donor's own record: identity, verification, location and the two
 /// fields they can edit (name, mobile number). The phone number is only
@@ -22,7 +23,14 @@ class PersonalInformationScreen extends StatefulWidget {
 }
 
 class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
-  late final Future<String?> _publicArea = Backend.instance.myPublicArea();
+  /// Uploads and edits aren't simulated in a client demo.
+  bool _demoBlocked() {
+    if (!Demo.on) return false;
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('This isn’t saved in the demo.')));
+    return true;
+  }
+
+  late final Future<String?> _publicArea = Demo.on ? Future.value(Demo.area) : Backend.instance.myPublicArea();
 
   static const _months = [
     'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
@@ -68,7 +76,7 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(LucideIcons.camera),
+              leading: const RbIcon(RbGlyph.camera),
               title: const Text('Take a photo'),
               onTap: () async {
                 final file = await ImagePicker().pickImage(source: ImageSource.camera, maxWidth: 1280, imageQuality: 70);
@@ -76,7 +84,7 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(LucideIcons.image),
+              leading: const RbIcon(RbGlyph.photo),
               title: const Text('Choose from gallery'),
               onTap: () async {
                 final file = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 1280, imageQuality: 70);
@@ -88,6 +96,7 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
       ),
     );
     if (picked == null || !mounted) return;
+    if (_demoBlocked()) return;
     setState(() => _uploading = true);
     try {
       await Backend.instance.uploadIdProof(picked);
@@ -117,7 +126,7 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
                   Align(
                     alignment: Alignment.centerLeft,
                     child: IconButton(
-                      icon: const Icon(LucideIcons.arrowLeft, color: AppColors.textPrimaryWarm),
+                      icon: const RbIcon(RbGlyph.back, color: AppColors.textPrimaryWarm),
                       onPressed: () => Navigator.pop(context),
                     ),
                   ),
@@ -129,13 +138,16 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
               ),
             ),
             Expanded(
-              child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                stream: Backend.instance.myDonorDocStream(),
+              child: StreamBuilder<Map<String, dynamic>>(
+                stream: Demo.on ? Demo.instance.watch(() => Demo.instance.myProfile) : Backend.instance.myDonorDocStream().map((s) => s.data() ?? {}),
                 builder: (context, snapshot) {
+                  if (snapshot.hasError) {
+                    return const Center(child: Text('Couldn’t load your details. Check your connection and try again.', textAlign: TextAlign.center, style: TextStyle(color: AppColors.textSecondary)));
+                  }
                   if (!snapshot.hasData) {
                     return const Center(child: CircularProgressIndicator(strokeWidth: 2));
                   }
-                  final data = snapshot.data!.data() ?? {};
+                  final data = snapshot.data!;
                   final name = data['name'] as String? ?? '—';
                   final phone = data['phone'] as String? ?? '—';
                   final bloodGroup = data['blood_group'] as String? ?? '—';
@@ -196,10 +208,10 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
                         ),
                         const SizedBox(height: 22),
                         _card([
-                          _row(LucideIcons.droplet, 'Blood group', bloodGroup, emphasise: true),
-                          _row(LucideIcons.phone, 'Mobile number', maskPhone(phone)),
+                          _row(RbGlyph.droplet, 'Blood group', bloodGroup, emphasise: true),
+                          _row(RbGlyph.phone, 'Mobile number', maskPhone(phone)),
                           _row(
-                            LucideIcons.calendar,
+                            RbGlyph.calendar,
                             'Member since',
                             createdAt == null ? '—' : _formatDate(createdAt.toDate()),
                             isLast: true,
@@ -209,7 +221,7 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
                         _sectionLabel('Verification'),
                         _card([
                           _row(
-                            isVerified ? LucideIcons.badgeCheck : LucideIcons.clock,
+                            isVerified ? RbGlyph.verified : RbGlyph.clock,
                             'Status',
                             isVerified ? 'Verified' : 'Pending review',
                             valueColor: isVerified ? AppColors.warmGreenText : AppColors.warmAmberText,
@@ -239,7 +251,7 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
                         _sectionLabel('Location'),
                         _card([
                           _row(
-                            LucideIcons.mapPin,
+                            RbGlyph.pin,
                             'Your area',
                             lat == null || lng == null
                                 ? 'Not set'
@@ -249,7 +261,7 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
                           FutureBuilder<String?>(
                             future: _publicArea,
                             builder: (context, snap) => _row(
-                              LucideIcons.locateFixed,
+                              RbGlyph.locate,
                               'Nearby',
                               snap.data == null ? 'Approx. area not available yet' : 'Approx. area: ${snap.data}',
                               stacked: true,
@@ -262,7 +274,7 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
                           alignment: Alignment.centerLeft,
                           child: TextButton.icon(
                             onPressed: () => _changeArea(lat?.toDouble(), lng?.toDouble()),
-                            icon: const Icon(LucideIcons.mapPinned, size: 15),
+                            icon: const RbIcon(RbGlyph.pin, size: 15),
                             label: const Text('Change my area'),
                           ),
                         ),
@@ -281,7 +293,7 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
                               name: data['name'] as String? ?? '',
                               phone: data['phone'] as String? ?? '',
                             ),
-                            icon: const Icon(LucideIcons.pencil, size: 15),
+                            icon: const RbIcon(RbGlyph.pen, size: 15),
                             label: const Text('Edit name & number'),
                           ),
                         ),
@@ -336,7 +348,7 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
       initialLat: lat,
       initialLng: lng,
     );
-    if (picked == null || !mounted) return;
+    if (picked == null || !mounted || _demoBlocked()) return;
     final messenger = ScaffoldMessenger.of(context);
     try {
       await Backend.instance.updateMyLocation(lat: picked.lat, lng: picked.lng, label: picked.label);
@@ -347,7 +359,7 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
   }
 
   Widget _row(
-    IconData icon,
+    RbGlyph icon,
     String label,
     String value, {
     bool isLast = false,
@@ -365,7 +377,7 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
       height: 32,
       decoration: BoxDecoration(color: iconBg, borderRadius: BorderRadius.circular(10)),
       alignment: Alignment.center,
-      child: Icon(icon, size: 15, color: iconColor),
+      child: RbIcon(icon, size: 15, color: iconColor),
     );
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
@@ -434,6 +446,11 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
     });
     if (_nameError != null || _phoneError != null) return;
 
+    if (Demo.on) {
+      Navigator.pop(context, false);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Editing isn’t saved in the demo.')));
+      return;
+    }
     setState(() => _saving = true);
     try {
       await Backend.instance.updateProfile(name: name, phone: phone.isEmpty ? widget.currentPhone : phone);

@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
+import 'rb_icon.dart';
 
 enum GlyphTone { red, gold, success, neutral }
 
@@ -12,7 +13,7 @@ enum GlyphTone { red, gold, success, neutral }
 /// the old UI — it reads like an emoji sticker. The droplet ties the icon
 /// back to what this app is about.
 class BrandGlyph extends StatelessWidget {
-  final IconData icon;
+  final RbGlyph icon;
   final GlyphTone tone;
   final double size;
   /// Explicit colours override [tone] — for callers (StateCard) that
@@ -47,7 +48,7 @@ class BrandGlyph extends StatelessWidget {
             borderRadius: BorderRadius.only(topLeft: Radius.circular(size * 0.08), topRight: r, bottomLeft: r, bottomRight: r),
           ),
           alignment: Alignment.center,
-          child: Transform.rotate(angle: -math.pi / 4, child: Icon(icon, size: size * 0.42, color: fg)),
+          child: Transform.rotate(angle: -math.pi / 4, child: RbIcon(icon, size: size * 0.42, color: fg)),
         ),
       ),
     );

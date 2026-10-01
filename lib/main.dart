@@ -1,7 +1,9 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
 import 'package:flutter/material.dart';
+import 'demo/demo_overlay.dart';
 import 'firebase_options.dart';
+import 'preview_mode.dart';
 import 'services/backend.dart';
 import 'services/push_service.dart';
 import 'theme/app_colors.dart';
@@ -25,11 +27,14 @@ Future<void> main() async {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
+  static final _navigatorKey = GlobalKey<NavigatorState>();
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Rakta Bandhan',
       debugShowCheckedModeBanner: false,
+      navigatorKey: _navigatorKey,
       theme: AppTheme.lightTheme,
       // The final artifact's shell is a fixed ~430px mobile composition,
       // centred on wide viewports rather than stretched full-width. This
@@ -39,6 +44,8 @@ class MyApp extends StatelessWidget {
       // as its own top-level route and would bypass a wrap placed anywhere
       // lower in the tree.
       builder: (context, child) {
+        // Client-demo controls exist only in preview builds.
+        if (kEnablePreviewUi && child != null) child = DemoOverlay(navigatorKey: _navigatorKey, child: child);
         if (!kIsWeb || child == null) return child ?? const SizedBox.shrink();
         return ColoredBox(
           color: AppColors.warmPageBackground,

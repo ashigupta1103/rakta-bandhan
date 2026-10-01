@@ -1,8 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../preview_mode.dart';
+import '../demo/demo.dart';
 import '../services/backend.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
@@ -12,6 +11,8 @@ import '../widgets/brand_glyph.dart';
 import '../widgets/rb_ui.dart';
 import 'create_experience_screen.dart';
 import 'notifications_screen.dart';
+import 'testimonials_screen.dart';
+import '../widgets/rb_icon.dart';
 
 /// Community tab root. Stories are real: they live in `community_stories`
 /// and are posted from CreateExperienceScreen. Likes/comments/leaderboard
@@ -46,8 +47,37 @@ class _CommunityScreenState extends State<CommunityScreen> {
   // Not final: a Firestore snapshot stream is finished once it errors, so
   // "Try again" has to subscribe to a fresh one (a bare setState would just
   // rebuild against the same dead stream and show the error forever).
-  Stream<QuerySnapshot<Map<String, dynamic>>> _stories = Backend.instance.communityStoriesStream();
-  Stream<QuerySnapshot<Map<String, dynamic>>> _announcements = Backend.instance.announcementsStream();
+  Stream<List<_Doc>> _stories = _storiesStream();
+  Stream<List<_Doc>> _announcements = _announcementsStream();
+
+  static List<_Doc> _docs(QuerySnapshot<Map<String, dynamic>> q) => [for (final d in q.docs) (id: d.id, data: d.data())];
+
+  // Client demo: only demo content — never mixed into the real feed.
+  static Stream<List<_Doc>> _storiesStream() => Demo.on
+      ? Demo.instance.watch(() => [
+            for (var i = 0; i < Demo.instance.stories.length; i++) (id: 'demo-story-$i', data: Demo.instance.stories[i]),
+            (id: 'demo-story-fixture', data: _demoFixtureStory),
+          ])
+      : Backend.instance.communityStoriesStream().map(_docs);
+
+  static Stream<List<_Doc>> _announcementsStream() => Demo.on
+      ? Stream.value([(id: 'demo-announcement', data: _demoAnnouncement)])
+      : Backend.instance.announcementsStream().map(_docs);
+
+  static final Map<String, dynamic> _demoFixtureStory = {
+    'author_name': 'Priya (demo)',
+    'topic': 'My first donation',
+    'location_label': Demo.area,
+    'blood_group': 'B+',
+    'body': 'I was nervous before my first donation, but the staff were kind and it was over in fifteen minutes. A demo story — shown only in the client demo.',
+    'created_at': Timestamp.fromDate(DateTime.now().subtract(const Duration(days: 2))),
+  };
+
+  static final Map<String, dynamic> _demoAnnouncement = {
+    'title': 'Blood donation camp (demo)',
+    'body': 'A sample announcement, shown only in the client demo. Real camps and drives appear here once the team posts them.',
+    'created_at': Timestamp.fromDate(DateTime.now().subtract(const Duration(days: 1))),
+  };
 
   /// Authors this person chose to hide ("Hide posts from …") — kept on the
   /// device, so blocking someone never needs to tell them.
@@ -63,7 +93,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
     // Reads the public_stats/impact counter, not a `requests` query: a
     // normal user is not allowed to query fulfilled requests (they carry
     // phone numbers), which is why the old query always errored out here.
-    _impactStream = Backend.instance.impactThisMonthStream();
+    _impactStream = _impact();
   }
 
   @override
@@ -93,6 +123,12 @@ class _CommunityScreenState extends State<CommunityScreen> {
     );
   }
 
+  // In the demo the community figure counts only the demo's own completed
+  // donation — no invented totals.
+  static Stream<int> _impact() => Demo.on
+      ? Demo.instance.watch(() => Demo.instance.request?['status'] == 'fulfilled' ? 1 : 0)
+      : Backend.instance.impactThisMonthStream();
+
   void _openComposer() => Navigator.push(context, MaterialPageRoute(builder: (context) => const CreateExperienceScreen()));
 
   // ------------------------------------------------------------- Stories
@@ -102,24 +138,27 @@ class _CommunityScreenState extends State<CommunityScreen> {
       padding: kRbPagePadding,
       children: [
         _composer(),
-        if (kEnablePreviewUi) ...[
-          _previewLabel('Preview data — sample story layout'),
-          _storyCard(
-            'demo-1',
-            const {'author_name': 'Demo Volunteer 01', 'topic': 'Volunteer appreciation', 'location_label': 'Sample area', 'body': 'Sample layout text — a short note thanking volunteers for a donation drive would appear here.'},
-            demo: true,
-          ),
-          const SizedBox(height: 12),
-        ],
-        RbSectionLabel('Latest stories'),
-        StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        const SizedBox(height: 10),
+        RbListGroup(
+          children: [
+            RbRow(
+              icon: RbGlyph.quote,
+              bare: true,
+              title: 'Testimonials',
+              subtitle: 'Read them, or add yours after a donation',
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TestimonialsScreen())),
+            ),
+          ],
+        ),
+        const RbSectionLabel('Latest stories'),
+        StreamBuilder<List<_Doc>>(
           stream: _stories,
           builder: (context, snapshot) {
             if (snapshot.hasError) {
               return RbStatePanel.error(
                 title: "Couldn't load stories",
                 message: communityLoadErrorMessage(snapshot.error),
-                onRetry: () => setState(() => _stories = Backend.instance.communityStoriesStream()),
+                onRetry: () => setState(() => _stories = _storiesStream()),
               );
             }
             if (!snapshot.hasData) return const _StorySkeleton();
@@ -127,12 +166,10 @@ class _CommunityScreenState extends State<CommunityScreen> {
             // `where is_hidden == false` would need a composite index and
             // would also drop every story written before moderation
             // existed (no such field at all).
-            final docs = snapshot.data!.docs
-                .where((d) => d.data()['is_hidden'] != true && !_hiddenAuthors.contains(d.data()['author_uid']))
-                .toList();
+            final docs = snapshot.data!.where((d) => d.data['is_hidden'] != true && !_hiddenAuthors.contains(d.data['author_uid'])).toList();
             if (docs.isEmpty) {
               return RbStatePanel(
-                icon: LucideIcons.heartHandshake,
+                icon: RbGlyph.community,
                 tone: GlyphTone.gold,
                 title: 'No stories yet',
                 message: 'Be the first to share what donating — or receiving — meant to you.',
@@ -143,7 +180,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
             return Column(
               children: [
                 for (final doc in docs) ...[
-                  _storyCard(doc.id, doc.data()),
+                  _storyCard(doc.id, doc.data, demo: Demo.on),
                   const SizedBox(height: 14),
                 ],
               ],
@@ -164,7 +201,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
         children: [
           Row(
             children: [
-              const BrandGlyph(icon: LucideIcons.penLine, tone: GlyphTone.gold, size: 40),
+              const BrandGlyph(icon: RbGlyph.pen, tone: GlyphTone.gold, size: 40),
               const SizedBox(width: 12),
               Expanded(
                 child: Container(
@@ -179,11 +216,11 @@ class _CommunityScreenState extends State<CommunityScreen> {
           const Row(
             children: [
               SizedBox(width: 52),
-              Icon(LucideIcons.image, size: 15, color: AppColors.ink2),
+              RbIcon(RbGlyph.photo, size: 15, color: AppColors.ink2),
               SizedBox(width: 6),
               Text('Photo', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: AppColors.ink2)),
               SizedBox(width: 16),
-              Icon(LucideIcons.shieldCheck, size: 15, color: AppColors.ink2),
+              RbIcon(RbGlyph.shield, size: 15, color: AppColors.ink2),
               SizedBox(width: 6),
               Expanded(child: Text('Guidelines apply', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: AppColors.ink2))),
             ],
@@ -192,17 +229,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
       ),
     );
   }
-
-  Widget _previewLabel(String text) => Padding(
-        padding: const EdgeInsets.fromLTRB(2, 22, 2, 10),
-        child: Row(
-          children: [
-            const Icon(LucideIcons.eye, size: 13, color: AppColors.goldDeep),
-            const SizedBox(width: 6),
-            Expanded(child: Text(text, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.goldDeep))),
-          ],
-        ),
-      );
 
   /// A post: author row, the photo edge to edge (4:5 to 1.91:1, like
   /// Instagram's crop limits), then the text. Tap the photo for a
@@ -218,7 +244,8 @@ class _CommunityScreenState extends State<CommunityScreen> {
     final name = data['author_name'] as String? ?? 'A donor';
     final meta = [
       if (location != null && location.isNotEmpty) location,
-      if (created != null) _timeAgo(created) else if (demo) 'sample',
+      if (created != null) _timeAgo(created),
+      if (demo) 'demo',
     ].join(' · ');
 
     return RbCard(
@@ -265,7 +292,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                 if (!demo)
                   PopupMenuButton<String>(
                     tooltip: 'More',
-                    icon: const Icon(LucideIcons.ellipsis, size: 18, color: AppColors.ink2),
+                    icon: const RbIcon(RbGlyph.more, size: 18, color: AppColors.ink2),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     onSelected: (action) => _onStoryAction(action, id, data),
                     itemBuilder: (_) => [
@@ -294,7 +321,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                     errorBuilder: (_, _, _) => Container(
                       color: AppColors.sand,
                       alignment: Alignment.center,
-                      child: const Icon(LucideIcons.imageOff, color: AppColors.ink2),
+                      child: const RbIcon(RbGlyph.photoOff, color: AppColors.ink2),
                     ),
                   ),
                 ),
@@ -354,7 +381,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                   'Fake or misleading',
                   'Something else',
                 ])
-                  ListTile(title: Text(r, style: const TextStyle(fontSize: 14.5)), trailing: const Icon(LucideIcons.chevronRight, size: 16, color: AppColors.chevronMuted), onTap: () => Navigator.pop(sheet, r)),
+                  ListTile(title: Text(r, style: const TextStyle(fontSize: 14.5)), trailing: const RbIcon(RbGlyph.chevron, size: 16, color: AppColors.chevronMuted), onTap: () => Navigator.pop(sheet, r)),
                 const SizedBox(height: 8),
               ],
             ),
@@ -398,25 +425,21 @@ class _CommunityScreenState extends State<CommunityScreen> {
         const SizedBox(height: 4),
         const Text('Camps, drives and updates from the trust. Only real, confirmed events are posted here.', style: TextStyle(fontSize: 13.5, color: AppColors.ink2, height: 1.45)),
         const SizedBox(height: 16),
-        if (kEnablePreviewUi) ...[
-          _announcementCard(const {'title': 'Demo community update', 'body': 'Sample layout text — a short update from Rakta Bandhan about ongoing work would appear here.'}, demo: true),
-          const SizedBox(height: 12),
-        ],
-        StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        StreamBuilder<List<_Doc>>(
           stream: _announcements,
           builder: (context, snapshot) {
             if (snapshot.hasError) {
               return RbStatePanel.error(
                 title: "Couldn't load announcements",
                 message: communityLoadErrorMessage(snapshot.error),
-                onRetry: () => setState(() => _announcements = Backend.instance.announcementsStream()),
+                onRetry: () => setState(() => _announcements = _announcementsStream()),
               );
             }
             if (!snapshot.hasData) return const RbLoading();
-            final docs = snapshot.data!.docs;
+            final docs = snapshot.data!;
             if (docs.isEmpty) {
               return const RbStatePanel(
-                icon: LucideIcons.megaphone,
+                icon: RbGlyph.megaphone,
                 tone: GlyphTone.gold,
                 title: 'No announcements yet',
                 message: 'Blood camps, drives and initiatives will appear here once they are announced. No dates or venues are shown until they are real.',
@@ -425,7 +448,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
             return Column(
               children: [
                 for (final doc in docs) ...[
-                  _announcementCard(doc.data()),
+                  _announcementCard(doc.data, demo: Demo.on),
                   const SizedBox(height: 12),
                 ],
               ],
@@ -443,7 +466,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const BrandGlyph(icon: LucideIcons.megaphone, tone: GlyphTone.gold, size: 38),
+          const BrandGlyph(icon: RbGlyph.megaphone, tone: GlyphTone.gold, size: 38),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -468,7 +491,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
   // ------------------------------------------------------------- Impact
 
   Widget _impactTab() {
-    final month = const ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][DateTime.now().month - 1];
     return ListView(
       padding: kRbPagePadding,
       children: [
@@ -479,66 +501,87 @@ class _CommunityScreenState extends State<CommunityScreen> {
               return RbStatePanel.error(
                 title: "Couldn't load this month's impact",
                 message: communityLoadErrorMessage(snapshot.error),
-                onRetry: () => setState(() => _impactStream = Backend.instance.impactThisMonthStream()),
+                onRetry: () => setState(() => _impactStream = _impact()),
               );
             }
             if (!snapshot.hasData) return const RbLoading();
             final count = snapshot.data!;
-            return RbCard(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
+            if (count == 0) {
+              return Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+                decoration: BoxDecoration(color: Colors.white, border: Border.all(color: AppColors.red100, width: 1.5), borderRadius: BorderRadius.circular(20)),
+                child: Column(
+                  children: [
+                    const BrandGlyph(icon: RbGlyph.droplet, size: 52),
+                    const SizedBox(height: 16),
+                    Text('No donations recorded this month yet', textAlign: TextAlign.center, style: AppTextStyles.display(fontSize: 18, color: AppColors.ink)),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'This counts donations confirmed by both the donor and the requester. It updates the moment the first one this month is recorded.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 13, color: AppColors.ink2, height: 1.5),
+                    ),
+                  ],
+                ),
+              );
+            }
+            return Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment(-0.3, -1),
+                  end: Alignment(0.3, 1),
+                  colors: [AppColors.emberFieldStart, AppColors.emberFieldMid, AppColors.emberFieldEnd],
+                ),
+                borderRadius: BorderRadius.circular(20),
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      const BloodGroupDroplet(label: '', size: 16),
-                      const SizedBox(width: 8),
-                      Text('$month so far', style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.ink2)),
-                    ],
-                  ),
+                  const Text('Together this month', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.gold)),
                   const SizedBox(height: 10),
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Text('$count', style: AppTextStyles.display(fontSize: 52, color: count == 0 ? AppColors.ink2 : AppColors.brandRed, height: 0.95)),
+                      Text('$count', style: AppTextStyles.display(fontSize: 46, color: AppColors.onEmberWarm, height: 0.9)),
                       const SizedBox(width: 12),
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.only(bottom: 6),
-                          child: Text(
-                            count == 1 ? 'donation completed through the app' : 'donations completed through the app',
-                            style: const TextStyle(fontSize: 14, color: AppColors.ink, height: 1.3),
-                          ),
-                        ),
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 7),
+                        child: Text(count == 1 ? 'donation by\nthe community' : 'donations by\nthe community', style: const TextStyle(fontSize: 14, height: 1.25, color: AppColors.onEmberWarm)),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 14),
-                  const Divider(height: 1, color: AppColors.warmDivider),
                   const SizedBox(height: 12),
                   Text(
-                    count == 0
-                        ? 'Nothing recorded yet this month. The figure updates the moment a donation is confirmed by both sides.'
-                        : 'Counted only when both the donor and the requester confirm the donation.',
-                    style: const TextStyle(fontSize: 13, color: AppColors.ink2, height: 1.45),
+                    Demo.on ? 'Demo · counts only the donation completed in this demo.' : 'Counted when both the donor and the requester confirm a donation.',
+                    style: const TextStyle(fontSize: 12, color: AppColors.onEmberMuted),
                   ),
                 ],
               ),
             );
           },
         ),
-        const RbSectionLabel('Recognition'),
-        RbCard(
-          color: AppColors.goldTint,
+        const SizedBox(height: 22),
+        const Text('Community impact', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.ink2)),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+          decoration: const BoxDecoration(
+            color: AppColors.goldTint,
+            border: Border(left: BorderSide(color: AppColors.gold, width: 3)),
+            borderRadius: BorderRadius.horizontal(right: Radius.circular(12)),
+          ),
           child: const Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(LucideIcons.award, size: 18, color: AppColors.goldDeep),
-              SizedBox(width: 12),
+              RbIcon(RbGlyph.certificate, size: 16, color: AppColors.goldDeep),
+              SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'Donor recognition is coming. Rankings need a public community identity, which hasn’t launched yet — so there are no placeholder scores here.',
-                  style: TextStyle(fontSize: 13.5, color: AppColors.goldDeepest, height: 1.5),
+                  'Recognition is coming. Individual rankings and Donor of the Year need a public community identity, which hasn’t launched yet — nothing here is a placeholder score.',
+                  style: TextStyle(fontSize: 12.5, color: AppColors.goldDeepest, height: 1.5),
                 ),
               ),
             ],
@@ -549,8 +592,9 @@ class _CommunityScreenState extends State<CommunityScreen> {
   }
 }
 
-/// Two placeholder post shapes while stories load — keeps the layout from
-/// jumping when the first real card arrives.
+/// A document id and its fields — from Firestore, or from the client demo.
+typedef _Doc = ({String id, Map<String, dynamic> data});
+
 class _StorySkeleton extends StatelessWidget {
   const _StorySkeleton();
 
@@ -598,7 +642,7 @@ class _PhotoViewer extends StatelessWidget {
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
         elevation: 0,
-        leading: IconButton(icon: const Icon(LucideIcons.x), onPressed: () => Navigator.pop(context)),
+        leading: IconButton(icon: const RbIcon(RbGlyph.close), onPressed: () => Navigator.pop(context)),
       ),
       body: Center(
         child: InteractiveViewer(

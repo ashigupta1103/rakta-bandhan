@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../theme/app_colors.dart';
 import '../widgets/brand_glyph.dart';
+import '../widgets/rb_icon.dart';
 
 class CancelConfirmScreen extends StatelessWidget {
   final String requestId;
@@ -18,7 +18,7 @@ class CancelConfirmScreen extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const BrandGlyph(icon: LucideIcons.x, tone: GlyphTone.neutral, size: 56),
+              const BrandGlyph(icon: RbGlyph.close, tone: GlyphTone.neutral, size: 56),
               const SizedBox(height: 16),
               const Text(
                 'Request cancelled',

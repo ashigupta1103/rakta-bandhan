@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../services/backend.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/filter_chip_row.dart';
+import '../widgets/rb_icon.dart';
 
 /// Help & support — an accordion FAQ using the same grouped-row component
 /// used everywhere else in the app. Every answer below is verified against
@@ -113,7 +113,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: Row(
                   children: [
-                    IconButton(icon: const Icon(LucideIcons.arrowLeft, color: AppColors.textPrimaryWarm), onPressed: () => Navigator.pop(context)),
+                    IconButton(icon: const RbIcon(RbGlyph.back, color: AppColors.textPrimaryWarm), onPressed: () => Navigator.pop(context)),
                     const SizedBox(width: 4),
                     const Text('Help & support', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
                   ],
@@ -144,11 +144,11 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                           decoration: InputDecoration(
                             hintText: 'Search help',
                             hintStyle: const TextStyle(color: AppColors.disabledTint),
-                            prefixIcon: const Icon(LucideIcons.search, size: 19, color: AppColors.disabledTint),
+                            prefixIcon: const RbIcon(RbGlyph.search, size: 19, color: AppColors.disabledTint),
                             suffixIcon: _query.isEmpty
                                 ? null
                                 : IconButton(
-                                    icon: const Icon(LucideIcons.x, size: 15, color: AppColors.disabledTint),
+                                    icon: const RbIcon(RbGlyph.close, size: 15, color: AppColors.disabledTint),
                                     onPressed: () => setState(() {
                                       _searchController.clear();
                                       _query = '';
@@ -192,7 +192,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                                       Row(
                                         children: [
                                           Expanded(child: Text(_filtered[i].$1, style: TextStyle(fontSize: 14.5, fontWeight: _expanded == i ? FontWeight.w600 : FontWeight.w500, color: AppColors.textPrimaryWarm))),
-                                          Icon(_expanded == i ? LucideIcons.minus : LucideIcons.plus, size: 15, color: AppColors.disabledTint),
+                                          RbIcon(_expanded == i ? RbGlyph.minus : RbGlyph.plus, size: 15, color: AppColors.disabledTint),
                                         ],
                                       ),
                                       if (_expanded == i) ...[
@@ -224,10 +224,10 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                         decoration: BoxDecoration(color: Colors.white, border: Border.all(color: AppColors.warmBorder), borderRadius: BorderRadius.circular(12)),
                         child: const Row(
                           children: [
-                            Icon(LucideIcons.flag, size: 17, color: AppColors.textSecondary),
+                            RbIcon(RbGlyph.flag, size: 17, color: AppColors.textSecondary),
                             SizedBox(width: 10),
                             Expanded(child: Text('Report an issue', style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w500, color: AppColors.textPrimaryWarm))),
-                            Icon(LucideIcons.chevronRight, size: 16, color: AppColors.chevronMuted),
+                            RbIcon(RbGlyph.chevron, size: 16, color: AppColors.chevronMuted),
                           ],
                         ),
                       ),
