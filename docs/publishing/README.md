@@ -97,6 +97,7 @@ Not testable here: real push delivery, real calls between two phones, and the Go
    3. Upload to **Internal testing** first.
    4. New personal developer accounts must run a closed test with at least 12 testers for 14 days before production access.
    5. App content › **Foreground service** declaration: *Phone call* (see `store-listing.md`).
+   6. App content › **App access**: choose "All or some functionality is restricted" and paste the sign-in instructions from the App Review notes in `store-listing.md` (the two review emails and the review code). Reviewers can't read an email, which is why those two addresses use a fixed code.
 6. **Two-phone checklist** on the internal-testing build (one phone signed in as a requester, one as a donor):
    - [ ] Sign in with an email address → the 6-digit code arrives by email → entering it opens the app (a new account continues to registration).
    - [ ] A wrong code is refused, and a resent code arrives after the 30-second wait.

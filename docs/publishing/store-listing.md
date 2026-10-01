@@ -117,14 +117,15 @@ Tracking: **No** (no IDFA, no data brokers, no cross-app tracking).
 
 ## App Review notes (paste into App Store Connect › App Review Information)
 
-> **Sign-in:** use the review accounts below (email + password, already verified). New accounts confirm their email with a link Firebase sends.
-> - Account A (requester): `review-a@<your-domain>` / `<password>`
-> - Account B (donor): `review-b@<your-domain>` / `<password>`
-> *(Create both in the app before submitting, verify their emails, and register B as an O+ donor near A's location.)*
+> **Sign-in:** the app has no passwords. Enter one of the review emails below and continue; on the 6-digit code screen enter the review code (no email is sent for these two addresses).
+> - Account A (requester): `<REVIEW_EMAIL_A>`
+> - Account B (donor): `<REVIEW_EMAIL_B>`
+> - Review code: `<REVIEW_CODE>`
+> *(Both accounts, and B as a verified, available O+ donor near A's location, are created beforehand with `functions/scripts/seed-review-accounts.mjs`.)*
 >
-> **To see matching, chat and calling**, use two devices or simulators signed in with two different numbers:
-> 1. On device A, Request tab › "Need blood yourself?" › pick a blood group, urgency and location.
-> 2. On device B, register with a compatible blood group near the same location. The request appears on the Request tab. Tap "View request" › Accept.
+> **To see matching, chat and calling**, use two devices or simulators, one signed in as A and one as B:
+> 1. On device A, Request tab › "Need blood yourself?" › pick a blood group B can donate to (O+, A+, B+ or AB+), urgency and location.
+> 2. On device B (already registered), the request appears on the Request tab. Tap "View request" › Accept.
 > 3. Both devices are now matched. Tap Message to chat, or the phone icon for an in-app voice call.
 >
 > **Account deletion:** My Page › Settings › Delete my account.

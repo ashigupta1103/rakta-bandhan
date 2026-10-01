@@ -37,11 +37,18 @@ import {
   generateCode,
   hashCode,
   normalizeEmail,
+  parseReviewEmails,
+  reviewCodeFor,
   sendRefusal,
 } from './otp';
 
 const SMTP_URL = defineSecret('SMTP_URL');
 const MAIL_FROM = defineString('MAIL_FROM', { default: 'Rakta Bandhan <no-reply@raktabandhan.org>' });
+// App-store review access: for the addresses listed in REVIEW_EMAILS the sign-in
+// code is the fixed REVIEW_CODE and no email is sent. Leave REVIEW_EMAILS empty
+// (the default) and the feature doesn't exist. See docs/launch/AFTER_BLAZE_UPGRADE.md.
+const REVIEW_EMAILS = defineString('REVIEW_EMAILS', { default: '' });
+const REVIEW_CODE = defineSecret('REVIEW_CODE');
 
 /** Mixed into code hashes so a leaked hash isn't a lookup-table hit. */
 const PEPPER = 'rakta-bandhan-login-v1';
@@ -54,6 +61,23 @@ function readSmtpUrl(): string {
     return SMTP_URL.value() ?? '';
   } catch {
     return '';
+  }
+}
+
+function reviewList(): string[] {
+  try {
+    return parseReviewEmails(REVIEW_EMAILS.value());
+  } catch {
+    return [];
+  }
+}
+
+/** The fixed review code for this address, or null when review access doesn't apply. */
+function reviewCodeForEmail(email: string): string | null {
+  try {
+    return reviewCodeFor(email, reviewList(), REVIEW_CODE.value());
+  } catch {
+    return null;
   }
 }
 
@@ -84,7 +108,7 @@ async function chargeIp(ip: string): Promise<void> {
   });
 }
 
-export const requestLoginCode = onCall({ secrets: [SMTP_URL] }, async (req) => {
+export const requestLoginCode = onCall({ secrets: [SMTP_URL, REVIEW_CODE] }, async (req) => {
   const channel: Channel = req.data?.channel === 'sms' ? 'sms' : 'email';
   if (channel === 'sms') {
     throw new HttpsError('unimplemented', 'Codes by SMS are coming soon. Please use your email for now.');
@@ -96,7 +120,10 @@ export const requestLoginCode = onCall({ secrets: [SMTP_URL] }, async (req) => {
 
   const now = Date.now();
   const ref = db.doc(`login_codes/${destinationKey(channel, email)}`);
-  const code = generateCode();
+  // A review address signs in with the fixed code, through the same hashing,
+  // expiry and five-try limit as any code; only the email is skipped.
+  const reviewCode = reviewCodeForEmail(email);
+  const code = reviewCode ?? generateCode();
   await db.runTransaction(async (tx) => {
     const state = (await tx.get(ref)).data() as SendState | undefined;
     const refusal = sendRefusal(state, now);
@@ -124,7 +151,7 @@ export const requestLoginCode = onCall({ secrets: [SMTP_URL] }, async (req) => {
   });
 
   try {
-    await sendEmail(email, code);
+    if (!reviewCode) await sendEmail(email, code);
   } catch (e) {
     if (e instanceof HttpsError) throw e;
     logger.error('login email failed', { error: String(e) });
@@ -178,6 +205,14 @@ export const verifyLoginCode = onCall(async (req) => {
     user = await auth.createUser({ email, emailVerified: true });
   }
   if (user.disabled) throw new HttpsError('permission-denied', 'This account has been disabled. Contact support.');
+  // A review address is a stand-in for a reviewer, never for staff: the fixed
+  // code must never open an admin account. Every review sign-in is logged.
+  if (reviewList().includes(email)) {
+    if ((await db.doc(`admins/${user.uid}`).get()).exists) {
+      throw new HttpsError('permission-denied', 'This account can’t be used for review sign-in.');
+    }
+    logger.warn('review account signed in', { uid: user.uid });
+  }
   if (!user.emailVerified) await auth.updateUser(user.uid, { emailVerified: true });
   const token = await auth.createCustomToken(user.uid, LOGIN_CLAIM);
   return { token, isNewUser: user.metadata.lastSignInTime == null };

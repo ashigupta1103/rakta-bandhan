@@ -14,6 +14,8 @@ import {
   hashCode,
   normalizeEmail,
   normalizeIndianMobile,
+  parseReviewEmails,
+  reviewCodeFor,
   sendRefusal,
 } from '../otp';
 
@@ -73,4 +75,24 @@ test('the email shows the code in the subject and body', () => {
   assert.match(m.subject, /^012345 /);
   assert.match(m.text, /012 345/);
   assert.match(m.html, /012 345/);
+});
+
+test('the review allow-list is parsed from a comma list and drops anything that is not an email', () => {
+  assert.deepEqual(parseReviewEmails(' Review-A@Example.com , review-b@example.com,not-an-email,, '), [
+    'review-a@example.com',
+    'review-b@example.com',
+  ]);
+  assert.deepEqual(parseReviewEmails(''), []);
+  assert.deepEqual(parseReviewEmails(undefined), []);
+  assert.deepEqual(parseReviewEmails(42), []);
+});
+
+test('the review code applies only to a listed address and only when it is 6 digits', () => {
+  const list = ['review-a@example.com'];
+  assert.equal(reviewCodeFor('review-a@example.com', list, '246810'), '246810');
+  assert.equal(reviewCodeFor('someone@example.com', list, '246810'), null, 'not on the list');
+  assert.equal(reviewCodeFor('review-a@example.com', [], '246810'), null, 'empty list = feature off');
+  for (const bad of [undefined, '', '12345', '1234567', 'abcdef', 246810]) {
+    assert.equal(reviewCodeFor('review-a@example.com', list, bad), null, `configured=${String(bad)}`);
+  }
 });
