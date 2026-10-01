@@ -1376,6 +1376,10 @@ class Backend {
 
   static bool isFallback(Position p) => p.accuracy == 0 && p.latitude == 8.5241 && p.longitude == 76.9366;
 
+  /// Address lookups are a nicety — never let a slow geocoding server hold
+  /// up registration or a request (callers fall back to no label).
+  static const _geocodeTimeout = Duration(seconds: 8);
+
   Uri _geocodeUri(String path, Map<String, String> params) => kLocationIqKey.isEmpty
       ? Uri.https('nominatim.openstreetmap.org', path, params)
       : Uri.https('us1.locationiq.com', '/v1$path', {...params, 'key': kLocationIqKey});
@@ -1399,7 +1403,7 @@ class Backend {
         const d = 0.45;
         params['viewbox'] = '${near.lng - d},${near.lat + d},${near.lng + d},${near.lat - d}';
       }
-      final response = await http.get(_geocodeUri('/search', params), headers: {'User-Agent': 'RaktaBandhan/1.0'});
+      final response = await http.get(_geocodeUri('/search', params), headers: {'User-Agent': 'RaktaBandhan/1.0'}).timeout(_geocodeTimeout);
       if (response.statusCode != 200) return [];
       final List results = jsonDecode(response.body);
       return results
@@ -1422,7 +1426,7 @@ class Backend {
       final response = await http.get(
         _geocodeUri('/reverse', {'lat': lat.toString(), 'lon': lng.toString(), 'format': 'json', 'zoom': '18'}),
         headers: {'User-Agent': 'RaktaBandhan/1.0'},
-      );
+      ).timeout(_geocodeTimeout);
       if (response.statusCode != 200) return null;
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       return body['display_name'] as String?;
@@ -1444,7 +1448,7 @@ class Backend {
           'addressdetails': '1',
         }),
         headers: {'User-Agent': 'RaktaBandhan/1.0'},
-      );
+      ).timeout(_geocodeTimeout);
       if (response.statusCode != 200) return null;
       final address = (jsonDecode(response.body) as Map<String, dynamic>)['address'] as Map<String, dynamic>?;
       if (address == null) return null;

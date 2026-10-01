@@ -34,20 +34,18 @@ mkdir -p "$OUT"
 GRANTER=$!
 
 # Google's one-time "Location Accuracy" prompt (shown the first time an app
-# asks for a precise fix): tap "Turn on", as a user would.
+# asks for a precise fix): tap "Turn on", as a user would. Detected by the
+# focused window belonging to Google Play services; "Turn on" sits at the
+# dialog's bottom right (72% across, 73.5% down on a phone-shaped screen).
 (
-  for _ in $(seq 1 400); do
-    "$ADB" shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
-    xml=$("$ADB" shell cat /sdcard/ui.xml 2>/dev/null)
-    if echo "$xml" | grep -q 'Location Accuracy'; then
-      b=$(echo "$xml" | grep -o 'text="Turn on"[^>]*bounds="\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]"' | grep -o '\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]' | head -1)
-      if [ -n "$b" ]; then
-        set -- $(echo "$b" | tr '[],' '   ')
-        "$ADB" shell input tap $(( ($1 + $3) / 2 )) $(( ($2 + $4) / 2 ))
-        echo "tapped Location Accuracy: Turn on"
-      fi
+  read -r W H < <("$ADB" shell wm size | grep -o '[0-9]*x[0-9]*' | tail -1 | tr 'x' ' ')
+  for _ in $(seq 1 600); do
+    if "$ADB" shell dumpsys window 2>/dev/null | grep -E 'mCurrentFocus|mFocusedWindow' | grep -q 'com.google.android.gms'; then
+      "$ADB" shell input tap $(( W * 72 / 100 )) $(( H * 735 / 1000 ))
+      echo "tapped Location Accuracy: Turn on"
+      sleep 3
     fi
-    sleep 2
+    sleep 1
   done
 ) &
 DISMISSER=$!

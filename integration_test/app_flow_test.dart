@@ -125,7 +125,8 @@ void main() {
     //    Chennai Central; fall back to the map pin if GPS is slow).
     await t.enterText(find.byType(TextField).at(0), 'Test Donor');
     await t.enterText(find.byType(TextField).at(1), '9876543210');
-    await tapWhenReady(t, find.text('O+'));
+    FocusManager.instance.primaryFocus?.unfocus();
+    await pumpFor(t, const Duration(seconds: 1));
     final resolved = DateTime.now().add(const Duration(seconds: 20));
     while (DateTime.now().isBefore(resolved) && find.textContaining('Location pinned').evaluate().isEmpty) {
       await t.pump(const Duration(milliseconds: 300));
@@ -138,9 +139,26 @@ void main() {
       await tapWhenReady(t, find.text('Use this area'));
     }
     await snap(t, '03_registration');
-    await tapWhenReady(t, find.text('Complete registration'));
-    await waitFor(t, find.text('I agree, continue'), why: 'consent screen');
+    await tapWhenReady(t, find.text('O+'));
+    await pumpFor(t, const Duration(milliseconds: 500));
+    await tapWhenReady(t, find.widgetWithText(ElevatedButton, 'Complete registration'));
+    await snap(t, '03c_after_register_tap');
+    await waitFor(t, find.text('I agree, continue'), why: 'consent screen', timeout: const Duration(seconds: 60));
+    await snap(t, '03d_consent');
+    await tapWhenReady(t, find.byType(Checkbox));
     await tapWhenReady(t, find.text('I agree, continue'));
+    // Location was granted during registration, so the separate location
+    // screen is skipped; tolerate it if a device shows it anyway.
+    final next = DateTime.now().add(const Duration(seconds: 20));
+    while (DateTime.now().isBefore(next) &&
+        find.text('Continue to Rakta Bandhan').evaluate().isEmpty &&
+        find.text('Not now').evaluate().isEmpty) {
+      await t.pump(const Duration(milliseconds: 200));
+    }
+    if (find.text('Not now').evaluate().isNotEmpty) await tapWhenReady(t, find.text('Not now'));
+    await waitFor(t, find.text('Continue to Rakta Bandhan'), why: 'verifying screen');
+    await snap(t, '03e_welcome');
+    await tapWhenReady(t, find.text('Continue to Rakta Bandhan'));
     await waitFor(t, find.text('My Page'), why: 'main navigation');
     final me = FirebaseAuth.instance.currentUser!.uid;
 

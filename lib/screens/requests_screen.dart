@@ -325,9 +325,8 @@ class _RequestsScreenState extends State<RequestsScreen> {
     Backend.instance.expireIfStale(requestId, request);
     final status = request['status'] as String? ?? 'open';
     final bloodGroup = request['blood_group'] as String? ?? '';
-    final locationLabel = (request['location_label'] as String?)?.isNotEmpty == true
-        ? request['location_label'] as String
-        : '${request['units_needed'] ?? 1} unit(s) needed';
+    final units = (request['units_needed'] as num?)?.toInt() ?? 1;
+    final locationLabel = Backend.shortPlace(request['location_label'] as String?, fallback: '$units ${units == 1 ? 'unit' : 'units'} needed');
 
     final isMatched = status == 'matched' && request['matched_donor_phone'] != null;
 

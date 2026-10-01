@@ -180,7 +180,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                             Text(Backend.shortPlace(location, fallback: 'Blood request'), style: AppTextStyles.display(fontSize: 22, color: AppColors.ink, height: 1.2)),
                             const SizedBox(height: 3),
                             Text(
-                              '$units unit(s) · $urgency${createdAt == null ? '' : ' · raised ${_timeAgo(createdAt)}'}',
+                              '$units ${units == 1 ? 'unit' : 'units'} · $urgency${createdAt == null ? '' : ' · raised ${_timeAgo(createdAt)}'}',
                               style: const TextStyle(fontSize: 12.5, color: AppColors.ink2),
                             ),
                           ],

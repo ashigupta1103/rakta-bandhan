@@ -122,7 +122,7 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
             final bloodGroup = data['blood_group'] as String? ?? '';
             final urgency = data['urgency'] as String? ?? 'normal';
             final units = data['units_needed'] ?? 1;
-            final location = (data['location_label'] as String?)?.isNotEmpty == true ? data['location_label'] as String : 'Blood request';
+            final location = Backend.shortPlace(data['location_label'] as String?, fallback: 'Blood request');
             final createdAt = (data['created_at'] as Timestamp?)?.toDate();
             final lat = (data['lat'] as num?)?.toDouble();
             final lng = (data['lng'] as num?)?.toDouble();
@@ -193,7 +193,7 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
                               runSpacing: 6,
                               children: [
                                 _metaChip(LucideIcons.mapPin, distance),
-                                _metaChip(LucideIcons.hourglass, '$units unit(s)'),
+                                _metaChip(LucideIcons.hourglass, '$units ${units == 1 ? 'unit' : 'units'}'),
                                 _metaChip(LucideIcons.clock, createdAt == null ? '—' : _timeAgo(createdAt)),
                               ],
                             ),

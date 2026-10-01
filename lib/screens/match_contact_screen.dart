@@ -100,7 +100,7 @@ class _MatchContactScreenState extends State<MatchContactScreen> {
                 return const Center(child: Text('Request not found.', style: TextStyle(color: Colors.white70)));
               }
               final bloodGroup = request['blood_group'] as String? ?? '';
-              final location = (request['location_label'] as String?)?.isNotEmpty == true ? request['location_label'] as String : 'the requester';
+              final location = Backend.shortPlace(request['location_label'] as String?, fallback: 'the requester');
               final name = request['requester_name'] as String? ?? 'Requester';
               final phone = request['requester_phone'] as String? ?? '';
               final requesterUid = request['requester_uid'] as String? ?? '';

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/brand_glyph.dart';
 import 'legal_reader_screen.dart';
 import 'location_permission_screen.dart';
+import 'verifying_screen.dart';
 
 class ConsentScreen extends StatefulWidget {
   const ConsentScreen({super.key});
@@ -16,9 +18,20 @@ class ConsentScreen extends StatefulWidget {
 class _ConsentScreenState extends State<ConsentScreen> {
   bool _agreed = false;
 
-  void _accept() {
+  Future<void> _accept() async {
     if (!_agreed) return;
-    Navigator.push(context, MaterialPageRoute(builder: (context) => const LocationPermissionScreen()));
+    // Registration usually already asked for location (to fill in the
+    // area). Don't ask a second time — go straight on if it's granted.
+    var granted = false;
+    try {
+      final p = await Geolocator.checkPermission();
+      granted = p == LocationPermission.always || p == LocationPermission.whileInUse;
+    } catch (_) {}
+    if (!mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => granted ? const VerifyingScreen() : const LocationPermissionScreen()),
+    );
   }
 
   @override
