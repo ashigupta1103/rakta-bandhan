@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+
 import '../demo/demo.dart';
 import '../services/backend.dart';
 import '../theme/app_colors.dart';
@@ -14,7 +15,14 @@ import '../widgets/rb_icon.dart';
 /// downscaled on the phone (1440 px, JPEG ~78%) before upload, so a post
 /// costs ~150–300 KB of storage instead of a 4–6 MB camera original.
 class CreateExperienceScreen extends StatefulWidget {
-  const CreateExperienceScreen({super.key});
+  /// Set when editing the user's own story: the form opens pre-filled with
+  /// its text and topic. Saving works in the client demo; for published
+  /// stories the backend update is still to be connected.
+  final String? editStoryId;
+  final String initialBody;
+  final String? initialTopic;
+
+  const CreateExperienceScreen({super.key, this.editStoryId, this.initialBody = '', this.initialTopic});
 
   @override
   State<CreateExperienceScreen> createState() => _CreateExperienceScreenState();
@@ -23,9 +31,10 @@ class CreateExperienceScreen extends StatefulWidget {
 class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
   static const _topics = ['My first donation', 'Donation experience', 'Helping someone', 'Blood camp', 'Gratitude', 'Awareness', 'Other'];
 
-  final _textController = TextEditingController();
+  late final _textController = TextEditingController(text: widget.initialBody);
   final _focusNode = FocusNode();
-  String _topic = 'My first donation';
+  late String _topic = _topics.contains(widget.initialTopic) ? widget.initialTopic! : 'My first donation';
+  bool get _editing => widget.editStoryId != null;
   bool _showBloodGroup = true;
   bool _tagLocation = false;
   XFile? _photo;
@@ -40,16 +49,8 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ListTile(
-              leading: const RbIcon(RbGlyph.photo),
-              title: const Text('Choose from gallery'),
-              onTap: () => Navigator.pop(sheet, ImageSource.gallery),
-            ),
-            ListTile(
-              leading: const RbIcon(RbGlyph.camera),
-              title: const Text('Take a photo'),
-              onTap: () => Navigator.pop(sheet, ImageSource.camera),
-            ),
+            ListTile(leading: const RbIcon(RbGlyph.photo), title: const Text('Choose from gallery'), onTap: () => Navigator.pop(sheet, ImageSource.gallery)),
+            ListTile(leading: const RbIcon(RbGlyph.camera), title: const Text('Take a photo'), onTap: () => Navigator.pop(sheet, ImageSource.camera)),
           ],
         ),
       ),
@@ -93,9 +94,20 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
   Future<void> _submit() async {
     final body = _textController.text.trim();
     if (body.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Write something to share first.')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Write something to share first.')));
+      return;
+    }
+    if (_editing) {
+      final messenger = ScaffoldMessenger.of(context);
+      if (Demo.isDemoId(widget.editStoryId)) {
+        Demo.instance.updateStory(widget.editStoryId!, body: body, topic: _topic);
+        Navigator.pop(context);
+        messenger.showSnackBar(const SnackBar(content: Text('Story updated.')));
+        return;
+      }
+      // Saving an edit to a published story needs a backend update that
+      // isn't connected yet (backend team). Say so — never fake a save.
+      messenger.showSnackBar(const SnackBar(content: Text('Saving edits isn’t available yet. Your story hasn’t changed.')));
       return;
     }
     if (Demo.on) {
@@ -110,24 +122,14 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
       final donor = (await Backend.instance.myDonorDoc()).data();
       // Neighbourhood only ("Adyar, Chennai") — never the registered address.
       final area = _tagLocation ? await Backend.instance.myPublicArea() : null;
-      await Backend.instance.submitCommunityStory(
-        topic: _topic,
-        body: body,
-        bloodGroup: _showBloodGroup ? (donor?['blood_group'] as String?) : null,
-        locationLabel: area,
-        photo: _photo,
-      );
+      await Backend.instance.submitCommunityStory(topic: _topic, body: body, bloodGroup: _showBloodGroup ? (donor?['blood_group'] as String?) : null, locationLabel: area, photo: _photo);
       if (!mounted) return;
       Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Shared with the community.')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Shared with the community.')));
     } catch (_) {
       if (!mounted) return;
       setState(() => _submitting = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not share this. Please try again.')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not share this. Please try again.')));
     }
   }
 
@@ -143,8 +145,14 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
               child: Row(
                 children: [
                   IconButton(
-                      tooltip: 'Close',icon: const RbIcon(RbGlyph.close, color: AppColors.textPrimaryWarm), onPressed: () => Navigator.pop(context)),
-                  const Text('Share an experience', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
+                    tooltip: 'Close',
+                    icon: const RbIcon(RbGlyph.close, color: AppColors.textPrimaryWarm),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  Text(
+                    _editing ? 'Edit story' : 'Share an experience',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm),
+                  ),
                 ],
               ),
             ),
@@ -154,14 +162,17 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('What happened?', style: AppTextStyles.display(fontSize: 25, color: AppColors.ink, height: 1.2)),
+                    Text(_editing ? 'Your story' : 'What happened?', style: AppTextStyles.display(fontSize: 25, color: AppColors.ink, height: 1.2)),
                     const SizedBox(height: 6),
                     RichText(
                       text: TextSpan(
                         style: const TextStyle(fontSize: 13.5, color: AppColors.ink2),
                         children: [
                           const TextSpan(text: 'You post as '),
-                          TextSpan(text: 'your registered name', style: TextStyle(color: AppColors.goldDeep, fontWeight: FontWeight.w700)),
+                          TextSpan(
+                            text: 'your registered name',
+                            style: TextStyle(color: AppColors.goldDeep, fontWeight: FontWeight.w700),
+                          ),
                           const TextSpan(text: '. Your phone number and exact address are never shown.'),
                         ],
                       ),
@@ -192,66 +203,80 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 14),
-                    if (_photoBytes != null)
-                      // Preview exactly as the feed will show it.
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(14),
-                        child: Stack(
-                          children: [
-                            AspectRatio(aspectRatio: 4 / 5, child: Image.memory(_photoBytes!, fit: BoxFit.cover, width: double.infinity)),
-                            Positioned(
-                              top: 8,
-                              right: 8,
-                              child: IconButton.filled(
-                                tooltip: 'Remove photo',
-                                style: IconButton.styleFrom(backgroundColor: Colors.black54),
-                                icon: const RbIcon(RbGlyph.close, size: 16, color: Colors.white),
-                                onPressed: () => setState(() {
-                                  _photo = null;
-                                  _photoBytes = null;
-                                }),
+                    // Editing changes the words and topic only; the photo and
+                    // privacy choices stay as originally posted.
+                    if (_editing) ...[
+                      const SizedBox(height: 10),
+                      const Text('The photo and privacy settings stay as you posted them.', style: TextStyle(fontSize: 12.5, color: AppColors.ink2, height: 1.4)),
+                    ],
+                    if (!_editing) ...[
+                      const SizedBox(height: 14),
+                      if (_photoBytes != null)
+                        // Preview exactly as the feed will show it.
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(14),
+                          child: Stack(
+                            children: [
+                              AspectRatio(
+                                aspectRatio: 4 / 5,
+                                child: Image.memory(_photoBytes!, fit: BoxFit.cover, width: double.infinity),
                               ),
-                            ),
-                            Positioned(
-                              bottom: 8,
-                              right: 8,
-                              child: TextButton.icon(
-                                style: TextButton.styleFrom(backgroundColor: Colors.black54, foregroundColor: Colors.white),
-                                onPressed: _pickPhoto,
-                                icon: const RbIcon(RbGlyph.retry, size: 14),
-                                label: const Text('Change'),
+                              Positioned(
+                                top: 8,
+                                right: 8,
+                                child: IconButton.filled(
+                                  tooltip: 'Remove photo',
+                                  style: IconButton.styleFrom(backgroundColor: Colors.black54),
+                                  icon: const RbIcon(RbGlyph.close, size: 16, color: Colors.white),
+                                  onPressed: () => setState(() {
+                                    _photo = null;
+                                    _photoBytes = null;
+                                  }),
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
-                      )
-                    else
-                      GestureDetector(
-                        onTap: _pickPhoto,
-                        child: CustomPaint(
-                          painter: DashedRRectPainter(color: AppColors.warmBorder, radius: 12),
-                          child: Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            alignment: Alignment.center,
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                RbIcon(RbGlyph.photoAdd, size: 16, color: AppColors.ink2),
-                                SizedBox(width: 8),
-                                Text('Add a photo (optional)', style: TextStyle(fontSize: 13.5, color: AppColors.ink2)),
-                              ],
+                              Positioned(
+                                bottom: 8,
+                                right: 8,
+                                child: TextButton.icon(
+                                  style: TextButton.styleFrom(backgroundColor: Colors.black54, foregroundColor: Colors.white),
+                                  onPressed: _pickPhoto,
+                                  icon: const RbIcon(RbGlyph.retry, size: 14),
+                                  label: const Text('Change'),
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      else
+                        GestureDetector(
+                          onTap: _pickPhoto,
+                          child: CustomPaint(
+                            painter: DashedRRectPainter(color: AppColors.warmBorder, radius: 12),
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              alignment: Alignment.center,
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  RbIcon(RbGlyph.photoAdd, size: 16, color: AppColors.ink2),
+                                  SizedBox(width: 8),
+                                  Text('Add a photo (optional)', style: TextStyle(fontSize: 13.5, color: AppColors.ink2)),
+                                ],
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    if (Demo.on) ...[
-                      const SizedBox(height: 8),
-                      const Text('Demo · a photo you pick stays on this device for the demo feed. Nothing is uploaded.', style: TextStyle(fontSize: 12, color: AppColors.goldDeep, height: 1.4)),
+                      if (Demo.on) ...[
+                        const SizedBox(height: 8),
+                        const Text('Demo · a photo you pick stays on this device for the demo feed. Nothing is uploaded.', style: TextStyle(fontSize: 12, color: AppColors.goldDeep, height: 1.4)),
+                      ],
                     ],
                     const SizedBox(height: 22),
-                    const Text('Choose a topic', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.1, color: AppColors.ink2)),
+                    const Text(
+                      'Choose a topic',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.1, color: AppColors.ink2),
+                    ),
                     const SizedBox(height: 10),
                     Wrap(
                       spacing: 8,
@@ -267,30 +292,49 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
                                 border: _topic == topic ? null : Border.all(color: AppColors.warmBorder),
                                 borderRadius: BorderRadius.circular(999),
                               ),
-                              child: Text(topic, style: TextStyle(fontSize: 13.5, fontWeight: _topic == topic ? FontWeight.w600 : FontWeight.w400, color: _topic == topic ? AppColors.whiteTextOnPrimary : AppColors.textPrimaryWarm)),
+                              child: Text(
+                                topic,
+                                style: TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: _topic == topic ? FontWeight.w600 : FontWeight.w400,
+                                  color: _topic == topic ? AppColors.whiteTextOnPrimary : AppColors.textPrimaryWarm,
+                                ),
+                              ),
                             ),
                           ),
                       ],
                     ),
-                    const SizedBox(height: 22),
-                    const Text('Privacy', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.1, color: AppColors.ink2)),
-                    const SizedBox(height: 10),
-                    Container(
-                      decoration: BoxDecoration(color: Colors.white, border: Border.all(color: AppColors.warmBorder), borderRadius: BorderRadius.circular(12)),
-                      child: Column(
-                        children: [
-                          _privacyRow('Show my blood group', 'Adds the droplet to your disc', _showBloodGroup, (v) => setState(() => _showBloodGroup = v)),
-                          _privacyRow('Show my area', 'Neighbourhood only, e.g. “Adyar, Chennai” — never your address', _tagLocation, (v) => setState(() => _tagLocation = v), isLast: true),
-                        ],
+                    if (!_editing) ...[
+                      const SizedBox(height: 22),
+                      const Text(
+                        'Privacy',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.1, color: AppColors.ink2),
                       ),
-                    ),
+                      const SizedBox(height: 10),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          border: Border.all(color: AppColors.warmBorder),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          children: [
+                            _privacyRow('Show my blood group', 'Adds the droplet to your disc', _showBloodGroup, (v) => setState(() => _showBloodGroup = v)),
+                            _privacyRow('Show my area', 'Neighbourhood only, e.g. “Adyar, Chennai” — never your address', _tagLocation, (v) => setState(() => _tagLocation = v), isLast: true),
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
             ),
             Container(
               padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
-              decoration: const BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: AppColors.warmBorder))),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                border: Border(top: BorderSide(color: AppColors.warmBorder)),
+              ),
               child: Column(
                 children: [
                   SizedBox(
@@ -299,11 +343,15 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
                       onPressed: (_textController.text.trim().isEmpty || _submitting) ? null : _submit,
                       child: _submitting
                           ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                          : const Text('Share experience'),
+                          : Text(_editing ? 'Save changes' : 'Share experience'),
                     ),
                   ),
                   const SizedBox(height: 9),
-                  const Text('Visible to everyone signed in to Rakta Bandhan. Follow the community guidelines — no phone numbers, no payment for blood.', textAlign: TextAlign.center, style: TextStyle(fontSize: 11.5, color: AppColors.disabledTint, height: 1.4)),
+                  const Text(
+                    'Visible to everyone signed in to Rakta Bandhan. Follow the community guidelines — no phone numbers, no payment for blood.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 11.5, color: AppColors.disabledTint, height: 1.4),
+                  ),
                 ],
               ),
             ),
@@ -316,14 +364,19 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
   Widget _privacyRow(String label, String subtitle, bool value, ValueChanged<bool> onChanged, {bool isLast = false}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-      decoration: BoxDecoration(border: isLast ? null : const Border(bottom: BorderSide(color: AppColors.warmDivider))),
+      decoration: BoxDecoration(
+        border: isLast ? null : const Border(bottom: BorderSide(color: AppColors.warmDivider)),
+      ),
       child: Row(
         children: [
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppColors.textPrimaryWarm)),
+                Text(
+                  label,
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppColors.textPrimaryWarm),
+                ),
                 const SizedBox(height: 2),
                 Text(subtitle, style: const TextStyle(fontSize: 11.5, color: AppColors.disabledTint)),
               ],

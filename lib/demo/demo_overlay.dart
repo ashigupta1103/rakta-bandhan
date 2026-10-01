@@ -64,6 +64,12 @@ class DemoOverlay extends StatelessWidget {
     if (ctx == null) return;
     showModalBottomSheet<void>(
       context: ctx,
+      // Sized to its content, capped below the status bar, scrolling when
+      // a short screen can't fit it all.
+      isScrollControlled: true,
+      useSafeArea: true,
+      constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(ctx).height * 0.9),
+      showDragHandle: true,
       backgroundColor: AppColors.warmGround,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (sheet) => _DemoControls(navigatorKey: navigatorKey),
@@ -133,9 +139,11 @@ class _DemoControls extends StatelessWidget {
           _nav.push(MaterialPageRoute(builder: (_) => const DonationConfirmScreen()));
         }),
     ];
+    // SafeArea keeps the last rows clear of Android's navigation bar.
     return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 18, 20, 12),
+      top: false,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,

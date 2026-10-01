@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:share_plus/share_plus.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
@@ -7,9 +8,9 @@ import 'legal_reader_screen.dart';
 import '../widgets/rb_icon.dart';
 
 /// About Rakta Bandhan — mission, vision, the project's story and team, as
-/// supplied by the Rakta Bandhan / Rotary team. Team photographs are still
-/// to come: set `photo` on a [_Member] once the image is in assets/team/;
-/// until then each member shows their initials.
+/// supplied by the Rakta Bandhan / Rotary team. Each team card shows that
+/// member's own photo or logo from assets/images/ (a placeholder frame if a
+/// member has none).
 class AboutScreen extends StatelessWidget {
   const AboutScreen({super.key});
 
@@ -27,21 +28,26 @@ class AboutScreen extends StatelessWidget {
   static const _team = [
     _Member(
       name: 'PHF Rtn. Radhika Dhruv',
-      photo: null, // 'assets/team/radhika-dhruv.jpg' once supplied
+      photo: 'assets/images/Radhika dhurv.jpeg',
+      // Full-length portrait: crop to head and shoulders.
+      focus: Alignment(-0.03, -0.63),
+      zoom: 1.6,
       role: 'Project Chairman · Visionary & Principal Sponsor',
       detail: 'Immediate Past President, Rotary Club of Madras Cosmos',
       bio: 'Radhika Dhruv conceptualised Rakta Bandhan from the thought that reaching a blood donor should be faster and more seamless in an emergency. Her vision has driven the development of the platform, and the app’s development has been majorly sponsored by her.',
     ),
     _Member(
       name: 'CSK',
-      photo: null, // 'assets/team/csk.jpg' once supplied
+      photo: 'assets/images/Chennai_Super_Kings_Logo.svg',
       role: 'Management Trustee',
       detail: 'Rakta Bandhan project trust',
       bio: 'As Management Trustee, CSK oversees the governance of the project on behalf of the partner trusts — making sure Rakta Bandhan is run responsibly, transparently and in the service of donors and patients.',
     ),
     _Member(
       name: 'Adarsh Betala',
-      photo: null, // 'assets/team/adarsh-betala.jpg' once supplied
+      photo: 'assets/images/Rtn Adarsh.jpg.jpeg',
+      focus: Alignment(-0.21, -0.3),
+      zoom: 1.4,
       role: 'President',
       detail: 'Rakta Bandhan',
       bio: 'As President, Adarsh Betala leads the day-to-day direction of Rakta Bandhan — bringing together the clubs, volunteers, hospitals and the technology team so that every request reaches willing donors quickly.',
@@ -267,12 +273,27 @@ class AboutScreen extends StatelessWidget {
                     child: Container(
                       width: 68,
                       height: 80,
-                      foregroundDecoration: m.photo == null
+                      foregroundDecoration: m.photo == null || m.isLogo
                           ? BoxDecoration(border: Border.all(color: AppColors.warmBorder), borderRadius: BorderRadius.circular(16))
                           : null,
+                      color: AppColors.sand,
                       child: m.photo == null
                           ? placeholder
-                          : Image.asset(m.photo!, fit: BoxFit.cover, errorBuilder: (context, error, stack) => placeholder),
+                          : m.isLogo
+                              // A logo is shown whole, never cropped.
+                              ? Padding(padding: const EdgeInsets.all(8), child: SvgPicture.asset(m.photo!, fit: BoxFit.contain))
+                              : Transform.scale(
+                                  scale: m.zoom,
+                                  alignment: m.focus,
+                                  child: Image.asset(
+                                    m.photo!,
+                                    fit: BoxFit.cover,
+                                    width: 68,
+                                    height: 80,
+                                    alignment: const Alignment(0, -0.8),
+                                    errorBuilder: (context, error, stack) => placeholder,
+                                  ),
+                                ),
                     ),
                   ),
                 ),
@@ -306,9 +327,25 @@ class _Member {
   final String role;
   final String detail;
   final String bio;
-  /// Asset path of the member's photograph, e.g. 'assets/team/radhika-dhruv.jpg'
-  /// (also list it under `flutter: assets:` in pubspec.yaml). Null shows
-  /// initials.
+  /// Asset path of the member's photo or logo (assets/images/, listed in
+  /// pubspec.yaml). An .svg is drawn whole as a logo; null shows the
+  /// placeholder frame.
   final String? photo;
-  const _Member({required this.name, required this.role, required this.detail, required this.bio, this.photo});
+
+  /// Portrait crop: the point of the frame to zoom around (the face), and
+  /// how far — so a full-length photo reads as head and shoulders.
+  final Alignment focus;
+  final double zoom;
+
+  const _Member({
+    required this.name,
+    required this.role,
+    required this.detail,
+    required this.bio,
+    this.photo,
+    this.focus = Alignment.center,
+    this.zoom = 1,
+  });
+
+  bool get isLogo => photo?.endsWith('.svg') ?? false;
 }

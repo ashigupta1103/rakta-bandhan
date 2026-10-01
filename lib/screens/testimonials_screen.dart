@@ -201,6 +201,9 @@ class _ShareTestimonialButton extends StatelessWidget {
       onPressed: () => showModalBottomSheet<void>(
         context: context,
         isScrollControlled: true,
+        useSafeArea: true,
+        showDragHandle: true,
+        constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.92),
         backgroundColor: Colors.white,
         shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
         builder: (_) => const _TestimonialSheet(),
@@ -254,53 +257,106 @@ class _TestimonialSheetState extends State<_TestimonialSheet> {
   Widget build(BuildContext context) {
     final length = _quote.text.trim().length;
     final ready = length >= 10 && length <= 600 && _consent && !_sending;
-    return Padding(
-      padding: EdgeInsets.fromLTRB(20, 18, 20, 20 + MediaQuery.of(context).viewInsets.bottom),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text('Your testimonial', style: AppTextStyles.display(fontSize: 21, color: AppColors.ink)),
-          const SizedBox(height: 6),
-          const Text('A few lines about what Rakta Bandhan meant to you. It is published under your registered name after review.', style: TextStyle(fontSize: 13, color: AppColors.ink2, height: 1.45)),
-          const SizedBox(height: 14),
-          TextField(
-            controller: _quote,
-            minLines: 3,
-            maxLines: 6,
-            maxLength: 600,
-            onChanged: (_) => setState(() {}),
-            decoration: const InputDecoration(hintText: 'What happened, and how did it feel?'),
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _role,
-            maxLength: 60,
-            decoration: const InputDecoration(hintText: 'Who you are, e.g. “Donor, Adyar” or “Patient’s son”'),
-          ),
-          // Testimonials are text-only today: there is no photo storage for
-          // them, so the area says so instead of pretending to upload.
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            decoration: BoxDecoration(color: AppColors.sand, borderRadius: BorderRadius.circular(12)),
-            child: const Row(
-              children: [
-                RbIcon(RbGlyph.photoOff, size: 18, color: AppColors.ink2),
-                SizedBox(width: 10),
-                Expanded(child: Text('Photos can’t be added to testimonials yet. Our team may ask you for one when we review it.', style: TextStyle(fontSize: 12.5, color: AppColors.ink2, height: 1.4))),
-              ],
+    Widget fieldLabel(String text) => Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Text(text, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.ink)),
+        );
+    // Scrolls as one piece, lifts above the keyboard, and keeps the button
+    // clear of Android's navigation bar.
+    return SafeArea(
+      top: false,
+      child: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(20, 0, 20, 16 + MediaQuery.viewInsetsOf(context).bottom),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('Your testimonial', style: AppTextStyles.display(fontSize: 22, color: AppColors.ink)),
+            const SizedBox(height: 6),
+            const Text(
+              'A few lines about what Rakta Bandhan meant to you. It is published under your registered name after review.',
+              style: TextStyle(fontSize: 13.5, color: AppColors.ink2, height: 1.45),
             ),
-          ),
-          CheckboxListTile(
-            contentPadding: EdgeInsets.zero,
-            controlAffinity: ListTileControlAffinity.leading,
-            value: _consent,
-            onChanged: (v) => setState(() => _consent = v ?? false),
-            title: const Text('I agree to Rakta Bandhan publishing this with my name.', style: TextStyle(fontSize: 13, color: AppColors.ink)),
-          ),
-          const SizedBox(height: 6),
-          ElevatedButton(onPressed: ready ? _send : null, child: Text(_sending ? 'Sending…' : 'Send for review')),
-        ],
+            const SizedBox(height: 20),
+            fieldLabel('Your experience'),
+            TextField(
+              controller: _quote,
+              minLines: 3,
+              maxLines: 6,
+              maxLength: 600,
+              textCapitalization: TextCapitalization.sentences,
+              onChanged: (_) => setState(() {}),
+              decoration: const InputDecoration(hintText: 'What happened, and how did it feel?'),
+            ),
+            const SizedBox(height: 12),
+            fieldLabel('About you'),
+            TextField(
+              controller: _role,
+              maxLength: 60,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: const InputDecoration(hintText: 'e.g. “Donor, Adyar” or “Patient’s son”'),
+            ),
+            const SizedBox(height: 12),
+            // Testimonials are text-only today: there is no photo storage for
+            // them, so the area says so instead of pretending to upload.
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(color: AppColors.sand, borderRadius: BorderRadius.circular(12)),
+              child: const Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(padding: EdgeInsets.only(top: 1), child: RbIcon(RbGlyph.photoOff, size: 18, color: AppColors.ink2)),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Photos can’t be added to testimonials yet. Our team may ask you for one when we review it.',
+                      style: TextStyle(fontSize: 12.5, color: AppColors.ink2, height: 1.4),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            Semantics(
+              checked: _consent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(10),
+                onTap: () => setState(() => _consent = !_consent),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: Checkbox(
+                          value: _consent,
+                          activeColor: AppColors.brandRed,
+                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          visualDensity: VisualDensity.compact,
+                          onChanged: (v) => setState(() => _consent = v ?? false),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Padding(
+                          padding: EdgeInsets.only(top: 2),
+                          child: Text('I agree to Rakta Bandhan publishing this with my name.', style: TextStyle(fontSize: 13.5, color: AppColors.ink, height: 1.4)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            SizedBox(
+              height: 48,
+              child: ElevatedButton(onPressed: ready ? _send : null, child: Text(_sending ? 'Sending…' : 'Send for review')),
+            ),
+          ],
+        ),
       ),
     );
   }

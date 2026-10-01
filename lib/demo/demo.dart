@@ -286,8 +286,11 @@ class Demo extends ChangeNotifier {
 
   // ------------------------------------------------------------ community
 
+  int _storySeq = 0;
+
   void addStory(String body, String topic, {Uint8List? photo}) {
     stories.insert(0, {
+      'id': 'demo-story-${_storySeq++}',
       'image_bytes': ?photo,
       'author_uid': myUid,
       'author_name': myName,
@@ -297,6 +300,25 @@ class Demo extends ChangeNotifier {
       'created_at': Timestamp.now(),
       'is_demo': true,
     });
+    notifyListeners();
+  }
+
+  /// Edits the demo user's own story in place (photo kept unless replaced).
+  void updateStory(String id, {required String body, required String topic, Uint8List? photo}) {
+    final i = stories.indexWhere((st) => st['id'] == id);
+    if (i < 0) return;
+    stories[i] = {
+      ...stories[i],
+      'body': body,
+      'topic': topic,
+      'image_bytes': ?photo ?? stories[i]['image_bytes'],
+      'edited_at': Timestamp.now(),
+    };
+    notifyListeners();
+  }
+
+  void deleteStory(String id) {
+    stories.removeWhere((st) => st['id'] == id);
     notifyListeners();
   }
 

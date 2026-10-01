@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:gal/gal.dart';
 import 'package:share_plus/share_plus.dart';
+
 import '../demo/demo.dart';
 import '../services/backend.dart';
 import '../services/donation_history_service.dart';
@@ -63,7 +64,11 @@ class _CertificateScreenState extends State<CertificateScreen> {
     try {
       final png = await _renderPng();
       if (kIsWeb) {
-        await SharePlus.instance.share(ShareParams(files: [XFile.fromData(png, mimeType: 'image/png', name: '$_fileName.png')]));
+        await SharePlus.instance.share(
+          ShareParams(
+            files: [XFile.fromData(png, mimeType: 'image/png', name: '$_fileName.png')],
+          ),
+        );
       } else {
         if (!await Gal.hasAccess()) await Gal.requestAccess();
         await Gal.putImageBytes(png, name: _fileName);
@@ -81,10 +86,12 @@ class _CertificateScreenState extends State<CertificateScreen> {
     setState(() => _busy = true);
     try {
       final png = await _renderPng();
-      await SharePlus.instance.share(ShareParams(
-        files: [XFile.fromData(png, mimeType: 'image/png', name: '$_fileName.png')],
-        text: 'I donated blood through Rakta Bandhan. Find a donor — or become one: ${AboutScreen.shareUrl}',
-      ));
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile.fromData(png, mimeType: 'image/png', name: '$_fileName.png')],
+          text: 'I donated blood through Rakta Bandhan. Find a donor — or become one: ${AboutScreen.shareUrl}',
+        ),
+      );
     } catch (_) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Couldn’t open sharing. Please try again.')));
     } finally {
@@ -119,63 +126,70 @@ class _CertificateScreenState extends State<CertificateScreen> {
                   ),
                 ),
               ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Column(
+                  children: [
+                    const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        RbIcon(RbGlyph.checkCircle, size: 15, color: AppColors.onEmberSuccess),
+                        SizedBox(width: 7),
+                        Text(
+                          'Donation complete',
+                          style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.onEmberSuccess),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      _isToday ? 'You helped someone today' : 'Thank you for donating',
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.display(fontSize: 26, height: 1.2, color: AppColors.onEmberWarm),
+                    ),
+                  ],
+                ),
+              ),
+              // The certificate keeps its portrait (A4-like) proportions and
+              // scales as a whole to the space left — never stretched to the
+              // phone's width, never pushing the buttons off screen.
               Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(22, 6, 22, 24),
-                  child: Column(
-                    children: [
-                      const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          RbIcon(RbGlyph.checkCircle, size: 15, color: AppColors.onEmberSuccess),
-                          SizedBox(width: 7),
-                          Text('Donation complete', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.onEmberSuccess)),
-                        ],
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
+                  child: Center(
+                    child: AspectRatio(
+                      aspectRatio: _cardSize.width / _cardSize.height,
+                      child: FittedBox(
+                        child: FutureBuilder<Map<String, dynamic>?>(
+                          future: Demo.on ? Future.value(Demo.instance.myProfile) : Backend.instance.myDonorDoc().then((d) => d.data()),
+                          builder: (context, snapshot) {
+                            final name = snapshot.data?['name'] as String? ?? 'A Rakta Bandhan donor';
+                            return RepaintBoundary(key: _certificateKey, child: _certificateCard(name));
+                          },
+                        ),
                       ),
-                      const SizedBox(height: 10),
-                      Text(
-                        _isToday ? 'You helped someone today' : 'Thank you for donating',
-                        textAlign: TextAlign.center,
-                        style: AppTextStyles.display(fontSize: 28, height: 1.2, color: AppColors.onEmberWarm),
-                      ),
-                      const SizedBox(height: 22),
-                      FutureBuilder<Map<String, dynamic>?>(
-                        future: Demo.on ? Future.value(Demo.instance.myProfile) : Backend.instance.myDonorDoc().then((d) => d.data()),
-                        builder: (context, snapshot) {
-                          final name = snapshot.data?['name'] as String? ?? 'A Rakta Bandhan donor';
-                          return RepaintBoundary(key: _certificateKey, child: _certificateCard(name));
-                        },
-                      ),
-                      const SizedBox(height: 20),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              style: OutlinedButton.styleFrom(foregroundColor: AppColors.onEmber, side: const BorderSide(color: AppColors.onEmberOutline)),
-                              onPressed: _busy ? null : _save,
-                              icon: const RbIcon(RbGlyph.download, size: 16),
-                              label: const Text('Save'),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: AppColors.brandRed),
-                              onPressed: _busy ? null : _share,
-                              icon: const RbIcon(RbGlyph.share, size: 16),
-                              label: const Text('Share'),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      const Text(
-                        'Issued by Rakta Bandhan from the donation recorded in the app. It is not a medical record.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 11.5, color: AppColors.onEmberFaint, height: 1.5),
-                      ),
-                    ],
+                    ),
                   ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(child: _action(RbGlyph.download, 'Save', _save)),
+                        const SizedBox(width: 12),
+                        Expanded(child: _action(RbGlyph.share, 'Share', _share)),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    const Text(
+                      'Issued by Rakta Bandhan from the donation recorded in the app. It is not a medical record.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 11.5, color: AppColors.onEmberFaint, height: 1.45),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -185,21 +199,44 @@ class _CertificateScreenState extends State<CertificateScreen> {
     );
   }
 
+  /// Fixed design size of the certificate (≈ A4 portrait, 1 : 1.414).
+  static const _cardSize = Size(360, 510);
+
+  /// Save and Share: same height, outline and weight, side by side.
+  Widget _action(RbGlyph glyph, String label, VoidCallback onTap) => OutlinedButton.icon(
+    style: OutlinedButton.styleFrom(
+      minimumSize: const Size(0, 48),
+      foregroundColor: AppColors.onEmberStrong,
+      side: const BorderSide(color: AppColors.onEmberOutline),
+      textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+    ),
+    onPressed: _busy ? null : onTap,
+    icon: RbIcon(glyph, size: 18),
+    label: Text(label),
+  );
+
   Widget _certificateCard(String name) {
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(20, 22, 20, 28),
+      width: _cardSize.width,
+      height: _cardSize.height,
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
       decoration: BoxDecoration(
         color: const Color(0xFFFDFAF4),
         borderRadius: BorderRadius.circular(12),
-        boxShadow: const [BoxShadow(color: Colors.black38, blurRadius: 44, offset: Offset(0, 18))],
+        boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 28, offset: Offset(0, 12))],
       ),
       child: Stack(
+        fit: StackFit.expand,
         children: [
           Positioned.fill(
             child: Padding(
               padding: const EdgeInsets.all(8),
-              child: DecoratedBox(decoration: BoxDecoration(border: Border.all(color: const Color(0xFFEFCE8C)), borderRadius: BorderRadius.circular(8))),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  border: Border.all(color: const Color(0xFFEFCE8C)),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
             ),
           ),
           Positioned(
@@ -208,74 +245,100 @@ class _CertificateScreenState extends State<CertificateScreen> {
             top: 0,
             child: Container(
               height: 4,
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(colors: [AppColors.brandRed, AppColors.vermilion, AppColors.gold]),
-              ),
+              decoration: const BoxDecoration(gradient: LinearGradient(colors: [AppColors.brandRed, AppColors.vermilion, AppColors.gold])),
             ),
           ),
-          Column(
-            children: [
-              Image.asset('assets/branding/final-logo-transparent.png', width: 108),
-              const SizedBox(height: 10),
-              const Text('Certificate of donation', style: TextStyle(fontSize: 12, letterSpacing: 0.1, fontWeight: FontWeight.w600, color: AppColors.goldDeep)),
-              Container(height: 1, color: const Color(0xFFEFCE8C), margin: const EdgeInsets.symmetric(vertical: 14, horizontal: 24)),
-              const Text('This certifies that', style: TextStyle(fontSize: 12, color: AppColors.ink2)),
-              const SizedBox(height: 4),
-              Text(name, textAlign: TextAlign.center, style: AppTextStyles.display(fontSize: 26, color: AppColors.ink, height: 1.2)),
-              const SizedBox(height: 8),
-              RichText(
-                textAlign: TextAlign.center,
-                text: TextSpan(
-                  style: const TextStyle(fontSize: 12.5, color: AppColors.ink2, height: 1.6),
+          // A long name or hospital scales the content down as a unit
+          // instead of overflowing the fixed card.
+          Center(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: SizedBox(
+                width: _cardSize.width - 40,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    const TextSpan(text: 'voluntarily donated '),
-                    TextSpan(text: record.bloodGroup.isEmpty ? 'blood' : '${record.bloodGroup} blood', style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w700)),
-                    TextSpan(text: '\nat ${record.hospital}${record.date.isEmpty ? '' : '\non ${record.date}'}'),
-                    const TextSpan(text: ',\nanswering a request made through Rakta Bandhan.'),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 14),
-              const BloodGroupDroplet(label: '', size: 18, filled: true, color: AppColors.brandRed),
-              const SizedBox(height: 7),
-              Text('${_ordinal(donationNumber)} donation', style: const TextStyle(fontSize: 11.5, color: AppColors.ink2)),
-              if (Demo.on) ...[
-                const SizedBox(height: 6),
-                const Text('Demo certificate — sample data, not issued', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: AppColors.goldDeep)),
-              ],
-              Container(height: 1, color: const Color(0xFFEFCE8C), margin: const EdgeInsets.fromLTRB(24, 16, 24, 12)),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 26,
-                      height: 26,
-                      decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.goldTint),
-                      alignment: Alignment.center,
-                      child: const RbIcon(RbGlyph.certificate, size: 14, color: AppColors.goldDeep),
+                    Image.asset('assets/branding/final-logo-transparent.png', width: 84),
+                    const SizedBox(height: 10),
+                    const Text(
+                      'Certificate of donation',
+                      style: TextStyle(fontSize: 12, letterSpacing: 0.1, fontWeight: FontWeight.w600, color: AppColors.goldDeep),
                     ),
-                    const SizedBox(width: 10),
-                    Flexible(
-                      child: RichText(
-                        textAlign: TextAlign.left,
-                        text: const TextSpan(
-                          style: TextStyle(fontSize: 10.5, height: 1.4, color: AppColors.ink2),
-                          children: [
-                            TextSpan(text: 'A service project of\n'),
-                            TextSpan(text: 'Rotary Club of Madras Cosmos &\nRotary Club of Chennai Capital', style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.ink)),
-                          ],
-                        ),
+                    Container(height: 1, color: const Color(0xFFEFCE8C), margin: const EdgeInsets.symmetric(vertical: 14, horizontal: 24)),
+                    const Text('This certifies that', style: TextStyle(fontSize: 12, color: AppColors.ink2)),
+                    const SizedBox(height: 4),
+                    Text(
+                      name,
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      style: AppTextStyles.display(fontSize: 26, color: AppColors.ink, height: 1.2),
+                    ),
+                    const SizedBox(height: 8),
+                    RichText(
+                      textAlign: TextAlign.center,
+                      text: TextSpan(
+                        style: const TextStyle(fontSize: 12.5, color: AppColors.ink2, height: 1.6),
+                        children: [
+                          const TextSpan(text: 'voluntarily donated '),
+                          TextSpan(
+                            text: record.bloodGroup.isEmpty ? 'blood' : '${record.bloodGroup} blood',
+                            style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w700),
+                          ),
+                          TextSpan(text: '\nat ${record.hospital}${record.date.isEmpty ? '' : '\non ${record.date}'}'),
+                          const TextSpan(text: ',\nanswering a request made through Rakta Bandhan.'),
+                        ],
                       ),
                     ),
+                    const SizedBox(height: 14),
+                    const BloodGroupDroplet(label: '', size: 18, filled: true, color: AppColors.brandRed),
+                    const SizedBox(height: 7),
+                    Text('${_ordinal(donationNumber)} donation', style: const TextStyle(fontSize: 11.5, color: AppColors.ink2)),
+                    if (Demo.on) ...[
+                      const SizedBox(height: 6),
+                      const Text(
+                        'Demo certificate — sample data, not issued',
+                        style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: AppColors.goldDeep),
+                      ),
+                    ],
+                    Container(height: 1, color: const Color(0xFFEFCE8C), margin: const EdgeInsets.fromLTRB(24, 16, 24, 12)),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Container(
+                            width: 26,
+                            height: 26,
+                            decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.goldTint),
+                            alignment: Alignment.center,
+                            child: const RbIcon(RbGlyph.certificate, size: 14, color: AppColors.goldDeep),
+                          ),
+                          const SizedBox(width: 10),
+                          Flexible(
+                            child: RichText(
+                              textAlign: TextAlign.left,
+                              text: const TextSpan(
+                                style: TextStyle(fontSize: 10.5, height: 1.4, color: AppColors.ink2),
+                                children: [
+                                  TextSpan(text: 'A service project of\n'),
+                                  TextSpan(
+                                    text: 'Rotary Club of Madras Cosmos &\nRotary Club of Chennai Capital',
+                                    style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.ink),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    const Text('Platform by Elmatics', style: TextStyle(fontSize: 10, color: AppColors.mutedInk)),
                   ],
                 ),
               ),
-              const SizedBox(height: 10),
-              const Text('Platform by Elmatics', style: TextStyle(fontSize: 10, color: AppColors.mutedInk)),
-            ],
+            ),
           ),
         ],
       ),
@@ -285,10 +348,14 @@ class _CertificateScreenState extends State<CertificateScreen> {
   String _ordinal(int n) {
     if (n % 100 >= 11 && n % 100 <= 13) return '${n}th';
     switch (n % 10) {
-      case 1: return '${n}st';
-      case 2: return '${n}nd';
-      case 3: return '${n}rd';
-      default: return '${n}th';
+      case 1:
+        return '${n}st';
+      case 2:
+        return '${n}nd';
+      case 3:
+        return '${n}rd';
+      default:
+        return '${n}th';
     }
   }
 }

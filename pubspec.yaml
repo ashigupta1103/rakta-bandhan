@@ -72,6 +72,7 @@ dependencies:
   # Donation certificate: share it, or save it to the photo gallery.
   share_plus: ^12.0.1
   gal: ^2.3.3
+  flutter_svg: ^2.3.0
 
 dev_dependencies:
   flutter_test:
@@ -104,6 +105,8 @@ flutter:
     - assets/illustrations/hands_heart.png
     - assets/sounds/urgent_alert.wav
     - assets/sounds/incoming_call.wav
+    # About › Our team: member photos and logo.
+    - assets/images/
 
   # To add assets to your application, add an assets section, like this:
   # assets:
