@@ -2,8 +2,8 @@ rules_version = '2';
 
 // Rakta Bandhan — Cloud Storage rules.
 //
-// Only community post photos live in Storage. Each user writes only into
-// their own folder, only JPEG/PNG/WebP images, at most 2 MB (the app
+// Community post photos and private profile photos live in Storage.
+// Community: each user writes only into their own folder, only JPEG/PNG/WebP images, at most 2 MB (the app
 // compresses to ~150 KB before upload). Any signed-in user can view them,
 // like the posts themselves. Deleting a post deletes its photo
 // (functions/src/index.ts → onStoryDeleted); the author can also remove
@@ -20,6 +20,19 @@ service firebase.storage {
         && request.resource.contentType.matches('image/(jpeg|png|webp)');
       allow delete: if request.auth != null && request.auth.uid == uid;
       allow update: if false;
+    }
+
+    // Profile photo — private to its owner (shown only on their own My
+    // Page). Overwritten in place when changed; deleted with the account.
+    match /avatars/{uid}/{fileName} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null
+        && request.auth.uid == uid
+        && (request.auth.token.get('login', '') == 'email_otp'
+            || request.auth.token.get('email_verified', false) == true)
+        && request.resource.size < 2 * 1024 * 1024
+        && request.resource.contentType.matches('image/(jpeg|png|webp)');
+      allow delete: if request.auth != null && request.auth.uid == uid;
     }
 
     match /{allPaths=**} {

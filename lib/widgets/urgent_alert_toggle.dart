@@ -5,6 +5,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../services/backend.dart';
 import '../services/urgent_alert_service.dart';
 import '../theme/app_colors.dart';
+import 'rb_ui.dart';
 import 'brand_glyph.dart';
 
 /// "Ring me for urgent requests" — the donor's opt-in to the full-screen,
@@ -111,51 +112,23 @@ class _UrgentAlertToggleState extends State<UrgentAlertToggle> {
 
   @override
   Widget build(BuildContext context) {
+    // Signed out (e.g. the preview gallery): nothing to toggle.
+    if (Backend.instance.currentUser == null) return const SizedBox.shrink();
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: Backend.instance.myDonorDocStream(),
       builder: (context, snap) {
         final on = snap.data?.data()?['urgent_alerts'] == true;
-        final row = Row(
-          children: [
-            Icon(on ? LucideIcons.bell : LucideIcons.bellOff, size: 17, color: on ? AppColors.brandRed : AppColors.ink2),
-            const SizedBox(width: 11),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Ring me for urgent requests', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
-                  Text(
-                    on ? 'Full-screen alert with sound for urgent needs nearby' : 'Off — you’ll still see requests in the Request tab',
-                    style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
-                  ),
-                ],
-              ),
-            ),
-            if (_busy)
-              const Padding(padding: EdgeInsets.all(14), child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)))
-            else
-              Switch(
-                value: on,
-                activeThumbColor: AppColors.primary,
-                activeTrackColor: AppColors.primaryLightTint,
-                inactiveThumbColor: AppColors.textMuted,
-                inactiveTrackColor: AppColors.dividerWarm,
-                onChanged: snap.hasData ? ((v) => v ? _turnOn() : _turnOff()) : null,
-              ),
-          ],
+        final row = RbRow(
+          icon: on ? LucideIcons.bellRing : LucideIcons.bellOff,
+          tone: on ? RbTone.red : RbTone.neutral,
+          title: 'Ring me for urgent requests',
+          subtitle: on ? 'Full-screen alert with sound for urgent needs nearby' : 'Off — you’ll still see requests in the Requests tab',
+          trailing: _busy
+              ? const Padding(padding: EdgeInsets.all(14), child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)))
+              : RbSwitch(value: on, onChanged: snap.hasData ? ((v) => v ? _turnOn() : _turnOff()) : null),
         );
-        if (!widget.asCard) {
-          return Padding(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6), child: row);
-        }
-        return Container(
-          padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.cardBorderWarm),
-          ),
-          child: row,
-        );
+        if (!widget.asCard) return row;
+        return RbListGroup(children: [row]);
       },
     );
   }

@@ -16,6 +16,8 @@ import '../widgets/blood_group_droplet.dart';
 import '../widgets/filter_chip_row.dart';
 import '../widgets/map_markers.dart';
 import '../widgets/map_tiles.dart';
+import '../widgets/pressable.dart';
+import '../widgets/rb_ui.dart';
 import '../widgets/state_card.dart';
 import 'donor_details_screen.dart';
 import 'location_picker_screen.dart';
@@ -508,9 +510,9 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
       builder: (context, scrollController) {
         return Container(
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: const BorderRadius.only(topLeft: Radius.circular(22), topRight: Radius.circular(22)),
-            boxShadow: [BoxShadow(color: AppColors.shadowCard.withValues(alpha: 0.12), blurRadius: 24, offset: const Offset(0, -8))],
+            color: AppColors.warmGround,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            boxShadow: const [BoxShadow(color: AppColors.shadowDark, blurRadius: 24, offset: Offset(0, -4))],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -529,16 +531,24 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
                   stream: _donorStream,
                   builder: (context, snapshot) {
                     if (snapshot.hasError) {
-                      return Center(
-                        child: StateCard.error(
-                          title: "Couldn't load donors",
-                          message: 'Check your connection and try again.',
-                          onRetry: () => setState(() => _retryToken++),
-                        ),
+                      return ListView(
+                        controller: scrollController,
+                        padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+                        children: [
+                          RbStatePanel.error(
+                            title: "Couldn't load donors",
+                            message: 'Check your connection and try again.',
+                            onRetry: () => setState(() => _retryToken++),
+                          ),
+                        ],
                       );
                     }
                     if (!snapshot.hasData) {
-                      return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+                      return ListView(
+                        controller: scrollController,
+                        padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+                        children: [_sheetHeader(null), for (var i = 0; i < 3; i++) const _DonorSkeleton()],
+                      );
                     }
                     final myUid = Backend.instance.currentUser?.uid;
                     final donors = snapshot.data!
@@ -556,39 +566,24 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
                         return da.compareTo(db);
                       });
 
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    return ListView(
+                      controller: scrollController,
+                      padding: EdgeInsets.fromLTRB(20, 4, 20, 16 + MediaQuery.of(context).padding.bottom),
                       children: [
-                        Padding(
-                          padding: const EdgeInsets.only(left: 20, right: 20, bottom: 10),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.baseline,
-                            textBaseline: TextBaseline.alphabetic,
-                            children: [
-                              Text('Nearby donors', style: AppTextStyles.display(fontSize: 19, color: AppColors.ink)),
-                              const SizedBox(width: 8),
-                              Text('· ${donors.length} available', style: const TextStyle(fontSize: 12.5, color: AppColors.ink2)),
-                              const Spacer(),
-                              const Text('Nearest', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.red700)),
-                            ],
-                          ),
-                        ),
-                        Expanded(
-                          child: donors.isEmpty
-                              ? Center(
-                                  child: StateCard.empty(
-                                    icon: LucideIcons.mapPin,
-                                    title: 'No available donors nearby yet. Try expanding your search radius.',
-                                  ),
-                                )
-                              : ListView.separated(
-                                  controller: scrollController,
-                                  padding: EdgeInsets.fromLTRB(20, 8, 20, 8 + MediaQuery.of(context).padding.bottom),
-                                  itemCount: donors.length,
-                                  separatorBuilder: (context, index) => const SizedBox(height: 10),
-                                  itemBuilder: (context, index) => _buildDonorCard(donors[index]),
-                                ),
-                        ),
+                        _sheetHeader(donors.length),
+                        if (donors.isEmpty)
+                          RbStatePanel(
+                            icon: LucideIcons.users,
+                            title: _bloodGroupFilter == 'All' ? 'No available donors here yet' : 'No $_bloodGroupFilter donors nearby',
+                            message: 'Only donors who have switched on availability appear, within ${_searchRadiusKm.round()} km. Try another blood group or search a different area.',
+                            actionLabel: _bloodGroupFilter == 'All' ? null : 'Show all blood groups',
+                            onAction: _bloodGroupFilter == 'All' ? null : () => setState(() => _bloodGroupFilter = 'All'),
+                          )
+                        else
+                          for (final donor in donors) ...[
+                            _buildDonorCard(donor),
+                            const SizedBox(height: 10),
+                          ],
                       ],
                     );
                   },
@@ -598,6 +593,34 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
           ),
         );
       },
+    );
+  }
+
+  /// Title row of the sheet: what's listed, how many, and in what order.
+  Widget _sheetHeader(int? count) {
+    final where = _searchedLabel == null ? 'near you' : 'near ${Backend.shortPlace(_searchedLabel)}';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(_bloodGroupFilter == 'All' ? 'Donors $where' : '$_bloodGroupFilter donors $where',
+                    maxLines: 1, overflow: TextOverflow.ellipsis, style: AppTextStyles.display(fontSize: 20, color: AppColors.ink)),
+                const SizedBox(height: 2),
+                Text('Available now · nearest first · within ${_searchRadiusKm.round()} km', style: const TextStyle(fontSize: 12.5, color: AppColors.ink2)),
+              ],
+            ),
+          ),
+          if (count != null && count > 0) ...[
+            const SizedBox(width: 10),
+            RbChip('$count', icon: LucideIcons.users, tone: RbTone.success),
+          ],
+        ],
+      ),
     );
   }
 
@@ -726,137 +749,122 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
     );
   }
 
+  /// Blood group leads (it's what the requester scans for), then the
+  /// person, then distance and their neighbourhood. Tapping selects the
+  /// donor (and its map pin) and reveals the two actions.
   Widget _buildDonorCard(Map<String, dynamic> donor) {
     final bool isAvailable = donor['isAvailable'] as bool;
     final bool isVerified = donor['isVerified'] as bool;
     final isHighlighted = _highlightedDonorId == donor['id'];
     final distanceKmValue = donor['distanceKm'] as double?;
+    final area = donor['area'] as String;
+    final bloodGroup = donor['bloodGroup'] as String;
+    final sending = _sendingDonorId == donor['id'];
 
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: isHighlighted ? AppColors.primary : AppColors.cardBorderWarm, width: isHighlighted ? 1.5 : 1),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.primaryLightTint),
-                    alignment: Alignment.center,
-                    child: Text(donor['initials'] as String, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.primary)),
+    void openProfile() => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => DonorDetailsScreen(
+              donorId: donor['id'] as String,
+              name: donor['name'] as String,
+              initials: donor['initials'] as String,
+              bloodGroup: bloodGroup,
+              isVerified: isVerified,
+              distanceKm: distanceKmValue,
+              isAvailable: isAvailable,
+            ),
+          ),
+        );
+
+    return Pressable(
+      onTap: () => setState(() => _highlightedDonorId = isHighlighted ? null : donor['id'] as String),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: isHighlighted ? AppColors.brandRed : AppColors.warmBorder, width: isHighlighted ? 1.5 : 1),
+          boxShadow: isHighlighted ? const [BoxShadow(color: AppColors.shadowCard, blurRadius: 16, offset: Offset(0, 6))] : null,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                BloodGroupDroplet(label: bloodGroup, size: 40, fontSize: 12.5, serif: true),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(child: Text(donor['name'] as String, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppTextStyles.display(fontSize: 17, color: AppColors.ink))),
+                          if (isVerified) ...[
+                            const SizedBox(width: 6),
+                            const Icon(LucideIcons.badgeCheck, size: 16, color: AppColors.successText, semanticLabel: 'Verified'),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        [
+                          distanceKmValue == null ? 'Distance unknown' : '${distanceKmValue < 10 ? distanceKmValue.toStringAsFixed(1) : distanceKmValue.round()} km away',
+                          if (area.isNotEmpty) area,
+                        ].join(' · '),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 13, color: AppColors.ink2),
+                      ),
+                    ],
                   ),
-                  Positioned(
-                    right: -5,
-                    bottom: -3,
-                    child: BloodGroupDroplet(label: donor['bloodGroup'] as String, size: 20, filled: true, color: AppColors.primary, textColor: AppColors.onEmber, fontSize: 7),
+                ),
+                const SizedBox(width: 8),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(width: 7, height: 7, decoration: BoxDecoration(shape: BoxShape.circle, color: isAvailable ? AppColors.successText : AppColors.mutedInk)),
+                        const SizedBox(width: 5),
+                        Text(isAvailable ? 'Available' : 'Away', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isAvailable ? AppColors.successText : AppColors.ink2)),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    AnimatedRotation(
+                      turns: isHighlighted ? 0.25 : 0,
+                      duration: const Duration(milliseconds: 180),
+                      child: const Icon(LucideIcons.chevronRight, size: 16, color: AppColors.chevronMuted),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            if (isHighlighted) ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(onPressed: openProfile, child: const Text('View profile')),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: _sendingDonorId == null ? () => _sendRequestTo(donor) : null,
+                      icon: sending
+                          ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : const Icon(LucideIcons.droplet, size: 15),
+                      label: Text('Request $bloodGroup'),
+                    ),
                   ),
                 ],
               ),
-              const SizedBox(width: 13),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Flexible(child: Text(donor['name'] as String, style: AppTextStyles.display(fontSize: 16, color: AppColors.ink), overflow: TextOverflow.ellipsis)),
-                        if (isVerified) ...[
-                          const SizedBox(width: 7),
-                          Container(
-                            width: 16,
-                            height: 16,
-                            decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.warmGreenBg),
-                            alignment: Alignment.center,
-                            child: const Icon(LucideIcons.check, color: AppColors.warmGreenText, size: 9),
-                          ),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: 3),
-                    Row(
-                      children: [
-                        Text(distanceKmValue == null ? 'Distance unknown' : '${distanceKmValue.toStringAsFixed(1)} km', style: const TextStyle(fontSize: 12.5, color: AppColors.ink2)),
-                        const SizedBox(width: 7),
-                        Container(width: 3, height: 3, decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.disabledTint)),
-                        const SizedBox(width: 7),
-                        Container(
-                          width: 7,
-                          height: 7,
-                          decoration: BoxDecoration(shape: BoxShape.circle, color: isAvailable ? AppColors.warmGreenText : AppColors.textMuted),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(isAvailable ? 'Available' : 'Unavailable', style: const TextStyle(fontSize: 12.5, color: AppColors.ink2)),
-                      ],
-                    ),
-                    if ((donor['area'] as String).isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Row(
-                        children: [
-                          const Icon(LucideIcons.mapPin, size: 11, color: AppColors.ink2),
-                          const SizedBox(width: 4),
-                          Flexible(
-                            child: Text(donor['area'] as String, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: AppColors.ink2)),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              if (isHighlighted)
-                GestureDetector(
-                  onTap: _sendingDonorId == null ? () => _sendRequestTo(donor) : null,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-                    decoration: BoxDecoration(
-                      color: _sendingDonorId == null ? AppColors.brandRed : AppColors.disabledTint,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: _sendingDonorId == donor['id']
-                        ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                        : const Text('Request', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.whiteTextOnPrimary)),
-                  ),
-                )
-              else
-                GestureDetector(
-                  onTap: () => setState(() => _highlightedDonorId = donor['id'] as String),
-                  child: const Icon(LucideIcons.chevronRight, size: 18, color: AppColors.disabledTint),
-                ),
             ],
-          ),
-          if (isHighlighted) ...[
-            const SizedBox(height: 10),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => DonorDetailsScreen(
-                      donorId: donor['id'] as String,
-                      name: donor['name'] as String,
-                      initials: donor['initials'] as String,
-                      bloodGroup: donor['bloodGroup'] as String,
-                      isVerified: isVerified,
-                      distanceKm: distanceKmValue,
-                      isAvailable: isAvailable,
-                    ),
-                  ),
-                ),
-                child: const Text('View profile'),
-              ),
-            ),
           ],
-        ],
+        ),
       ),
     );
   }
@@ -956,4 +964,26 @@ class _MarkerTailPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _MarkerTailPainter oldDelegate) => oldDelegate.color != color;
+}
+
+/// Placeholder donor row while the nearby query runs.
+class _DonorSkeleton extends StatelessWidget {
+  const _DonorSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    Widget bar(double w, double h) => Container(width: w, height: h, decoration: BoxDecoration(color: AppColors.sand, borderRadius: BorderRadius.circular(6)));
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.warmBorder)),
+      child: Row(
+        children: [
+          const BloodGroupDroplet(label: '', size: 40, color: AppColors.sand),
+          const SizedBox(width: 14),
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [bar(130, 12), const SizedBox(height: 8), bar(90, 9)]),
+        ],
+      ),
+    );
+  }
 }

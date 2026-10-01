@@ -4,21 +4,16 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../services/backend.dart';
+import '../services/phone_privacy.dart';
 import 'location_picker_screen.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/blood_group_droplet.dart';
 
-/// Read-only view of the donor record.
-///
-/// Reads the real Firestore document via Backend.myDonorDocStream() — no
-/// mock involved. Editing is deliberately NOT offered: `Backend` exposes
-/// registerDonor() and setAvailability() only, with no profile-update
-/// method, and inventing one would mean writing Firestore fields the
-/// backend contract does not define. The footer states this plainly rather
-/// than showing a disabled Edit button that implies otherwise. ID proof
-/// upload (below) is a distinct, additive verification action, not an edit
-/// of an existing field, so it doesn't conflict with that stance.
+/// The donor's own record: identity, verification, location and the two
+/// fields they can edit (name, mobile number). The phone number is only
+/// ever shown masked to its last three digits — including here, to its
+/// owner — and the edit sheet never pre-fills it.
 class PersonalInformationScreen extends StatefulWidget {
   const PersonalInformationScreen({super.key});
 
@@ -27,6 +22,8 @@ class PersonalInformationScreen extends StatefulWidget {
 }
 
 class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
+  late final Future<String?> _publicArea = Backend.instance.myPublicArea();
+
   static const _months = [
     'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
@@ -44,13 +41,14 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
 
   Future<void> _openEditSheet({required String name, required String phone}) async {
     final nameController = TextEditingController(text: name);
-    final phoneController = TextEditingController(text: phone);
+    final phoneController = TextEditingController();
     final saved = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       builder: (sheetContext) => _EditProfileSheet(
         nameController: nameController,
         phoneController: phoneController,
+        currentPhone: phone,
       ),
     );
     nameController.dispose();
@@ -157,12 +155,23 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
                             Stack(
                               clipBehavior: Clip.none,
                               children: [
-                                Container(
-                                  width: 60,
-                                  height: 60,
-                                  decoration: const BoxDecoration(color: AppColors.primaryLightTint, shape: BoxShape.circle),
-                                  alignment: Alignment.center,
-                                  child: Text(_initials(name), style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w600, color: AppColors.primary)),
+                                ClipOval(
+                                  child: Container(
+                                    width: 64,
+                                    height: 64,
+                                    color: AppColors.primaryLightTint,
+                                    alignment: Alignment.center,
+                                    child: data['photo_url'] is String
+                                        ? Image.network(
+                                            data['photo_url'] as String,
+                                            width: 64,
+                                            height: 64,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (context, error, stack) =>
+                                                Text(_initials(name), style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w600, color: AppColors.primary)),
+                                          )
+                                        : Text(_initials(name), style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w600, color: AppColors.primary)),
+                                  ),
                                 ),
                                 if (bloodGroup != '—')
                                   Positioned(
@@ -179,7 +188,7 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
                                 children: [
                                   Text(name.isEmpty ? '—' : name, style: AppTextStyles.display(fontSize: 20, color: AppColors.textPrimaryWarm)),
                                   const SizedBox(height: 4),
-                                  Text(phone, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                                  Text(maskPhone(phone), style: const TextStyle(fontSize: 13.5, color: AppColors.textSecondary, fontFeatures: [FontFeature.tabularFigures()])),
                                 ],
                               ),
                             ),
@@ -188,7 +197,7 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
                         const SizedBox(height: 22),
                         _card([
                           _row(LucideIcons.droplet, 'Blood group', bloodGroup, emphasise: true),
-                          _row(LucideIcons.phone, 'Phone number', phone),
+                          _row(LucideIcons.phone, 'Mobile number', maskPhone(phone)),
                           _row(
                             LucideIcons.calendar,
                             'Member since',
@@ -231,11 +240,21 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
                         _card([
                           _row(
                             LucideIcons.mapPin,
-                            'Registered area',
+                            'Your area',
                             lat == null || lng == null
                                 ? 'Not set'
                                 : Backend.shortPlace(data['location_label'] as String?, fallback: 'Pinned on the map'),
-                            isLast: true,
+                            stacked: true,
+                          ),
+                          FutureBuilder<String?>(
+                            future: _publicArea,
+                            builder: (context, snap) => _row(
+                              LucideIcons.locateFixed,
+                              'Nearby',
+                              snap.data == null ? 'Approx. area not available yet' : 'Approx. area: ${snap.data}',
+                              stacked: true,
+                              isLast: true,
+                            ),
                           ),
                         ]),
                         const SizedBox(height: 6),
@@ -292,15 +311,7 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
 
   Widget _sectionLabel(String text) => Padding(
         padding: const EdgeInsets.only(left: 4, bottom: 8),
-        child: Text(
-          text.toUpperCase(),
-          style: const TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textMutedWarm,
-            letterSpacing: 0.4,
-          ),
-        ),
+        child: Text(text, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
       );
 
   Widget _card(List<Widget> children) => Container(
@@ -341,42 +352,55 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
     String value, {
     bool isLast = false,
     bool emphasise = false,
+    bool stacked = false,
     Color? valueColor,
     Color iconBg = AppColors.dividerWarm,
     Color iconColor = AppColors.textSecondary,
   }) {
+    final valueStyle = emphasise
+        ? AppTextStyles.display(fontSize: 17, color: AppColors.primary)
+        : TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: valueColor ?? AppColors.textPrimaryWarm, height: 1.35);
+    final iconBox = Container(
+      width: 32,
+      height: 32,
+      decoration: BoxDecoration(color: iconBg, borderRadius: BorderRadius.circular(10)),
+      alignment: Alignment.center,
+      child: Icon(icon, size: 15, color: iconColor),
+    );
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
       decoration: BoxDecoration(
         border: isLast ? null : const Border(bottom: BorderSide(color: AppColors.dividerWarm)),
       ),
-      child: Row(
-        children: [
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(color: iconBg, borderRadius: BorderRadius.circular(10)),
-            alignment: Alignment.center,
-            child: Icon(icon, size: 15, color: iconColor),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(label, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-          ),
-          const SizedBox(width: 12),
-          emphasise
-              ? Text(value, style: AppTextStyles.display(fontSize: 17, color: AppColors.primary))
-              : Text(
-                  value,
-                  textAlign: TextAlign.right,
-                  style: TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w600,
-                    color: valueColor ?? AppColors.textPrimaryWarm,
+      child: stacked
+          ? Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                iconBox,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(label, style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary)),
+                      const SizedBox(height: 3),
+                      Text(value, maxLines: 3, overflow: TextOverflow.ellipsis, style: valueStyle),
+                    ],
                   ),
                 ),
-        ],
-      ),
+              ],
+            )
+          : Row(
+              children: [
+                iconBox,
+                const SizedBox(width: 12),
+                Text(label, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(value, textAlign: TextAlign.right, maxLines: 1, overflow: TextOverflow.ellipsis, style: valueStyle),
+                ),
+              ],
+            ),
     );
   }
 }
@@ -387,8 +411,10 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
 class _EditProfileSheet extends StatefulWidget {
   final TextEditingController nameController;
   final TextEditingController phoneController;
+  /// The saved number, used only when the field is left empty — never shown.
+  final String currentPhone;
 
-  const _EditProfileSheet({required this.nameController, required this.phoneController});
+  const _EditProfileSheet({required this.nameController, required this.phoneController, required this.currentPhone});
 
   @override
   State<_EditProfileSheet> createState() => _EditProfileSheetState();
@@ -404,13 +430,13 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
     final phone = widget.phoneController.text.trim();
     setState(() {
       _nameError = name.isEmpty ? 'Name is required' : null;
-      _phoneError = phone.length != 10 ? 'Enter a valid 10-digit number' : null;
+      _phoneError = phone.isNotEmpty && phone.length != 10 ? 'Enter a valid 10-digit number' : null;
     });
     if (_nameError != null || _phoneError != null) return;
 
     setState(() => _saving = true);
     try {
-      await Backend.instance.updateProfile(name: name, phone: phone);
+      await Backend.instance.updateProfile(name: name, phone: phone.isEmpty ? widget.currentPhone : phone);
       if (mounted) Navigator.pop(context, true);
     } catch (_) {
       if (!mounted) return;
@@ -439,7 +465,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
             decoration: InputDecoration(hintText: 'Your name', errorText: _nameError),
           ),
           const SizedBox(height: 14),
-          const Text('WhatsApp number', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
+          const Text('Mobile number', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
           const SizedBox(height: 6),
           TextField(
             controller: widget.phoneController,
@@ -448,7 +474,11 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
               FilteringTextInputFormatter.digitsOnly,
               LengthLimitingTextInputFormatter(10),
             ],
-            decoration: InputDecoration(hintText: '10-digit number', errorText: _phoneError),
+            decoration: InputDecoration(
+              hintText: 'New 10-digit number',
+              helperText: 'Leave empty to keep ${maskPhone(widget.currentPhone)}',
+              errorText: _phoneError,
+            ),
           ),
           const SizedBox(height: 20),
           ElevatedButton(

@@ -37,17 +37,18 @@ class FilterChipRow extends StatelessWidget {
               child: GestureDetector(
                 onTap: chip.onTap,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
                   decoration: BoxDecoration(
                     color: chip.active ? activeBg : Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    border: chip.active ? null : Border.all(color: AppColors.borderStrong),
+                    borderRadius: BorderRadius.circular(999),
+                    border: chip.active ? null : Border.all(color: AppColors.warmBorder),
+                    boxShadow: const [BoxShadow(color: AppColors.shadowCard, blurRadius: 8, offset: Offset(0, 2))],
                   ),
                   child: Text(
                     chip.label,
                     style: TextStyle(
-                      fontSize: 10.5,
-                      fontWeight: chip.active ? FontWeight.w600 : FontWeight.w400,
+                      fontSize: 13,
+                      fontWeight: chip.active ? FontWeight.w600 : FontWeight.w500,
                       color: chip.active ? activeText : inactiveText,
                     ),
                   ),

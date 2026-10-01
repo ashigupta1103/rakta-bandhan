@@ -53,6 +53,7 @@ const privacyPolicy = LegalDocument(
       '- The area you register from: a location label you choose and its map coordinates.',
       '- Whether you are available to donate, and the date of your last donation recorded in the app.',
       '- Optionally, a photo of an ID document, if you submit one for verification.',
+      '- Optionally, a profile photo. It is stored privately and only you can see it — it is not shown to other users.',
       'Requests — when you ask for blood: the blood group and number of units needed, how urgent it is, the location (usually a hospital) and its coordinates, and the request’s status over time.',
       'Conversations — when you are matched: the messages you send in the in-app chat, any location you choose to share in it (the hospital, or your position at that moment — never tracked continuously), when you last read the conversation (shown to the other person as “Seen”), and a record of in-app calls (who called whom, when, how long, and whether it was answered). The audio of calls is never recorded or stored.',
       'Community posts — if you share an experience: the text, the topic, and optionally one photo, your blood group and your neighbourhood if you choose to show them.',
@@ -83,7 +84,7 @@ const privacyPolicy = LegalDocument(
       'A small team of Rakta Bandhan administrators can see donor profiles including phone numbers, submitted ID photos, requests, and safety reports. They can read the chat on a request to review a report of abuse. Administrators cannot listen to calls — there is no recording to listen to. Every verification, ban and administrative change is written to an audit log.',
     ]),
     LegalSection('processors', 'Services we rely on', [
-      '- Google Firebase (Google LLC) — sign-in and email verification, the database that stores everything above, photo storage for community posts, server functions that send notifications, Firebase Cloud Messaging (push notifications) and analytics. Data is stored on Google Cloud servers, which may be located outside India.',
+      '- Google Firebase (Google LLC) — sign-in and email verification, the database that stores everything above, photo storage for community posts and profile photos, server functions that send notifications, Firebase Cloud Messaging (push notifications) and analytics. Data is stored on Google Cloud servers, which may be located outside India.',
       '- OpenStreetMap — when you search for an address, the text you type is sent to the OpenStreetMap Foundation’s Nominatim service. When you use your current location to fill in an address, your coordinates are sent to that service to look up the street name. Map images are loaded from OpenStreetMap’s tile servers, which see your IP address and the area of the map you are viewing.',
       '- Google’s public STUN servers — used for a moment at the start of each in-app call to help the two phones find each other. They see your IP address, not the call.',
       'These providers process data under their own privacy terms. We do not give your data to anyone else, except where the law requires it — for example a valid order from a court or government authority.',
@@ -93,7 +94,8 @@ const privacyPolicy = LegalDocument(
       '- An ID photo you submit is deleted as soon as an administrator has checked it; we keep only the fact and date it was checked.',
       '- Requests, chat messages and call records are kept as part of the request’s history so both people have a record of what happened.',
       '- Community posts stay until you or an administrator delete them; deleting a post deletes its photo.',
-      '- When you delete your account, we delete your sign-in account, your profile, your public listing, any ID photo, and every chat message you sent. Requests you raised are cancelled if still open, and your name and phone number are removed from them. If you were matched as a donor on an open request, that request is released back to other donors. A record that a donation happened is kept without anything that identifies you.',
+      '- A profile photo stays until you remove or replace it in My Page.',
+      '- When you delete your account, we delete your sign-in account, your profile, your public listing, any ID photo, your profile photo, and every chat message you sent. Requests you raised are cancelled if still open, and your name and phone number are removed from them. If you were matched as a donor on an open request, that request is released back to other donors. A record that a donation happened is kept without anything that identifies you.',
       '- Analytics data is kept according to Firebase Analytics retention settings, up to 14 months.',
     ]),
     LegalSection('rights', 'Your rights', [

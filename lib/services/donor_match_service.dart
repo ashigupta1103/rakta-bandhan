@@ -9,9 +9,6 @@ class DonorMatch {
   final String bloodGroup;
   final String distance;
   final String uid;
-  /// Revealed to the requester on match (see Backend.acceptRequest) — used
-  /// only for the "call from your phone" fallback; in-app calls don't need it.
-  final String phone;
   final bool isVerified;
 
   const DonorMatch({
@@ -20,7 +17,6 @@ class DonorMatch {
     required this.bloodGroup,
     required this.distance,
     this.uid = '',
-    this.phone = '',
     this.isVerified = false,
   });
 }
@@ -83,7 +79,6 @@ class FirestoreDonorMatchService implements DonorMatchService {
       bloodGroup: bloodGroup,
       distance: distance,
       uid: donorId ?? '',
-      phone: req['matched_donor_phone'] as String? ?? '',
       isVerified: isVerified,
     );
   }

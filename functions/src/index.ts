@@ -343,6 +343,7 @@ export const onRequestUpdated = onDocumentUpdated('requests/{requestId}', async 
     )));
   }
   if (was !== 'fulfilled' && now === 'fulfilled') {
+    jobs.push(applyDonorCompletion(requestId, after));
     jobs.push(sendToUser(after.requester_uid, push('Donation completed', `Thank you for using Rakta Bandhan. ${donorName} helped today.`)));
     jobs.push(sendToUser(after.matched_donor_id, push('Donation recorded — thank you', 'Your donation certificate is ready in Donation history.')));
   }
@@ -354,6 +355,43 @@ export const onRequestUpdated = onDocumentUpdated('requests/{requestId}', async 
   }
   await Promise.all(jobs);
 });
+
+/**
+ * The donor's side of a completed donation, when the requester's
+ * confirmation completed it (the requester can't write the donor's
+ * profile): 90-day cooldown, availability off, lock released, one history
+ * record keyed by the request id. Guarded by the donor's own
+ * `active_request_id`, which the app clears in the same write when it
+ * applies this itself — so the two paths can never both apply.
+ * Keep in step with Backend._writeDonorCompletion.
+ */
+export const DONOR_COOLDOWN_DAYS = 90;
+
+export async function applyDonorCompletion(requestId: string, req: DocumentData): Promise<void> {
+  const donorId = req.matched_donor_id as string | undefined;
+  if (!donorId) return;
+  const donorRef = db.collection('donors').doc(donorId);
+  await db.runTransaction(async (tx) => {
+    const donor = await tx.get(donorRef);
+    if (!donor.exists || donor.get('active_request_id') !== requestId) return;
+    const until = Timestamp.fromMillis(Date.now() + DONOR_COOLDOWN_DAYS * 86400000);
+    tx.update(donorRef, {
+      last_donation_date: FieldValue.serverTimestamp(),
+      is_available: false,
+      active_request_id: null,
+      reactivation_scheduled_at: until,
+    });
+    tx.set(db.collection('donors_public').doc(donorId), { is_available: false, updated_at: FieldValue.serverTimestamp() }, { merge: true });
+    tx.set(db.collection('donation_history').doc(requestId), {
+      donor_id: donorId,
+      request_id: requestId,
+      donation_date: FieldValue.serverTimestamp(),
+      confirmed_by: 'both',
+      hospital: req.location_label ?? '',
+      blood_group: req.blood_group ?? '',
+    });
+  });
+}
 
 /** Closes open requests nobody accepted before `expires_at` (6 hours). */
 export const expireOldRequests = onSchedule({ schedule: 'every 15 minutes', timeZone: 'Asia/Kolkata' }, async () => {

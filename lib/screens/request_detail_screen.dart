@@ -5,6 +5,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../services/backend.dart';
 import '../theme/app_colors.dart';
 import '../widgets/blood_group_droplet.dart';
+import '../widgets/place_link.dart';
 import '../widgets/loading_button.dart';
 import 'accept_result_screen.dart';
 
@@ -186,7 +187,7 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
                               ],
                             ),
                             const SizedBox(height: 16),
-                            Text(location, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
+                            PlaceLink(label: location, lat: (data['lat'] as num?)?.toDouble(), lng: (data['lng'] as num?)?.toDouble(), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
                             const SizedBox(height: 10),
                             Wrap(
                               spacing: 14,

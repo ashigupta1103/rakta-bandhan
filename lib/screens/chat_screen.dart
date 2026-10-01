@@ -5,11 +5,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../services/backend.dart';
 import '../services/call_service.dart';
 import '../services/chat_service.dart';
+import '../services/maps_link.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/confirm_sheet.dart';
@@ -95,7 +95,6 @@ class _ChatScreenState extends State<ChatScreen> {
       peerUid: peer.uid,
       peerName: peer.name,
       myName: me?['name'] as String? ?? 'Rakta Bandhan user',
-      peerPhone: peer.phone,
     );
   }
 
@@ -189,15 +188,10 @@ class _ChatScreenState extends State<ChatScreen> {
                       Navigator.pop(sheet);
                       _callInApp(peer);
                     }),
-                  if (peer.phone.isNotEmpty)
-                    _SheetAction(icon: LucideIcons.smartphone, label: 'Their phone', onTap: () {
-                      Navigator.pop(sheet);
-                      _callPhone(peer.phone);
-                    }),
                   if (location.isNotEmpty && request['lat'] != null)
                     _SheetAction(icon: LucideIcons.mapPin, label: 'Directions', onTap: () {
                       Navigator.pop(sheet);
-                      openInMaps((request['lat'] as num).toDouble(), (request['lng'] as num).toDouble(), location);
+                      openInMaps((request['lat'] as num).toDouble(), (request['lng'] as num).toDouble());
                     }),
                 ],
               ),
@@ -227,13 +221,6 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
       ),
     );
-  }
-
-  Future<void> _callPhone(String phone) async {
-    final uri = Uri(scheme: 'tel', path: phone);
-    if (!await launchUrl(uri) && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not open the dialer. Their number is $phone.')));
-    }
   }
 
   Future<void> _report(_Peer peer) async {
@@ -324,7 +311,6 @@ class _ChatScreenState extends State<ChatScreen> {
             final peer = _Peer(
               uid: (amRequester ? request['matched_donor_id'] : request['requester_uid']) as String? ?? '',
               name: (amRequester ? request['matched_donor_name'] : request['requester_name']) as String? ?? 'Donor',
-              phone: (amRequester ? request['matched_donor_phone'] : request['requester_phone']) as String? ?? '',
             );
             final closure = _closure(request);
 
@@ -415,13 +401,11 @@ class _ChatScreenState extends State<ChatScreen> {
             color: Colors.white,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: AppColors.warmBorder)),
             onSelected: (v) => switch (v) {
-              'phone' => _callPhone(peer.phone),
               'report' => _report(peer),
               'block' => _block(peer),
               _ => null,
             },
             itemBuilder: (_) => [
-              if (peer.phone.isNotEmpty) _menuItem('phone', LucideIcons.phone, 'Call their phone number'),
               _menuItem('report', LucideIcons.flag, 'Report'),
               if (open) _menuItem('block', LucideIcons.xCircle, 'Block and close chat', danger: true),
             ],
@@ -630,8 +614,7 @@ class _ChatScreenState extends State<ChatScreen> {
 class _Peer {
   final String uid;
   final String name;
-  final String phone;
-  const _Peer({required this.uid, required this.name, required this.phone});
+  const _Peer({required this.uid, required this.name});
 
   String get firstName => name.trim().isEmpty ? 'them' : name.trim().split(RegExp(r'\s+')).first;
   String get initials {
@@ -866,10 +849,6 @@ class _Arrive extends StatelessWidget {
 
 /// Opens a pin in the phone's maps app (Google Maps on Android and web,
 /// Apple or Google Maps on iOS — the universal URL hands off either way).
-Future<void> openInMaps(double lat, double lng, String label) async {
-  final uri = Uri.https('www.google.com', '/maps/search/', {'api': '1', 'query': '$lat,$lng'});
-  await launchUrl(uri, mode: LaunchMode.externalApplication);
-}
 
 /// A shared place: the label, and one tap to open directions. Deliberately
 /// not an embedded map tile — it would be another third-party request per
@@ -892,7 +871,7 @@ class _LocationBubble extends StatelessWidget {
           ConstrainedBox(
             constraints: BoxConstraints(maxWidth: math.min(MediaQuery.sizeOf(context).width, 430.0) * 0.76),
             child: Pressable(
-              onTap: message.lat == null ? null : () => openInMaps(message.lat!, message.lng!, message.text),
+              onTap: message.lat == null ? null : () => openInMaps(message.lat!, message.lng!),
               semanticLabel: 'Open location in maps',
               child: Container(
                 padding: const EdgeInsets.fromLTRB(12, 11, 14, 11),

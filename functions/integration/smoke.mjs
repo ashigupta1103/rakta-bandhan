@@ -52,6 +52,27 @@ await req.update({ status: 'matched', matched_donor_id: 'd1', matched_donor_name
 await sleep(3000);
 console.log('✔ onRequestUpdated ran');
 
+// 3b. Two-sided completion → the donor's cooldown starts only at completion.
+await db.doc('donors/d1').update({ active_request_id: req.id, is_available: true });
+await db.doc('donors_public/d1').set({ is_available: true });
+await req.update({ donor_confirmed_at: Timestamp.now() });
+await sleep(2500);
+let donor = (await db.doc('donors/d1').get()).data();
+assert.equal(donor.is_available, true, 'the donor confirming alone must not start the cooldown');
+assert.equal(donor.active_request_id, req.id);
+await req.update({ requester_confirmed_at: Timestamp.now(), status: 'fulfilled', fulfilled_at: Timestamp.now() });
+donor = await waitFor(async () => {
+  const d = (await db.doc('donors/d1').get()).data();
+  return d.active_request_id === null ? d : null;
+}, 'donor completion applied');
+assert.equal(donor.is_available, false);
+assert.ok(donor.reactivation_scheduled_at.toMillis() > Date.now() + 89 * 86400e3, 'cooldown ~90 days');
+assert.equal((await db.doc('donors_public/d1').get()).data().is_available, false);
+const history = await db.collection('donation_history').where('request_id', '==', req.id).get();
+assert.equal(history.size, 1, 'exactly one donation record');
+assert.equal(history.docs[0].id, req.id);
+console.log('✔ completion applied the donor cooldown once, at completion');
+
 // 4. Deleting a post → onStoryDeleted tolerates a photo that doesn't exist.
 const story = await db.collection('community_stories').add({ author_uid: 'u1', body: 'x', image_path: 'community/u1/missing.jpg' });
 await story.delete();

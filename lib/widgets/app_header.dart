@@ -8,19 +8,20 @@ import '../screens/legal_reader_screen.dart';
 import '../screens/testimonials_screen.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
-import 'pulsing_dot.dart';
 
 /// Shared tab-root header from the final artifact's "One header, one live
 /// state strip" pattern: brand/title on the left, at most two actions
-/// (notifications, More) on the right, and an optional hairline state strip
-/// underneath. Pushed screens keep using the platform [AppBar] with a back
+/// (notifications, More) on the right. No global status strip: a donor's
+/// availability lives on My Page only. Pushed screens keep using the platform [AppBar] with a back
 /// affordance — this widget is for tab roots only.
 class AppHeader extends StatelessWidget implements PreferredSizeWidget {
   final String title;
   final VoidCallback? onNotificationTap;
   final bool hasUnreadNotifications;
   final VoidCallback? onMoreTap;
-  final Widget? stateStrip;
+  /// Replaces the notifications button (the Messages inbox on Requests), so
+  /// a header never carries more than two actions.
+  final Widget? primaryAction;
 
   const AppHeader({
     super.key,
@@ -28,7 +29,7 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
     this.onNotificationTap,
     this.hasUnreadNotifications = false,
     this.onMoreTap,
-    this.stateStrip,
+    this.primaryAction,
   });
 
   // 20px vertical padding (10+10) plus a bare IconButton's Material default
@@ -39,7 +40,7 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
   // Profile), because nothing in AppTheme shrinks IconButton's default
   // minimum size.
   @override
-  Size get preferredSize => Size.fromHeight(stateStrip == null ? 72 : 108);
+  Size get preferredSize => const Size.fromHeight(72);
 
   @override
   Widget build(BuildContext context) {
@@ -53,11 +54,12 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
               children: [
                 Text(title, style: AppTextStyles.display(fontSize: 22, color: AppColors.ink)),
                 const Spacer(),
-                _HeaderIconButton(
-                  icon: LucideIcons.bell,
-                  showDot: hasUnreadNotifications,
-                  onTap: onNotificationTap ?? () {},
-                ),
+                primaryAction ??
+                    _HeaderIconButton(
+                      icon: LucideIcons.bell,
+                      showDot: hasUnreadNotifications,
+                      onTap: onNotificationTap ?? () {},
+                    ),
                 _HeaderIconButton(
                   icon: LucideIcons.ellipsis,
                   onTap: onMoreTap ?? () => showMoreSheet(context),
@@ -65,7 +67,6 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
               ],
             ),
           ),
-          ?stateStrip,
           Container(height: 1, color: AppColors.warmBorder),
         ],
       ),
@@ -102,42 +103,6 @@ class _HeaderIconButton extends StatelessWidget {
                 ),
               ),
             ),
-        ],
-      ),
-    );
-  }
-}
-
-/// The hairline "live state strip" — availability + verification + an
-/// optional trailing count — repeated under every tab-root header.
-class AppStateStrip extends StatelessWidget {
-  final bool isAvailable;
-  final String subtitle;
-  final String? trailing;
-
-  const AppStateStrip({super.key, required this.isAvailable, required this.subtitle, this.trailing});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 9),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: AppColors.warmDivider)),
-      ),
-      child: Row(
-        children: [
-          PulsingDot(color: isAvailable ? AppColors.successText : AppColors.mutedInk, size: 8),
-          const SizedBox(width: 8),
-          Text(
-            isAvailable ? 'Available' : 'Not available',
-            style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: isAvailable ? AppColors.successText : AppColors.mutedInk),
-          ),
-          Text(' · $subtitle', style: const TextStyle(fontSize: 12.5, color: AppColors.ink2)),
-          if (trailing != null) ...[
-            const Spacer(),
-            Text(trailing!, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.red700)),
-          ],
         ],
       ),
     );

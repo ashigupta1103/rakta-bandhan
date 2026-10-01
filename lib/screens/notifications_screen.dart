@@ -3,7 +3,9 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../services/notifications_service.dart';
 import '../services/urgent_alert_service.dart';
 import '../theme/app_colors.dart';
+import '../theme/app_text_styles.dart';
 import '../widgets/blood_group_droplet.dart';
+import '../widgets/rb_ui.dart';
 import 'match_contact_screen.dart';
 import 'tracking_screen.dart';
 
@@ -22,169 +24,109 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.warmPageBackground,
-      body: SafeArea(
-        child: Column(
-          children: [
-            SizedBox(
-              height: 52,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: IconButton(
-                      icon: const Icon(LucideIcons.arrowLeft, color: AppColors.textPrimaryWarm),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ),
-                  const Text(
-                    'Notifications',
-                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: StreamBuilder<NotificationsFeed>(
-                  key: ValueKey(_retryToken),
-                  stream: _service.watchNotifications(),
-                  builder: (context, snapshot) {
-                    if (snapshot.hasError) {
-                      return Center(
-                        child: _errorState(() => setState(() => _retryToken++)),
-                      );
-                    }
-                    if (!snapshot.hasData) {
-                      return const Center(child: CircularProgressIndicator(strokeWidth: 2));
-                    }
-                    final feed = snapshot.data!;
-                    if (!feed.enabled) return _disabledState();
-                    if (feed.items.isEmpty) return _emptyState();
-
-                    // Exactly one actionable item earns the only card and
-                    // the only button — the first request-kind notification.
-                    final actionableIndex = feed.items.indexWhere((n) => n.kind == NotificationKind.request);
-                    final actionable = actionableIndex == -1 ? null : feed.items[actionableIndex];
-                    final rest = [for (var i = 0; i < feed.items.length; i++) if (i != actionableIndex) feed.items[i]];
-
-                    return ListView(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      children: [
-                        if (actionable != null) ...[
-                          const Text('Needs you now', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.1, color: AppColors.textSecondary)),
-                          const SizedBox(height: 10),
-                          _actionableCard(actionable),
-                          const SizedBox(height: 22),
-                        ],
-                        if (rest.isNotEmpty) ...[
-                          const Text('Earlier', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.1, color: AppColors.textSecondary)),
-                          for (var i = 0; i < rest.length; i++) _archivalRow(rest[i], showDivider: i < rest.length - 1),
-                        ],
-                      ],
-                    );
-                  },
-                ),
-              ),
-            ),
-          ],
+      appBar: AppBar(
+        backgroundColor: AppColors.warmPageBackground,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        leading: IconButton(
+          tooltip: 'Back',
+          icon: const Icon(LucideIcons.arrowLeft, color: AppColors.textPrimaryWarm),
+          onPressed: () => Navigator.pop(context),
         ),
+        title: const Text('Notifications', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
+        centerTitle: false,
+      ),
+      body: StreamBuilder<NotificationsFeed>(
+        key: ValueKey(_retryToken),
+        stream: _service.watchNotifications(),
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return ListView(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+              children: [
+                RbStatePanel.error(
+                  title: "Couldn't load notifications",
+                  message: 'Check your connection and try again.',
+                  onRetry: () => setState(() => _retryToken++),
+                ),
+              ],
+            );
+          }
+          if (!snapshot.hasData) return const RbLoading(height: 240);
+          final feed = snapshot.data!;
+
+          // Exactly one actionable item earns the only card and the only
+          // button — the first request-kind notification.
+          final actionableIndex = feed.items.indexWhere((n) => n.kind == NotificationKind.request);
+          final actionable = actionableIndex == -1 ? null : feed.items[actionableIndex];
+          final rest = [for (var i = 0; i < feed.items.length; i++) if (i != actionableIndex) feed.items[i]];
+
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
+            children: [
+              if (!feed.enabled) _disabledBanner(),
+              if (feed.items.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.only(top: 8),
+                  child: RbStatePanel(
+                    icon: LucideIcons.bell,
+                    title: 'You’re all caught up',
+                    message: 'Matches, messages and updates on your requests will appear here.',
+                  ),
+                ),
+              if (actionable != null) ...[
+                const RbSectionLabel('Needs you now', padding: EdgeInsets.fromLTRB(2, 8, 2, 10)),
+                _actionableCard(actionable),
+              ],
+              if (rest.isNotEmpty) ...[
+                const RbSectionLabel('Earlier'),
+                RbListGroup(children: [for (final n in rest) _archivalRow(n)]),
+              ],
+            ],
+          );
+        },
       ),
     );
   }
 
-  Widget _disabledState() {
-    return Column(
-      children: [
-        const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(color: AppColors.warmAmberBg, borderRadius: BorderRadius.circular(16)),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 34,
-                height: 34,
-                decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                alignment: Alignment.center,
-                child: const Icon(LucideIcons.bellOff, size: 17, color: AppColors.warmAmberText),
-              ),
-              const SizedBox(width: 10),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Notifications are off', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF7A4A08))),
-                    SizedBox(height: 2),
-                    Text('Turn them on to hear about nearby requests instantly.', style: TextStyle(fontSize: 12, color: Color(0xFF8A7350))),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: () async {
-              final messenger = ScaffoldMessenger.of(context);
-              final allowed = await UrgentAlertService.instance.requestPushPermission();
-              messenger.showSnackBar(SnackBar(
-                content: Text(allowed ? 'Notifications are on.' : 'Notifications are still off — allow them in your device settings.'),
-              ));
-            },
-            child: const Text('Enable notifications'),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _emptyState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 60),
+  Widget _disabledBanner() {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8, bottom: 4),
+      child: RbCard(
+        color: AppColors.goldTint,
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, border: Border.all(color: AppColors.cardBorderWarm)),
-              alignment: Alignment.center,
-              child: const Icon(LucideIcons.bell, size: 20, color: AppColors.textMuted),
+            const Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(LucideIcons.bellOff, size: 18, color: AppColors.goldDeep),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Notifications are off', style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600, color: AppColors.goldDeepest)),
+                      SizedBox(height: 2),
+                      Text('Turn them on to hear about nearby requests and messages straight away.', style: TextStyle(fontSize: 13, color: AppColors.goldDeep, height: 1.4)),
+                    ],
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 12),
-            const Text('No notifications yet.', style: TextStyle(fontSize: 13.5, color: AppColors.textSecondary)),
+            ElevatedButton(
+              onPressed: () async {
+                final messenger = ScaffoldMessenger.of(context);
+                final allowed = await UrgentAlertService.instance.requestPushPermission();
+                messenger.showSnackBar(SnackBar(
+                  content: Text(allowed ? 'Notifications are on.' : 'Notifications are still off — allow them in your device settings.'),
+                ));
+              },
+              child: const Text('Turn on notifications'),
+            ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _errorState(VoidCallback onRetry) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 60),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: const BoxDecoration(color: AppColors.primaryLightTint, shape: BoxShape.circle),
-            alignment: Alignment.center,
-            child: const Icon(LucideIcons.wifiOff, size: 20, color: AppColors.primary),
-          ),
-          const SizedBox(height: 12),
-          const Text("Couldn't load notifications", style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
-          const SizedBox(height: 4),
-          const Text('Check your connection and try again.', style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary)),
-          const SizedBox(height: 14),
-          OutlinedButton(onPressed: onRetry, child: const Text('Retry')),
-        ],
       ),
     );
   }
@@ -206,43 +148,39 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   Widget _actionableCard(AppNotification n) {
-    return Container(
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [BoxShadow(color: AppColors.shadowCard, blurRadius: 16, offset: const Offset(0, 6))],
-      ),
+    return RbCard(
+      padding: EdgeInsets.zero,
+      clip: true,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Container(height: 3, color: AppColors.primary),
+          Container(height: 4, color: AppColors.brandRed),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const BloodGroupDroplet(label: '', size: 40, filled: true, color: AppColors.primary, textColor: AppColors.onEmber, centerIcon: Icon(LucideIcons.droplet, size: 16, color: AppColors.onEmber)),
+                    const BloodGroupDroplet(label: '', size: 40, centerIcon: Icon(LucideIcons.droplet, size: 16, color: AppColors.onEmber)),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(n.title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
-                          const SizedBox(height: 2),
-                          Text(n.body, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                          Text(n.title, style: AppTextStyles.display(fontSize: 17, color: AppColors.ink, height: 1.25)),
+                          const SizedBox(height: 3),
+                          Text(n.body, style: const TextStyle(fontSize: 13.5, color: AppColors.ink2, height: 1.4)),
                         ],
                       ),
                     ),
+                    const SizedBox(width: 8),
+                    Text(n.time, style: const TextStyle(fontSize: 12, color: AppColors.mutedInk)),
                   ],
                 ),
-                const SizedBox(height: 13),
-                ElevatedButton(
-                  onPressed: () => _openRequest(n),
-                  child: const Text('View request'),
-                ),
+                const SizedBox(height: 14),
+                ElevatedButton(onPressed: () => _openRequest(n), child: const Text('View request')),
               ],
             ),
           ),
@@ -251,38 +189,16 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     );
   }
 
-  /// Archival items sit on the ground with a hairline divider — a plain
-  /// grey dot for neutral events, a small green droplet for positive ones
-  /// (match / donation confirmed) per the approved device vocabulary.
-  Widget _archivalRow(AppNotification n, {required bool showDivider}) {
+  /// Earlier events: green droplet for positive ones (match / donation
+  /// confirmed), a neutral bell otherwise.
+  Widget _archivalRow(AppNotification n) {
     final isPositive = n.kind == NotificationKind.match || n.kind == NotificationKind.donationConfirmed;
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14),
-      decoration: BoxDecoration(border: showDivider ? const Border(bottom: BorderSide(color: AppColors.dividerWarm)) : null),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: isPositive
-                ? const Icon(LucideIcons.droplet, size: 14, color: AppColors.warmGreenText)
-                : Container(width: 7, height: 7, decoration: const BoxDecoration(color: AppColors.chevronMuted, shape: BoxShape.circle)),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(n.title, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
-                const SizedBox(height: 3),
-                Text(n.body, style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary, height: 1.4)),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(n.time, style: const TextStyle(fontSize: 11, color: AppColors.textMutedWarm)),
-        ],
-      ),
+    return RbRow(
+      icon: isPositive ? LucideIcons.droplet : (n.kind == NotificationKind.cancellation ? LucideIcons.circleX : LucideIcons.bell),
+      tone: isPositive ? RbTone.success : RbTone.neutral,
+      title: n.title,
+      subtitle: n.body,
+      trailing: Text(n.time, style: const TextStyle(fontSize: 12, color: AppColors.mutedInk)),
     );
   }
 }

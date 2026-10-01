@@ -64,7 +64,7 @@
 			</array>
 		</dict>
 		<dict>
-			<!-- Optional ID-proof photo for donor verification -->
+			<!-- Optional ID-proof photo for donor verification; optional private profile photo -->
 			<key>NSPrivacyCollectedDataType</key>
 			<string>NSPrivacyCollectedDataTypePhotosorVideos</string>
 			<key>NSPrivacyCollectedDataTypeLinked</key>

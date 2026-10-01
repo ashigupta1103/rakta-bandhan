@@ -85,6 +85,7 @@ class AccountService {
 
     await PushService.instance.unregisterDevice();
     await Backend.instance.deleteMyIdProof();
+    await Backend.instance.removeProfilePhoto(keepProfileField: true).catchError((_) {});
     await _db.collection('donors_public').doc(_uid).delete();
     await _db.collection('donors').doc(_uid).delete();
     // The sign-in account goes last, server-side (deleteMyAuthAccount). If

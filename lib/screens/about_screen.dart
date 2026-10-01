@@ -3,11 +3,13 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:share_plus/share_plus.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
+import '../widgets/rb_ui.dart';
 import 'legal_reader_screen.dart';
 
 /// About Rakta Bandhan — mission, vision, the project's story and team, as
 /// supplied by the Rakta Bandhan / Rotary team. Team photographs are still
-/// to come; each member shows their initials until then.
+/// to come: set `photo` on a [_Member] once the image is in assets/team/;
+/// until then each member shows their initials.
 class AboutScreen extends StatelessWidget {
   const AboutScreen({super.key});
 
@@ -25,18 +27,21 @@ class AboutScreen extends StatelessWidget {
   static const _team = [
     _Member(
       name: 'PHF Rtn. Radhika Dhruv',
+      photo: null, // 'assets/team/radhika-dhruv.jpg' once supplied
       role: 'Project Chairman · Visionary & Principal Sponsor',
       detail: 'Immediate Past President, Rotary Club of Madras Cosmos',
       bio: 'Radhika Dhruv conceptualised Rakta Bandhan from the thought that reaching a blood donor should be faster and more seamless in an emergency. Her vision has driven the development of the platform, and the app’s development has been majorly sponsored by her.',
     ),
     _Member(
       name: 'CSK',
+      photo: null, // 'assets/team/csk.jpg' once supplied
       role: 'Management Trustee',
       detail: 'Rakta Bandhan project trust',
       bio: 'As Management Trustee, CSK oversees the governance of the project on behalf of the partner trusts — making sure Rakta Bandhan is run responsibly, transparently and in the service of donors and patients.',
     ),
     _Member(
       name: 'Adarsh Betala',
+      photo: null, // 'assets/team/adarsh-betala.jpg' once supplied
       role: 'President',
       detail: 'Rakta Bandhan',
       bio: 'As President, Adarsh Betala leads the day-to-day direction of Rakta Bandhan — bringing together the clubs, volunteers, hospitals and the technology team so that every request reaches willing donors quickly.',
@@ -159,10 +164,16 @@ class AboutScreen extends StatelessWidget {
                           for (final m in _team) _teamCard(m),
                           const SizedBox(height: 22),
                           _label('Community & legal'),
-                          const SizedBox(height: 4),
-                          _linkRow(context, LucideIcons.heartHandshake, 'Community guidelines', () => LegalReaderScreen.guidelines()),
-                          _linkRow(context, LucideIcons.shieldCheck, 'Privacy policy', () => LegalReaderScreen.privacy()),
-                          _linkRow(context, LucideIcons.fileText, 'Terms of use', () => LegalReaderScreen.terms()),
+                          RbListGroup(
+                            children: [
+                              for (final (icon, label, page) in [
+                                (LucideIcons.heartHandshake, 'Community guidelines', () => const LegalReaderScreen.guidelines()),
+                                (LucideIcons.shieldCheck, 'Privacy policy', () => const LegalReaderScreen.privacy()),
+                                (LucideIcons.fileText, 'Terms of use', () => const LegalReaderScreen.terms()),
+                              ])
+                                RbRow(icon: icon, tone: RbTone.neutral, title: label, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => page()))),
+                            ],
+                          ),
                         ],
                       ),
                     ),
@@ -226,58 +237,50 @@ class AboutScreen extends StatelessWidget {
         .take(2)
         .map((w) => w[0].toUpperCase())
         .join();
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: Colors.white, border: Border.all(color: AppColors.warmBorder), borderRadius: BorderRadius.circular(14)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: const BoxDecoration(color: AppColors.primaryLightTint, shape: BoxShape.circle),
-                alignment: Alignment.center,
-                child: Text(initials, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.primary)),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(m.name, style: AppTextStyles.display(fontSize: 16.5, color: AppColors.ink)),
-                    Text(m.role, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primary)),
-                    Text(m.detail, style: const TextStyle(fontSize: 11.5, color: AppColors.ink2)),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(m.bio, style: const TextStyle(fontSize: 13, color: AppColors.ink, height: 1.55)),
-        ],
-      ),
+    final initialsDisc = Container(
+      color: AppColors.red100,
+      alignment: Alignment.center,
+      child: Text(initials, style: AppTextStyles.display(fontSize: 22, color: AppColors.brandRed)),
     );
-  }
-
-  Widget _linkRow(BuildContext context, IconData icon, String label, Widget Function() page) {
-    return InkWell(
-      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => page())),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: Row(
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: RbCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, size: 17, color: AppColors.ink2),
-            const SizedBox(width: 12),
-            Expanded(child: Text(label, style: const TextStyle(fontSize: 14, color: AppColors.ink))),
-            const Icon(LucideIcons.chevronRight, size: 16, color: AppColors.chevronMuted),
+            Row(
+              children: [
+                ClipOval(
+                  child: SizedBox(
+                    width: 64,
+                    height: 64,
+                    child: m.photo == null
+                        ? initialsDisc
+                        : Image.asset(m.photo!, fit: BoxFit.cover, errorBuilder: (context, error, stack) => initialsDisc),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(m.name, style: AppTextStyles.display(fontSize: 18, color: AppColors.ink, height: 1.2)),
+                      const SizedBox(height: 3),
+                      Text(m.role, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.brandRed, height: 1.3)),
+                      Text(m.detail, style: const TextStyle(fontSize: 12.5, color: AppColors.ink2, height: 1.3)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(m.bio, style: const TextStyle(fontSize: 14, color: AppColors.ink, height: 1.55)),
           ],
         ),
       ),
     );
   }
+
 }
 
 @immutable
@@ -286,5 +289,9 @@ class _Member {
   final String role;
   final String detail;
   final String bio;
-  const _Member({required this.name, required this.role, required this.detail, required this.bio});
+  /// Asset path of the member's photograph, e.g. 'assets/team/radhika-dhruv.jpg'
+  /// (also list it under `flutter: assets:` in pubspec.yaml). Null shows
+  /// initials.
+  final String? photo;
+  const _Member({required this.name, required this.role, required this.detail, required this.bio, this.photo});
 }

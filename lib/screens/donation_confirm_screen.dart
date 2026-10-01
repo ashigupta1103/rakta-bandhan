@@ -3,16 +3,13 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../services/backend.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
-import '../widgets/blood_group_droplet.dart';
 import '../widgets/ring_field.dart';
 import 'cooldown_screen.dart';
+import 'donation_history_screen.dart';
 
-/// Terminal-success composition per Visual Richness Proposal #11: ember
-/// gradient, the committed ring group, a cream droplet holding a check, and
-/// the impact trail placing this donation inside a history rather than
-/// announcing it in isolation. Donation count comes from the real
-/// Backend.instance.myDonationCount() (already incremented by the
-/// markFulfilled() call that led here) — not invented copy.
+/// Shown once a donation is complete (both sides confirmed): ember field,
+/// ring group, a cream droplet, and the real count from
+/// Backend.instance.myDonationCount() — shown only once it has loaded.
 class DonationConfirmScreen extends StatelessWidget {
   const DonationConfirmScreen({super.key});
 
@@ -67,25 +64,20 @@ class DonationConfirmScreen extends StatelessWidget {
                         const Text('Donation recorded', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.1, color: AppColors.onEmberEyebrow)),
                         const SizedBox(height: 12),
                         Text(
-                          count <= 1 ? "That's one life\nyou've helped" : "That's $count lives\nyou've helped",
+                          'Thank you for\ngiving blood',
                           textAlign: TextAlign.center,
                           style: AppTextStyles.display(fontSize: 29, color: AppColors.onEmberStrong, height: 1.16),
                         ),
-                        const SizedBox(height: 20),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            for (var i = 0; i < 4; i++) ...[
-                              if (i > 0) const SizedBox(width: 9),
-                              BloodGroupDroplet(
-                                label: '',
-                                size: i == 3 ? 30 : 24,
-                                filled: true,
-                                color: i == 3 ? AppColors.onEmber : AppColors.onEmberOutline,
-                              ),
-                            ],
-                          ],
+                        const SizedBox(height: 12),
+                        // Only the real count, once it has loaded.
+                        AnimatedOpacity(
+                          opacity: snapshot.hasData && count > 0 ? 1 : 0,
+                          duration: const Duration(milliseconds: 200),
+                          child: Text(
+                            count == 1 ? 'Your first donation through Rakta Bandhan' : 'Donation $count through Rakta Bandhan',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.onEmber),
+                          ),
                         ),
                       ],
                     ),
@@ -108,6 +100,10 @@ class DonationConfirmScreen extends StatelessWidget {
                             onPressed: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const CooldownScreen())),
                             child: const Text('Done', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
                           ),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const DonationHistoryScreen())),
+                          child: const Text('See history & certificate', style: TextStyle(fontSize: 14, color: AppColors.onEmberMuted)),
                         ),
                       ],
                     ),

@@ -69,7 +69,7 @@ Deploy Hosting first; see the README. The pages come from the in-app text.
 | Phone number (Personal info) | Yes | No* | App functionality, account management | Required |
 | Approximate and precise location (Location) | Yes | No | App functionality | Required (area); current location optional |
 | Health info: blood group (Health and fitness) | Yes | No | App functionality | Required |
-| Photos: ID proof, community post photos (Photos and videos) | Yes | No | App functionality | Optional |
+| Photos: ID proof, profile photo, community post photos (Photos and videos) | Yes | No | App functionality | Optional |
 | Other in-app messages (Messages) | Yes | No | App functionality | Optional |
 | Other user-generated content: community posts (App activity) | Yes | No | App functionality | Optional |
 | App interactions (App activity) | Yes | No | Analytics | Required |
@@ -104,7 +104,7 @@ Tracking: **No** (no IDFA, no data brokers, no cross-app tracking).
 | Phone Number | Yes | No | App Functionality |
 | Health (blood group) | Yes | No | App Functionality |
 | Precise Location | Yes | No | App Functionality |
-| Photos or Videos (ID proof, community posts — optional) | Yes | No | App Functionality |
+| Photos or Videos (ID proof, profile photo, community posts — optional) | Yes | No | App Functionality |
 | Other User Content (messages, community posts) | Yes | No | App Functionality |
 | Product Interaction | No | No | Analytics |
 | Device ID | No | No | Analytics, App Functionality |
@@ -129,7 +129,7 @@ Tracking: **No** (no IDFA, no data brokers, no cross-app tracking).
 >
 > **Account deletion:** My Page › Settings › Delete my account.
 > **Report and block:** in any chat, tap the header or the ··· menu.
-> **Microphone** is used only for in-app voice calls between matched users. **Location** is used only while the app is open, to show nearby requests and donors. The **camera or photo library** is used only for the optional ID-proof photo and optional community post photos; **photo saving** only when the user taps Save on their donation certificate.
+> **Microphone** is used only for in-app voice calls between matched users. **Location** is used only while the app is open, to show nearby requests and donors. The **camera or photo library** is used only for the optional ID-proof photo, optional profile photo and optional community post photos; **photo saving** only when the user taps Save on their donation certificate.
 >
 > Rakta Bandhan is a non-commercial service project of Madras Cosmos Charitable Trust and Chennai Capital Trust (Rotary Club of Madras Cosmos and Rotary Club of Chennai Capital, Chennai). It connects blood requesters with volunteer donors and does not provide medical services.
 

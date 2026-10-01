@@ -5,6 +5,8 @@ import '../services/backend.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/blood_group_droplet.dart';
+import '../widgets/place_link.dart';
+import '../widgets/rb_ui.dart';
 import '../widgets/confirm_sheet.dart';
 import '../widgets/identity_disc.dart';
 import '../widgets/step_tracker.dart';
@@ -51,9 +53,9 @@ class _TrackingScreenState extends State<TrackingScreen> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(closed ? 'Donation completed. Thank you for using Rakta Bandhan.' : 'Thanks. We’ve asked $donorName to confirm as well.'),
       ));
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not update this request. Please try again.')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_confirmError(e))));
     } finally {
       if (mounted) setState(() => _confirming = false);
     }
@@ -89,7 +91,6 @@ class _TrackingScreenState extends State<TrackingScreen> {
       peerUid: request['matched_donor_id'] as String? ?? '',
       peerName: request['matched_donor_name'] as String? ?? 'Your donor',
       myName: me?['name'] as String? ?? 'Rakta Bandhan user',
-      peerPhone: request['matched_donor_phone'] as String? ?? '',
     );
   }
 
@@ -112,12 +113,25 @@ class _TrackingScreenState extends State<TrackingScreen> {
         child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
           stream: FirebaseFirestore.instance.collection('requests').doc(widget.requestId).snapshots(),
           builder: (context, snapshot) {
-            if (!snapshot.hasData) {
-              return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+            if (snapshot.hasError) {
+              return ListView(
+                padding: const EdgeInsets.all(20),
+                children: [
+                  RbStatePanel.error(
+                    title: 'Couldn’t load your request',
+                    message: 'Check your connection and try again.',
+                    onRetry: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => TrackingScreen(requestId: widget.requestId))),
+                  ),
+                ],
+              );
             }
+            if (!snapshot.hasData) return const RbLoading(height: 240);
             final data = snapshot.data!.data();
             if (data == null) {
-              return const Center(child: Text('Request not found.', style: TextStyle(color: AppColors.textSecondary)));
+              return ListView(
+                padding: const EdgeInsets.all(20),
+                children: const [RbStatePanel(icon: LucideIcons.searchX, title: 'Request not found', message: 'It may have been removed. Your other requests are on the Requests tab.')],
+              );
             }
             Backend.instance.expireIfStale(widget.requestId, data);
             final status = data['status'] as String? ?? 'open';
@@ -177,7 +191,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(Backend.shortPlace(location, fallback: 'Blood request'), style: AppTextStyles.display(fontSize: 22, color: AppColors.ink, height: 1.2)),
+                            PlaceLink(label: Backend.shortPlace(location, fallback: 'Blood request'), lat: (data['lat'] as num?)?.toDouble(), lng: (data['lng'] as num?)?.toDouble(), style: AppTextStyles.display(fontSize: 22, color: AppColors.ink, height: 1.2)),
                             const SizedBox(height: 3),
                             Text(
                               '$units ${units == 1 ? 'unit' : 'units'} · $urgency${createdAt == null ? '' : ' · raised ${_timeAgo(createdAt)}'}',
@@ -189,56 +203,82 @@ class _TrackingScreenState extends State<TrackingScreen> {
                     ],
                   ),
                   const SizedBox(height: 22),
-                  Container(
+                  RbCard(
                     padding: const EdgeInsets.fromLTRB(16, 18, 16, 4),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [BoxShadow(color: AppColors.shadowHero, blurRadius: 22, offset: const Offset(0, 8))],
-                    ),
                     child: StepTracker(steps: steps),
                   ),
                   if (isMatched && donorName != null) ...[
-                    const SizedBox(height: 14),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(color: Colors.white, border: Border.all(color: AppColors.cardBorderWarm), borderRadius: BorderRadius.circular(16)),
-                      child: Row(
+                    const RbSectionLabel('Your donor'),
+                    RbCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          IdentityDisc(initials: _initials(donorName), size: 40, isPublic: true),
-                          const SizedBox(width: 12),
-                          Expanded(child: Text(donorName, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm))),
-                          IconButton(
-                            tooltip: 'Message',
-                            icon: const Icon(LucideIcons.messageSquare, size: 18, color: AppColors.ink),
-                            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ChatScreen(requestId: widget.requestId))),
+                          Row(
+                            children: [
+                              IdentityDisc(initials: _initials(donorName), size: 44, isPublic: true),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(donorName, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppTextStyles.display(fontSize: 18, color: AppColors.ink)),
+                                    Text(
+                                      isFulfilled ? 'Donated for this request' : (donorConfirmed ? 'Says they have donated' : 'Accepted your request'),
+                                      style: const TextStyle(fontSize: 13, color: AppColors.ink2),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
-                          if (status == 'matched')
-                            IconButton(
-                              tooltip: 'Voice call',
-                              style: IconButton.styleFrom(backgroundColor: AppColors.brandRed),
-                              icon: const Icon(LucideIcons.phone, size: 16, color: Colors.white),
-                              onPressed: () => _call(data),
-                            ),
+                          const SizedBox(height: 14),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ChatScreen(requestId: widget.requestId))),
+                                  icon: const Icon(LucideIcons.messageSquare, size: 16),
+                                  label: const Text('Message'),
+                                ),
+                              ),
+                              if (status == 'matched') ...[
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    onPressed: () => _call(data),
+                                    icon: const Icon(LucideIcons.phone, size: 16),
+                                    label: const Text('Call in app'),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
                         ],
                       ),
                     ),
                   ],
                   if (status == 'matched' && donorName != null && !iConfirmed) ...[
                     const SizedBox(height: 12),
-                    OutlinedButton.icon(
-                      onPressed: _confirming ? null : () => _confirmReceived(donorName),
-                      icon: _confirming
-                          ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
-                          : const Icon(LucideIcons.checkCircle, size: 16),
-                      label: Text(donorConfirmed ? 'Confirm donation received' : 'Mark donation received'),
-                    ),
+                    if (donorConfirmed)
+                      ElevatedButton.icon(
+                        onPressed: _confirming ? null : () => _confirmReceived(donorName),
+                        icon: _confirming
+                            ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                            : const Icon(LucideIcons.badgeCheck, size: 16),
+                        label: const Text('Confirm donation received'),
+                      )
+                    else
+                      OutlinedButton.icon(
+                        onPressed: _confirming ? null : () => _confirmReceived(donorName),
+                        icon: _confirming
+                            ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                            : const Icon(LucideIcons.badgeCheck, size: 16),
+                        label: const Text('Mark donation received'),
+                      ),
                   ],
                   if (isTerminalBad) ...[
                     const SizedBox(height: 14),
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(color: Colors.white, border: Border.all(color: AppColors.cardBorderWarm), borderRadius: BorderRadius.circular(16)),
+                    RbCard(
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -267,30 +307,18 @@ class _TrackingScreenState extends State<TrackingScreen> {
                       child: const Text('Create a new request'),
                     ),
                   ] else if (canCancel) ...[
-                    const SizedBox(height: 20),
-                    const Text('If something changes', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.ink2)),
-                    const SizedBox(height: 10),
-                    Container(
-                      decoration: BoxDecoration(color: Colors.white, border: Border.all(color: AppColors.warmBorder), borderRadius: BorderRadius.circular(12)),
-                      child: InkWell(
-                        onTap: _cancelling ? null : _cancel,
-                        borderRadius: BorderRadius.circular(12),
-                        child: Padding(
-                          padding: const EdgeInsets.all(14),
-                          child: Row(
-                            children: [
-                              Text(
-                                _cancelling ? 'Cancelling…' : 'Cancel this request',
-                                style: const TextStyle(fontSize: 14, color: AppColors.red700, fontWeight: FontWeight.w600),
-                              ),
-                              if (_cancelling) ...[
-                                const SizedBox(width: 10),
-                                const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
-                              ],
-                            ],
-                          ),
+                    const RbSectionLabel('If something changes'),
+                    RbListGroup(
+                      children: [
+                        RbRow(
+                          icon: LucideIcons.circleX,
+                          destructive: true,
+                          title: _cancelling ? 'Cancelling…' : 'Cancel this request',
+                          subtitle: 'Donors stop seeing it straight away',
+                          onTap: _cancelling ? null : _cancel,
+                          trailing: _cancelling ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)) : null,
                         ),
-                      ),
+                      ],
                     ),
                   ],
                 ],
@@ -316,3 +344,8 @@ class _TrackingScreenState extends State<TrackingScreen> {
     return '${diff.inDays}d ago';
   }
 }
+
+/// Honest failure text for a confirmation that didn't save.
+String _confirmError(Object e) => e is StateError
+    ? e.message
+    : 'Your confirmation wasn’t saved. Check your connection and try again.';

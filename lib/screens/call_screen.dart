@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../services/alert_sound.dart';
 import '../services/call_service.dart';
@@ -20,30 +19,19 @@ import 'chat_screen.dart';
 /// entry point (chat header, contact sheet, donor-found, match-contact,
 /// tracking, inbox) goes through here, so the experience — and every
 /// failure state — is identical wherever a call starts.
-Future<void> startCallFlow(
-  BuildContext context, {
-  required String requestId,
-  required String peerUid,
-  required String peerName,
-  required String myName,
-  String peerPhone = '',
-}) async {
+Future<void> startCallFlow(BuildContext context, {required String requestId, required String peerUid, required String peerName, required String myName}) async {
   final existing = CallService.instance.active;
   if (existing != null) {
     // Already on a call — go back to it instead of starting a second one.
     await Navigator.of(context).push(MaterialPageRoute(fullscreenDialog: true, builder: (_) => CallScreen(call: existing)));
     return;
   }
-  await Navigator.of(context).push(MaterialPageRoute(
-    fullscreenDialog: true,
-    builder: (_) => CallScreen.outgoing(
-      requestId: requestId,
-      peerUid: peerUid,
-      peerName: peerName,
-      myName: myName,
-      peerPhone: peerPhone,
+  await Navigator.of(context).push(
+    MaterialPageRoute(
+      fullscreenDialog: true,
+      builder: (_) => CallScreen.outgoing(requestId: requestId, peerUid: peerUid, peerName: peerName, myName: myName),
     ),
-  ));
+  );
 }
 
 String _initialsOf(String name) {
@@ -62,33 +50,18 @@ String _mmss(int s) => '${(s ~/ 60).toString().padLeft(2, '0')}:${(s % 60).toStr
 /// Bottom: mute, speaker, message — and a clearly separated end button.
 ///
 /// An outgoing call that isn't answered doesn't just vanish: the screen
-/// stays with the three sensible next steps (call again, message, or their
-/// phone). While ringing, after [_hintAfter], it says out loud what the
-/// free plan can't do yet — reach someone whose app is closed — and offers
-/// the phone line right there.
+/// stays with the next steps (message, or call again). Phone numbers are
+/// never shown or dialled from here — everything stays in the app.
 class CallScreen extends StatefulWidget {
   final ActiveCall? call;
   final String? requestId;
   final String? peerUid;
   final String? peerName;
   final String myName;
-  final String peerPhone;
 
-  const CallScreen({super.key, required ActiveCall this.call})
-      : requestId = null,
-        peerUid = null,
-        peerName = null,
-        myName = '',
-        peerPhone = '';
+  const CallScreen({super.key, required ActiveCall this.call}) : requestId = null, peerUid = null, peerName = null, myName = '';
 
-  const CallScreen.outgoing({
-    super.key,
-    required String this.requestId,
-    required String this.peerUid,
-    required String this.peerName,
-    required this.myName,
-    this.peerPhone = '',
-  }) : call = null;
+  const CallScreen.outgoing({super.key, required String this.requestId, required String this.peerUid, required String this.peerName, required this.myName}) : call = null;
 
   @override
   State<CallScreen> createState() => _CallScreenState();
@@ -114,8 +87,7 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
   String get _requestId => _call?.requestId ?? widget.requestId!;
   String get _peerName => _call?.peerName ?? widget.peerName ?? '';
 
-  late final Future<DocumentSnapshot<Map<String, dynamic>>> _request =
-      FirebaseFirestore.instance.collection('requests').doc(_requestId).get();
+  late final Future<DocumentSnapshot<Map<String, dynamic>>> _request = FirebaseFirestore.instance.collection('requests').doc(_requestId).get();
 
   @override
   void initState() {
@@ -137,12 +109,7 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
       _showHint = false;
     });
     try {
-      final call = await CallService.instance.startCall(
-        requestId: widget.requestId!,
-        peerUid: widget.peerUid!,
-        peerName: widget.peerName!,
-        myName: widget.myName,
-      );
+      final call = await CallService.instance.startCall(requestId: widget.requestId!, peerUid: widget.peerUid!, peerName: widget.peerName!, myName: widget.myName);
       if (!mounted) {
         call.hangUp();
         return;
@@ -241,16 +208,6 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
     }
   }
 
-  Future<void> _callPhone() async {
-    final phone = widget.peerPhone;
-    if (phone.isEmpty) return;
-    await _call?.hangUp();
-    final ok = await launchUrl(Uri(scheme: 'tel', path: phone));
-    if (!ok && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not open the dialer. Their number is $phone.')));
-    }
-  }
-
   @override
   void dispose() {
     _call?.removeListener(_onCall);
@@ -321,37 +278,60 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
                 // as the call ends — the renderer is disposed right after.
                 SizedBox(width: 1, height: 1, child: live ? RTCVideoView(call.remoteRenderer) : null),
                 Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      _Portrait(initials: _initialsOf(_peerName), breath: _breath),
-                      const SizedBox(height: 22),
-                      Text(_peerName, textAlign: TextAlign.center, style: AppTextStyles.display(fontSize: 30, color: AppColors.onEmberStrong, height: 1.1)),
-                      const SizedBox(height: 8),
-                      AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 180),
-                        child: Text(
-                          _status,
-                          key: ValueKey('$_stage${call?.phase}'),
-                          style: const TextStyle(fontSize: 15, color: AppColors.onEmberMuted, fontFeatures: [FontFeature.tabularFigures()]),
+                  // Scrolls instead of overflowing on short phones or with
+                  // large system text.
+                  child: LayoutBuilder(
+                    builder: (context, box) => SingleChildScrollView(
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(minHeight: box.maxHeight),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            _Portrait(initials: _initialsOf(_peerName), breath: _breath),
+                            const SizedBox(height: 22),
+                            Text(
+                              _peerName,
+                              textAlign: TextAlign.center,
+                              style: AppTextStyles.display(fontSize: 30, color: AppColors.onEmberStrong, height: 1.1),
+                            ),
+                            const SizedBox(height: 8),
+                            AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 180),
+                              child: Row(
+                                key: ValueKey('$_stage${call?.phase}'),
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  _statusMark(call),
+                                  const SizedBox(width: 8),
+                                  Flexible(
+                                    child: Text(
+                                      _status,
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(fontSize: 15, color: AppColors.onEmberMuted, fontFeatures: [FontFeature.tabularFigures()]),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                              future: _request,
+                              builder: (context, snap) {
+                                final r = snap.data?.data();
+                                if (r == null) return const SizedBox(height: 28);
+                                final place = (r['location_label'] as String? ?? '').split(',').first.trim();
+                                return _ContextChip(text: '${r['blood_group'] ?? ''} request${place.isEmpty ? '' : ' · $place'}');
+                              },
+                            ),
+                            AnimatedSize(
+                              duration: const Duration(milliseconds: 220),
+                              curve: Curves.easeOutCubic,
+                              child: _showHint && live ? _ringingHint() : const SizedBox(width: double.infinity),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                        future: _request,
-                        builder: (context, snap) {
-                          final r = snap.data?.data();
-                          if (r == null) return const SizedBox(height: 28);
-                          final place = (r['location_label'] as String? ?? '').split(',').first.trim();
-                          return _ContextChip(text: '${r['blood_group'] ?? ''} request${place.isEmpty ? '' : ' · $place'}');
-                        },
-                      ),
-                      AnimatedSize(
-                        duration: const Duration(milliseconds: 220),
-                        curve: Curves.easeOutCubic,
-                        child: _showHint && live ? _ringingHint() : const SizedBox(width: double.infinity),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
                 if (_stage == _Stage.noAnswer || _stage == _Stage.failed) _afterActions() else _liveControls(),
@@ -363,24 +343,45 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
     );
   }
 
+  /// A small mark that says which state the call is in at a glance:
+  /// spinner while connecting, outgoing phone while ringing, a green dot
+  /// once live, a missed/alert icon when it didn't connect.
+  Widget _statusMark(ActiveCall? call) {
+    const size = 15.0;
+    switch (_stage) {
+      case _Stage.starting:
+        return const SizedBox(width: 13, height: 13, child: CircularProgressIndicator(strokeWidth: 1.6, color: AppColors.onEmberAccent));
+      case _Stage.failed:
+        return const Icon(LucideIcons.circleAlert, size: size, color: AppColors.onEmberAccent);
+      case _Stage.noAnswer:
+        return const Icon(LucideIcons.phoneMissed, size: size, color: AppColors.onEmberAccent);
+      case _Stage.live:
+        break;
+    }
+    return switch (call!.phase) {
+      CallPhase.connecting => const SizedBox(width: 13, height: 13, child: CircularProgressIndicator(strokeWidth: 1.6, color: AppColors.onEmberAccent)),
+      CallPhase.ringing => const Icon(LucideIcons.phoneOutgoing, size: size, color: AppColors.onEmberAccent),
+      CallPhase.active => Container(
+        width: 8,
+        height: 8,
+        decoration: const BoxDecoration(color: AppColors.onEmberSuccess, shape: BoxShape.circle),
+      ),
+      CallPhase.ended => const Icon(LucideIcons.phoneOff, size: size, color: AppColors.onEmberFaint),
+    };
+  }
+
   Widget _ringingHint() => Padding(
-        padding: const EdgeInsets.fromLTRB(32, 22, 32, 0),
-        child: Column(
-          children: [
-            Text(
-              '$_firstName may not have Rakta Bandhan open. Calls ring only while the app is open.',
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 12.5, color: AppColors.onEmberFaint, height: 1.45),
-            ),
-            if (widget.peerPhone.isNotEmpty)
-              TextButton.icon(
-                onPressed: _callPhone,
-                icon: const Icon(LucideIcons.phone, size: 14, color: AppColors.onEmber),
-                label: const Text('Call their phone instead', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.onEmber)),
-              ),
-          ],
+    padding: const EdgeInsets.fromLTRB(32, 22, 32, 0),
+    child: Column(
+      children: [
+        Text(
+          '$_firstName hasn’t picked up yet. If they don’t answer, you can leave them a message.',
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 12.5, color: AppColors.onEmberFaint, height: 1.45),
         ),
-      );
+      ],
+    ),
+  );
 
   Widget _liveControls() {
     final call = _call;
@@ -404,12 +405,7 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
                 active: call?.muted ?? false,
                 onTap: enabled ? call.toggleMute : null,
               ),
-              _RoundControl(
-                icon: LucideIcons.volume2,
-                label: 'Speaker',
-                active: call?.speakerOn ?? false,
-                onTap: enabled ? call.toggleSpeaker : null,
-              ),
+              _RoundControl(icon: LucideIcons.volume2, label: 'Speaker', active: call?.speakerOn ?? false, onTap: enabled ? call.toggleSpeaker : null),
               _RoundControl(icon: LucideIcons.messageSquare, label: 'Message', active: false, onTap: _openChat),
             ],
           ),
@@ -430,7 +426,11 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (_failure != null) ...[
-            Text(_failure!, textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, color: AppColors.onEmberMuted, height: 1.45)),
+            Text(
+              _failure!,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 13, color: AppColors.onEmberMuted, height: 1.45),
+            ),
             const SizedBox(height: 16),
           ] else ...[
             Text(
@@ -447,28 +447,20 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
             label: Text('Message $_firstName', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
           ),
           const SizedBox(height: 10),
-          Row(
-            children: [
-              if (widget.requestId != null)
-                Expanded(
-                  child: OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(foregroundColor: AppColors.onEmber, side: const BorderSide(color: AppColors.onEmberOutline)),
-                    onPressed: _place,
-                    icon: const Icon(LucideIcons.phone, size: 15),
-                    label: const Text('Call again'),
-                  ),
-                ),
-              if (widget.requestId != null && widget.peerPhone.isNotEmpty) const SizedBox(width: 10),
-              if (widget.peerPhone.isNotEmpty)
-                Expanded(
-                  child: OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(foregroundColor: AppColors.onEmber, side: const BorderSide(color: AppColors.onEmberOutline)),
-                    onPressed: _callPhone,
-                    icon: const Icon(LucideIcons.smartphone, size: 15),
-                    label: const Text('Their phone'),
-                  ),
-                ),
-            ],
+          if (widget.requestId != null)
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.onEmber,
+                side: const BorderSide(color: AppColors.onEmberOutline),
+              ),
+              onPressed: _place,
+              icon: const Icon(LucideIcons.phone, size: 15),
+              label: const Text('Call again in the app'),
+            ),
+          const SizedBox(height: 4),
+          TextButton(
+            onPressed: () => Navigator.of(context).maybePop(),
+            child: const Text('Close', style: TextStyle(fontSize: 14, color: AppColors.onEmberFaint)),
           ),
         ],
       ),
@@ -499,13 +491,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> with SingleTick
   void initState() {
     super.initState();
     AlertSound.incomingCall.start();
-    _sub = FirebaseFirestore.instance
-        .collection('requests')
-        .doc(incoming.requestId)
-        .collection('calls')
-        .doc(incoming.callId)
-        .snapshots()
-        .listen((snap) {
+    _sub = FirebaseFirestore.instance.collection('requests').doc(incoming.requestId).collection('calls').doc(incoming.callId).snapshots().listen((snap) {
       final status = snap.data()?['status'];
       if (status != 'ringing' && !_busy && mounted) {
         AlertSound.incomingCall.stop();
@@ -580,7 +566,11 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> with SingleTick
                     children: [
                       _Portrait(initials: _initialsOf(incoming.callerName), breath: _breath),
                       const SizedBox(height: 22),
-                      Text(incoming.callerName, textAlign: TextAlign.center, style: AppTextStyles.display(fontSize: 30, color: AppColors.onEmberStrong, height: 1.1)),
+                      Text(
+                        incoming.callerName,
+                        textAlign: TextAlign.center,
+                        style: AppTextStyles.display(fontSize: 30, color: AppColors.onEmberStrong, height: 1.1),
+                      ),
                       const SizedBox(height: 8),
                       const Text('Incoming voice call', style: TextStyle(fontSize: 15, color: AppColors.onEmberMuted)),
                     ],
@@ -618,17 +608,17 @@ class _EmberField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        width: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment(-0.25, -1),
-            end: Alignment(0.25, 1),
-            colors: [AppColors.gradientEmberStart, AppColors.gradientEmberMid, AppColors.gradientEmberEnd],
-            stops: [0, 0.6, 1],
-          ),
-        ),
-        child: child,
-      );
+    width: double.infinity,
+    decoration: const BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment(-0.25, -1),
+        end: Alignment(0.25, 1),
+        colors: [AppColors.gradientEmberStart, AppColors.gradientEmberMid, AppColors.gradientEmberEnd],
+        stops: [0, 0.6, 1],
+      ),
+    ),
+    child: child,
+  );
 }
 
 class _TrustLine extends StatelessWidget {
@@ -636,16 +626,13 @@ class _TrustLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(LucideIcons.lock, size: 12, color: AppColors.onEmber.withValues(alpha: 0.55)),
-          const SizedBox(width: 6),
-          Text(
-            'Rakta Bandhan call · encrypted, never recorded',
-            style: TextStyle(fontSize: 11.5, color: AppColors.onEmber.withValues(alpha: 0.55)),
-          ),
-        ],
-      );
+    mainAxisAlignment: MainAxisAlignment.center,
+    children: [
+      Icon(LucideIcons.lock, size: 12, color: AppColors.onEmber.withValues(alpha: 0.55)),
+      const SizedBox(width: 6),
+      Text('Rakta Bandhan call · encrypted, never recorded', style: TextStyle(fontSize: 11.5, color: AppColors.onEmber.withValues(alpha: 0.55))),
+    ],
+  );
 }
 
 /// The other person's disc inside the product's ring geometry. While the
@@ -687,14 +674,19 @@ class _ContextChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.07),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12.5, color: AppColors.onEmberMuted)),
-      );
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+    decoration: BoxDecoration(
+      color: Colors.white.withValues(alpha: 0.07),
+      border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+      borderRadius: BorderRadius.circular(999),
+    ),
+    child: Text(
+      text,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: const TextStyle(fontSize: 12.5, color: AppColors.onEmberMuted),
+    ),
+  );
 }
 
 class _RoundControl extends StatelessWidget {
@@ -721,10 +713,7 @@ class _RoundControl extends StatelessWidget {
               curve: Curves.easeOut,
               width: 62,
               height: 62,
-              decoration: BoxDecoration(
-                color: active ? AppColors.onEmber : Colors.white.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
+              decoration: BoxDecoration(color: active ? AppColors.onEmber : Colors.white.withValues(alpha: 0.1), shape: BoxShape.circle),
               alignment: Alignment.center,
               child: Icon(icon, size: 22, color: active ? AppColors.gradientEmberMid : AppColors.onEmber),
             ),
@@ -743,21 +732,21 @@ class _EndButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Pressable(
-        onTap: onTap,
-        semanticLabel: 'End call',
-        pressedScale: 0.94,
-        child: Container(
-          width: 72,
-          height: 72,
-          decoration: BoxDecoration(
-            color: onTap == null ? AppColors.red800 : AppColors.brandRed,
-            shape: BoxShape.circle,
-            boxShadow: const [BoxShadow(color: AppColors.shadowDark, blurRadius: 18, offset: Offset(0, 6))],
-          ),
-          alignment: Alignment.center,
-          child: const Icon(LucideIcons.phoneOff, size: 26, color: Colors.white),
-        ),
-      );
+    onTap: onTap,
+    semanticLabel: 'End call',
+    pressedScale: 0.94,
+    child: Container(
+      width: 72,
+      height: 72,
+      decoration: BoxDecoration(
+        color: onTap == null ? AppColors.red800 : AppColors.brandRed,
+        shape: BoxShape.circle,
+        boxShadow: const [BoxShadow(color: AppColors.shadowDark, blurRadius: 18, offset: Offset(0, 6))],
+      ),
+      alignment: Alignment.center,
+      child: const Icon(LucideIcons.phoneOff, size: 26, color: Colors.white),
+    ),
+  );
 }
 
 class _AnswerButton extends StatelessWidget {
@@ -770,22 +759,22 @@ class _AnswerButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Pressable(
-        onTap: onTap,
-        semanticLabel: label,
-        pressedScale: 0.94,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-              alignment: Alignment.center,
-              child: Icon(icon, size: 26, color: Colors.white),
-            ),
-            const SizedBox(height: 10),
-            Text(label, style: const TextStyle(fontSize: 13, color: AppColors.onEmberMuted)),
-          ],
+    onTap: onTap,
+    semanticLabel: label,
+    pressedScale: 0.94,
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 72,
+          height: 72,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          alignment: Alignment.center,
+          child: Icon(icon, size: 26, color: Colors.white),
         ),
-      );
+        const SizedBox(height: 10),
+        Text(label, style: const TextStyle(fontSize: 13, color: AppColors.onEmberMuted)),
+      ],
+    ),
+  );
 }

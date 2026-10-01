@@ -86,7 +86,7 @@ class DonorFoundScreen extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        ContactActions(requestId: requestId, peerUid: donor.uid, peerName: donor.name, peerPhone: donor.phone),
+                        ContactActions(requestId: requestId, peerUid: donor.uid, peerName: donor.name),
                         const SizedBox(height: 6),
                         const Text('They mark it as donated afterwards.', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: AppColors.onEmberFaint)),
                         TextButton(

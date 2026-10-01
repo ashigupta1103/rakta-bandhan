@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../services/emergency_contact_service.dart';
+import '../services/phone_privacy.dart';
 import '../theme/app_colors.dart';
 import '../widgets/loading_button.dart';
 import '../widgets/state_card.dart';
@@ -55,7 +56,6 @@ class _EmergencyContactScreenState extends State<EmergencyContactScreen> {
       if (contact != null) {
         _nameController.text = contact.name;
         _relationshipController.text = contact.relationship;
-        _phoneController.text = contact.phone;
       }
     });
   }
@@ -66,8 +66,10 @@ class _EmergencyContactScreenState extends State<EmergencyContactScreen> {
 
     setState(() {
       _nameError = name.isEmpty ? 'Enter a name' : null;
-      _phoneError = phone.isEmpty
+      _phoneError = phone.isEmpty && _contact == null
           ? 'Enter a phone number'
+          : phone.isEmpty
+              ? null
           : (phone.length != 10 || !RegExp(r'^[0-9]+$').hasMatch(phone))
               ? 'Enter a valid 10-digit number'
               : null;
@@ -78,7 +80,8 @@ class _EmergencyContactScreenState extends State<EmergencyContactScreen> {
     final contact = EmergencyContact(
       name: name,
       relationship: _relationshipController.text.trim(),
-      phone: phone,
+      // Left empty while editing = keep the saved number (never re-shown).
+      phone: phone.isEmpty ? _contact!.phone : phone,
     );
     await _service.save(contact);
     if (!mounted) return;
@@ -194,7 +197,7 @@ class _EmergencyContactScreenState extends State<EmergencyContactScreen> {
                   ),
                   const SizedBox(width: 12),
                   Text(
-                    contact.phone,
+                    maskPhone(contact.phone),
                     style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm),
                   ),
                 ],
@@ -251,7 +254,10 @@ class _EmergencyContactScreenState extends State<EmergencyContactScreen> {
         TextField(
           controller: _phoneController,
           keyboardType: TextInputType.phone,
-          decoration: InputDecoration(hintText: '10-digit number', errorText: _phoneError),
+          decoration: InputDecoration(
+            hintText: _contact == null ? '10-digit number' : 'New number, or leave empty to keep ${maskPhone(_contact!.phone)}',
+            errorText: _phoneError,
+          ),
         ),
         const SizedBox(height: 24),
         LoadingButton(

@@ -2,21 +2,29 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../services/backend.dart';
+import '../services/maps_link.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
+import '../theme/app_theme.dart';
+import '../widgets/app_header.dart';
 import '../widgets/blood_group_droplet.dart';
+import '../widgets/brand_glyph.dart';
 import '../widgets/confirm_sheet.dart';
-import '../widgets/dashed_border.dart';
 import '../widgets/messages_button.dart';
-import '../widgets/state_card.dart';
-import '../widgets/status_badge.dart';
+import '../widgets/rb_ui.dart';
 import 'cancel_confirm_screen.dart';
 import 'chat_screen.dart';
 import 'create_request_screen.dart';
 import 'match_contact_screen.dart';
+import 'notifications_screen.dart';
 import 'request_detail_screen.dart';
 import 'tracking_screen.dart';
 
+/// Request tab. "Near you": compatible open requests around the donor's
+/// registered area, most urgent first, plus any request this donor has
+/// accepted. "Yours": requests this user raised. Every card reads the same
+/// way — urgency and group, the place (tap to open it in Google Maps),
+/// distance · age · units — with one dominant action.
 class RequestsScreen extends StatefulWidget {
   const RequestsScreen({super.key});
 
@@ -24,12 +32,32 @@ class RequestsScreen extends StatefulWidget {
   State<RequestsScreen> createState() => _RequestsScreenState();
 }
 
+enum _Tab { nearby, yours }
+
 class _RequestsScreenState extends State<RequestsScreen> {
-  String _activeTab = 'My requests';
+  _Tab _tab = _Tab.nearby;
   String? _myBloodGroup;
-  // Requests near the donor's registered area — created once, so a rebuild
-  // doesn't tear down and re-bill the geohash listeners.
+  double? _myLat;
+  double? _myLng;
+  bool _profileLoaded = false;
+  // Created once, so a rebuild doesn't tear down and re-bill the listeners;
+  // recreated by [_resubscribe] because a Firestore stream is finished
+  // after an error (a bare setState would retry against a dead stream).
   Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>>? _nearbyOpen;
+  Stream<QuerySnapshot<Map<String, dynamic>>> _mine = Backend.instance.myRequestsStream();
+  Stream<QuerySnapshot<Map<String, dynamic>>> _accepted = _acceptedStream();
+
+  static Stream<QuerySnapshot<Map<String, dynamic>>> _acceptedStream() => FirebaseFirestore.instance
+      .collection('requests')
+      .where('matched_donor_id', isEqualTo: Backend.instance.currentUser?.uid)
+      .where('status', isEqualTo: 'matched')
+      .snapshots();
+
+  void _resubscribe() => setState(() {
+        _mine = Backend.instance.myRequestsStream();
+        _accepted = _acceptedStream();
+        if (_myLat != null && _myLng != null) _nearbyOpen = Backend.instance.openRequestsNearStream(_myLat!, _myLng!);
+      });
 
   @override
   void initState() {
@@ -40,52 +68,54 @@ class _RequestsScreenState extends State<RequestsScreen> {
       final lat = (data?['lat'] as num?)?.toDouble();
       final lng = (data?['lng'] as num?)?.toDouble();
       setState(() {
+        _profileLoaded = true;
         _myBloodGroup = data?['blood_group'] as String?;
+        _myLat = lat;
+        _myLng = lng;
         if (lat != null && lng != null) _nearbyOpen = Backend.instance.openRequestsNearStream(lat, lng);
       });
+    }).catchError((_) {
+      if (mounted) setState(() => _profileLoaded = true);
     });
   }
 
-  Color _getStatusBg(String status) {
-    switch (status) {
-      case 'open':
-        return AppColors.statusUrgentBg;
-      case 'matched':
-        return AppColors.statusPendingBg;
-      case 'fulfilled':
-        return AppColors.statusAvailableBg;
-      default:
-        return AppColors.cardBorderWarm;
-    }
+  // ------------------------------------------------------------- helpers
+
+  static const _urgencyRank = {'critical': 0, 'urgent': 1};
+
+  static String _ago(Object? ts) {
+    if (ts is! Timestamp) return '';
+    final d = DateTime.now().difference(ts.toDate());
+    if (d.inMinutes < 1) return 'just now';
+    if (d.inMinutes < 60) return '${d.inMinutes} min ago';
+    if (d.inHours < 24) return '${d.inHours} h ago';
+    if (d.inDays == 1) return 'yesterday';
+    return '${d.inDays} d ago';
   }
 
-  Color _getStatusText(String status) {
-    switch (status) {
-      case 'open':
-        return AppColors.statusUrgentText;
-      case 'matched':
-        return AppColors.statusPendingText;
-      case 'fulfilled':
-        return AppColors.statusAvailableText;
-      default:
-        return AppColors.textPrimaryWarm;
-    }
+  static String _units(Object? n) {
+    final v = (n as num?)?.toInt() ?? 1;
+    return v == 1 ? '1 unit' : '$v units';
   }
 
-  String _statusLabel(String status) {
-    switch (status) {
-      case 'open':
-        return 'Open';
-      case 'matched':
-        return 'Matched';
-      case 'fulfilled':
-        return 'Completed';
-      case 'cancelled':
-        return 'Cancelled';
-      case 'expired':
-        return 'Expired';
-      default:
-        return status;
+  double? _distanceTo(Map<String, dynamic> r) {
+    final lat = (r['lat'] as num?)?.toDouble();
+    final lng = (r['lng'] as num?)?.toDouble();
+    if (_myLat == null || _myLng == null || lat == null || lng == null) return null;
+    return distanceKm(_myLat!, _myLng!, lat, lng);
+  }
+
+  static String _km(double d) => d < 1 ? 'under 1 km' : '${d.toStringAsFixed(1)} km';
+
+  void _open(Widget screen) => Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
+
+  Future<void> _openPlace(Map<String, dynamic> r) async {
+    final lat = (r['lat'] as num?)?.toDouble();
+    final lng = (r['lng'] as num?)?.toDouble();
+    if (lat == null || lng == null) return;
+    final ok = await openInMaps(lat, lng);
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Couldn’t open Google Maps on this device.')));
     }
   }
 
@@ -105,127 +135,100 @@ class _RequestsScreenState extends State<RequestsScreen> {
       return;
     }
     if (!mounted) return;
-    Navigator.push(context, MaterialPageRoute(builder: (context) => CancelConfirmScreen(requestId: requestId)));
+    _open(CancelConfirmScreen(requestId: requestId));
   }
+
+  // ------------------------------------------------------------- build
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.warmPageBackground,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        automaticallyImplyLeading: false,
-        title: const Text('Blood requests', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500, color: AppColors.textPrimaryWarm)),
-        centerTitle: true,
-        actions: const [MessagesButton(), SizedBox(width: 6)],
+      appBar: AppHeader(
+        title: 'Requests',
+        primaryAction: const MessagesButton(),
+        onNotificationTap: () => _open(const NotificationsScreen()),
       ),
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
-              padding: const EdgeInsets.all(4.0),
-              decoration: BoxDecoration(color: AppColors.tabTrackBackground, borderRadius: BorderRadius.circular(24)),
-              child: Row(
-                children: [
-                  Expanded(child: _tabButton('My requests')),
-                  Expanded(child: _tabButton('Received')),
-                ],
+      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: _mine,
+        builder: (context, mineSnap) {
+          // Cancelled requests are finished business for the requester.
+          final mine = mineSnap.data?.docs.where((d) => d.data()['status'] != 'cancelled').toList();
+          final activeMine = mine?.where((d) => d.data()['status'] == 'open' || d.data()['status'] == 'matched').length ?? 0;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _tabRow(activeMine),
+              Expanded(
+                child: _tab == _Tab.nearby
+                    ? _nearbyList()
+                    : mineSnap.hasError
+                        ? _error(_resubscribe)
+                        : _yoursList(mine),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
-              child: _createRequestCta(),
-            ),
-            Expanded(child: _activeTab == 'Received' ? _receivedList() : _myRequestsList()),
-          ],
-        ),
+            ],
+          );
+        },
       ),
     );
   }
 
-  Widget _tabButton(String label) {
-    final isActive = _activeTab == label;
-    return GestureDetector(
-      onTap: () => setState(() => _activeTab = label),
-      child: Container(
-        alignment: Alignment.center,
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        decoration: BoxDecoration(color: isActive ? AppColors.primary : Colors.transparent, borderRadius: BorderRadius.circular(20)),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 13.5,
-            color: isActive ? AppColors.whiteTextOnPrimary : AppColors.textSecondary,
-            fontWeight: isActive ? FontWeight.w500 : FontWeight.normal,
-          ),
-        ),
-      ),
-    );
-  }
+  Widget _tabRow(int yoursCount) => RbTabBar(
+        tabs: [('Near you', 0), ('Yours', yoursCount)],
+        selected: _tab.index,
+        onChanged: (i) => setState(() => _tab = _Tab.values[i]),
+      );
 
-  Widget _receivedList() {
-    if (_myBloodGroup == null) {
-      return const Center(child: CircularProgressIndicator(strokeWidth: 2));
-    }
-    final compatible = Backend.instance.compatibleRecipientGroups(_myBloodGroup!);
+  // ------------------------------------------------------------- Near you
+
+  Widget _nearbyList() {
+    if (!_profileLoaded) return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+    final compatible = _myBloodGroup == null ? const <String>[] : Backend.instance.compatibleRecipientGroups(_myBloodGroup!);
     final myUid = Backend.instance.currentUser?.uid;
 
     return StreamBuilder<List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
       stream: _nearbyOpen ?? Stream.value(const []),
-      builder: (context, openSnapshot) {
+      builder: (context, openSnap) {
         return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-          stream: FirebaseFirestore.instance
-              .collection('requests')
-              .where('matched_donor_id', isEqualTo: myUid)
-              .where('status', isEqualTo: 'matched')
-              .snapshots(),
-          builder: (context, matchedSnapshot) {
-            if (!openSnapshot.hasData || !matchedSnapshot.hasData) {
-              return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+          stream: _accepted,
+          builder: (context, acceptedSnap) {
+            if (openSnap.hasError || acceptedSnap.hasError) return _error(_resubscribe);
+            if (!openSnap.hasData || !acceptedSnap.hasData) return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+            final open = openSnap.data!.where((d) => d.data()['requester_uid'] != myUid && compatible.contains(d.data()['blood_group'])).toList();
+            for (final d in open) {
+              // Lazy stand-in for expiry — a no-op unless genuinely past due.
+              Backend.instance.expireIfStale(d.id, d.data());
             }
-            final openDocs = openSnapshot.data!
-                .where((d) => d.data()['requester_uid'] != myUid && compatible.contains(d.data()['blood_group']))
-                .toList();
-            final matchedDocs = matchedSnapshot.data!.docs;
-
-            if (openDocs.isEmpty && matchedDocs.isEmpty) {
-              return Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: StateCard(
-                    icon: LucideIcons.inbox,
-                    iconBackground: AppColors.statusAvailableBg,
-                    iconColor: AppColors.statusAvailableText,
-                    title: 'No blood requests right now.',
-                    message: 'When someone nearby needs your blood group, their request will appear here.',
-                  ),
-                ),
-              );
-            }
+            open.sort((a, b) {
+              final ua = _urgencyRank[a.data()['urgency']] ?? 2;
+              final ub = _urgencyRank[b.data()['urgency']] ?? 2;
+              if (ua != ub) return ua.compareTo(ub);
+              return (_distanceTo(a.data()) ?? double.infinity).compareTo(_distanceTo(b.data()) ?? double.infinity);
+            });
+            final accepted = acceptedSnap.data!.docs;
 
             return ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
               children: [
-                if (openDocs.isNotEmpty) ...[
-                  _sectionLabel('Open requests you can fulfil'),
-                  const SizedBox(height: 10),
-                  for (final doc in openDocs) ...[
-                    _requestCard(doc.id, doc.data(), primaryAction: _CardAction.viewDetail),
-                    const SizedBox(height: 12),
-                  ],
+                if (accepted.isNotEmpty) ...[
+                  _sectionLabel('You’ve accepted'),
+                  for (final doc in accepted) ...[_acceptedCard(doc.id, doc.data()), const SizedBox(height: 12)],
+                  const SizedBox(height: 8),
                 ],
-                if (matchedDocs.isNotEmpty) ...[
-                  if (openDocs.isNotEmpty) const SizedBox(height: 6),
-                  _sectionLabel("You've accepted"),
-                  const SizedBox(height: 10),
-                  for (final doc in matchedDocs) ...[
-                    _requestCard(doc.id, doc.data(), primaryAction: _CardAction.viewContact),
-                    const SizedBox(height: 12),
-                  ],
-                ],
+                if (open.isEmpty && accepted.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: 16),
+                    child: RbStatePanel(
+                      icon: LucideIcons.inbox,
+                      tone: GlyphTone.success,
+                      title: 'No requests near you right now',
+                      message: 'When someone nearby needs your blood group, their request appears here and you’ll get a notification.',
+                    ),
+                  ),
+                if (open.isNotEmpty) _sectionLabel('${open.length} ${open.length == 1 ? 'request' : 'requests'} you can help with'),
+                for (final doc in open) ...[_nearbyCard(doc.id, doc.data()), const SizedBox(height: 12)],
+                const SizedBox(height: 8),
+                _createRequestCta(),
               ],
             );
           },
@@ -234,116 +237,162 @@ class _RequestsScreenState extends State<RequestsScreen> {
     );
   }
 
-  Widget _myRequestsList() {
-    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: Backend.instance.myRequestsStream(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator(strokeWidth: 2));
-        }
-        // A cancelled request is finished business from the requester's
-        // side — it stays in Firestore (the matched donor's feed still
-        // reports it) but is no longer listed here.
-        final docs = snapshot.data!.docs.where((d) => d.data()['status'] != 'cancelled').toList();
-        if (docs.isEmpty) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: StateCard.empty(title: "You haven't sent any requests yet.", icon: LucideIcons.clipboardList),
-            ),
-          );
-        }
-        return ListView.separated(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-          itemCount: docs.length,
-          separatorBuilder: (context, index) => const SizedBox(height: 12),
-          itemBuilder: (context, index) => _requestCard(docs[index].id, docs[index].data(), primaryAction: _CardAction.track),
-        );
-      },
-    );
-  }
-
-  Widget _createRequestCta() {
-    return GestureDetector(
-      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const CreateRequestScreen())),
-      child: CustomPaint(
-        painter: const DashedRRectPainter(color: AppColors.cardBorderWarm, radius: 20),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
-          child: Row(
-            children: [
-              Transform.rotate(
-                angle: -0.785398,
-                child: Container(
-                  width: 42,
-                  height: 42,
-                  decoration: const BoxDecoration(
-                    color: AppColors.red100,
-                    borderRadius: BorderRadius.only(topLeft: Radius.circular(21), topRight: Radius.circular(21), bottomRight: Radius.circular(21)),
-                  ),
-                  alignment: Alignment.center,
-                  child: Transform.rotate(angle: 0.785398, child: const Icon(LucideIcons.plus, size: 18, color: AppColors.brandRed)),
-                ),
-              ),
-              const SizedBox(width: 13),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Need blood yourself?', style: AppTextStyles.display(fontSize: 17, color: AppColors.textPrimaryWarm)),
-                    const SizedBox(height: 2),
-                    const Text('Alert nearby compatible donors in under a minute', style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary)),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
+  Widget _nearbyCard(String id, Map<String, dynamic> r) {
+    final distance = _distanceTo(r);
+    return _card(
+      urgency: r['urgency'] as String?,
+      bloodGroup: r['blood_group'] as String? ?? '',
+      request: r,
+      meta: [if (distance != null) _km(distance), _ago(r['created_at']), _units(r['units_needed'])],
+      action: ElevatedButton(
+        onPressed: () => _open(RequestDetailScreen(requestId: id)),
+        child: const Text('See request & help'),
       ),
     );
   }
 
-  Widget _messageButton(String requestId) => OutlinedButton.icon(
-        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => ChatScreen(requestId: requestId))),
-        icon: const Icon(LucideIcons.messageSquare, size: 15),
-        label: const Text('Message'),
-      );
+  /// A request this donor accepted — the counterpart shown is the
+  /// requester, never the donor's own name.
+  Widget _acceptedCard(String id, Map<String, dynamic> r) {
+    final requester = (r['requester_name'] as String?)?.trim();
+    final waitingOnThem = r['donor_confirmed_at'] != null;
+    return _card(
+      urgency: r['urgency'] as String?,
+      bloodGroup: r['blood_group'] as String? ?? '',
+      request: r,
+      statusLabel: waitingOnThem ? 'Waiting for the requester to confirm' : 'You accepted',
+      subtitle: requester == null || requester.isEmpty ? null : 'For $requester',
+      meta: [_ago(r['matched_at'] ?? r['created_at']), _units(r['units_needed'])],
+      action: Row(
+        children: [
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: () => _open(MatchContactScreen(requestId: id)),
+              icon: const Icon(LucideIcons.phone, size: 16),
+              label: const Text('Contact & confirm'),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: () => _open(ChatScreen(requestId: id)),
+              icon: const Icon(LucideIcons.messageSquare, size: 15),
+              label: const Text('Message'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-  Widget _sectionLabel(String text) {
-    return Row(
+  // ------------------------------------------------------------- Yours
+
+  Widget _yoursList(List<QueryDocumentSnapshot<Map<String, dynamic>>>? docs) {
+    if (docs == null) return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+    for (final d in docs) {
+      Backend.instance.expireIfStale(d.id, d.data());
+    }
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
       children: [
-        Container(width: 4, height: 14, decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(2))),
-        const SizedBox(width: 7),
-        Text(text, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
+        _createRequestCta(),
+        const SizedBox(height: 18),
+        if (docs.isEmpty)
+          const RbStatePanel(
+            icon: LucideIcons.clipboardList,
+            title: 'No requests yet',
+            message: 'Requests you raise appear here, with their status and who accepted them.',
+          )
+        else
+          for (final doc in docs) ...[_yoursCard(doc.id, doc.data()), const SizedBox(height: 12)],
       ],
     );
   }
 
-  Widget _requestCard(String requestId, Map<String, dynamic> request, {required _CardAction primaryAction}) {
-    // Lazy stand-in for the Blaze-only expireOldRequests scheduled
-    // function — no-op unless this doc is genuinely open and past due.
-    Backend.instance.expireIfStale(requestId, request);
-    final status = request['status'] as String? ?? 'open';
-    final bloodGroup = request['blood_group'] as String? ?? '';
-    final units = (request['units_needed'] as num?)?.toInt() ?? 1;
-    final locationLabel = Backend.shortPlace(request['location_label'] as String?, fallback: '$units ${units == 1 ? 'unit' : 'units'} needed');
+  Widget _yoursCard(String id, Map<String, dynamic> r) {
+    final status = r['status'] as String? ?? 'open';
+    final donor = (r['matched_donor_name'] as String?)?.trim();
+    final (label, live) = switch (status) {
+      'open' => ('Searching for a donor', true),
+      'matched' => (r['requester_confirmed_at'] != null
+          ? 'Waiting for the donor to confirm'
+          : r['donor_confirmed_at'] != null
+              ? 'Donor says they’ve donated — please confirm'
+              : (donor == null || donor.isEmpty ? 'Donor found' : '$donor accepted'), true),
+      'fulfilled' => ('Completed', false),
+      'expired' => ('Expired — no donor in time', false),
+      _ => (status, false),
+    };
+    return _card(
+      urgency: r['urgency'] as String?,
+      bloodGroup: r['blood_group'] as String? ?? '',
+      request: r,
+      statusLabel: label,
+      muted: !live,
+      meta: [_ago(r['created_at']), _units(r['units_needed'])],
+      action: live
+          ? Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _open(TrackingScreen(requestId: id)),
+                    icon: const Icon(LucideIcons.route, size: 16),
+                    label: const Text('Track request'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: status == 'open'
+                      ? OutlinedButton(
+                          style: OutlinedButton.styleFrom(foregroundColor: AppColors.red700, side: const BorderSide(color: AppColors.red200)),
+                          onPressed: () => _cancel(id),
+                          child: const Text('Cancel'),
+                        )
+                      : OutlinedButton.icon(
+                          onPressed: () => _open(ChatScreen(requestId: id)),
+                          icon: const Icon(LucideIcons.messageSquare, size: 15),
+                          label: const Text('Message'),
+                        ),
+                ),
+              ],
+            )
+          : OutlinedButton(onPressed: () => _open(TrackingScreen(requestId: id)), child: const Text('View details')),
+    );
+  }
 
-    final isMatched = status == 'matched' && request['matched_donor_phone'] != null;
+  // ------------------------------------------------------------- shared card
+
+  Widget _card({
+    required String? urgency,
+    required String bloodGroup,
+    required Map<String, dynamic> request,
+    required List<String> meta,
+    required Widget action,
+    String? statusLabel,
+    String? subtitle,
+    bool muted = false,
+  }) {
+    final critical = urgency == 'critical';
+    final urgent = urgency == 'urgent';
+    final edge = muted ? AppColors.warmBorder : (critical ? AppColors.brandRed : (urgent ? AppColors.vermilion : AppColors.warmBorder));
+    final place = Backend.shortPlace(request['location_label'] as String?, fallback: 'Location not given');
+    final hasPoint = request['lat'] is num && request['lng'] is num;
+    final metaText = meta.where((m) => m.isNotEmpty).join(' · ');
 
     return Container(
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.cardBorderWarm),
-        boxShadow: [BoxShadow(color: AppColors.shadowCard, blurRadius: 10, offset: const Offset(0, 3))],
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.warmBorder),
+        boxShadow: const [BoxShadow(color: AppColors.shadowCard, blurRadius: 16, offset: Offset(0, 6))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (isMatched) Container(height: 3, color: AppColors.warmGreenText),
+          Container(height: 4, color: edge),
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -352,79 +401,69 @@ class _RequestsScreenState extends State<RequestsScreen> {
                   children: [
                     BloodGroupDroplet(
                       label: bloodGroup,
-                      size: 38,
-                      filled: status != 'fulfilled' && status != 'expired',
-                      color: status == 'fulfilled'
-                          ? AppColors.statusAvailableBg
-                          : (status == 'expired' ? AppColors.dividerWarm : AppColors.primaryLightTint),
-                      textColor: status == 'fulfilled'
-                          ? AppColors.statusAvailableText
-                          : (status == 'expired' ? AppColors.textSecondary : AppColors.primary),
-                      fontSize: 12,
+                      size: 46,
+                      filled: true,
+                      color: muted ? AppColors.warmDivider : AppColors.brandRed,
+                      textColor: muted ? AppColors.ink2 : AppColors.onEmber,
+                      fontSize: 14,
+                      serif: true,
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 14),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          StatusBadge(label: _statusLabel(status), background: _getStatusBg(status), textColor: _getStatusText(status)),
-                          const SizedBox(height: 4),
-                          Text(
-                            locationLabel,
-                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                          Row(
+                            children: [
+                              _urgencyTag(urgency, muted),
+                              if (statusLabel != null) ...[
+                                const SizedBox(width: 8),
+                                Flexible(
+                                  child: Text(statusLabel, maxLines: 1, overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.ink2)),
+                                ),
+                              ],
+                            ],
                           ),
+                          const SizedBox(height: 6),
+                          // The place — tap to open it in Google Maps.
+                          Semantics(
+                            button: hasPoint,
+                            label: hasPoint ? 'Open $place in Google Maps' : null,
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(8),
+                              onTap: hasPoint ? () => _openPlace(request) : null,
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    child: Text(place, maxLines: 2, overflow: TextOverflow.ellipsis,
+                                        style: AppTextStyles.display(fontSize: 18, color: AppColors.ink, height: 1.25)),
+                                  ),
+                                  if (hasPoint)
+                                    const Padding(
+                                      padding: EdgeInsets.only(left: 8, top: 3),
+                                      child: Icon(LucideIcons.mapPinned, size: 17, color: AppColors.brandRed),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          if (subtitle != null) ...[
+                            const SizedBox(height: 2),
+                            Text(subtitle, style: const TextStyle(fontSize: 13, color: AppColors.ink2)),
+                          ],
+                          if (metaText.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Text(metaText, style: const TextStyle(fontSize: 13, color: AppColors.ink2)),
+                          ],
                         ],
                       ),
                     ),
                   ],
                 ),
-                if (isMatched) ...[
-                  Container(
-                    margin: const EdgeInsets.only(top: 14),
-                    padding: const EdgeInsets.only(top: 13),
-                    decoration: const BoxDecoration(border: Border(top: BorderSide(color: AppColors.dividerWarm))),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 32,
-                          height: 32,
-                          decoration: const BoxDecoration(color: AppColors.primaryLightTint, shape: BoxShape.circle),
-                          alignment: Alignment.center,
-                          child: Text(
-                            _initials(request['matched_donor_name'] as String? ?? '?'),
-                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primary),
-                          ),
-                        ),
-                        Container(width: 22, height: 1, color: AppColors.warmGreenText),
-                        Container(
-                          width: 32,
-                          height: 32,
-                          decoration: const BoxDecoration(color: AppColors.warmGreenBg, shape: BoxShape.circle),
-                          alignment: Alignment.center,
-                          child: const Icon(LucideIcons.check, size: 14, color: AppColors.warmGreenText),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            request['matched_donor_name'] as String? ?? '',
-                            style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const Icon(LucideIcons.phone, size: 15, color: AppColors.warmGreenText),
-                      ],
-                    ),
-                  ),
-                ],
-                if (status == 'expired') ...[
-                  const SizedBox(height: 10),
-                  _terminalNote('No donor found in time — matching stopped. You can create a new request.'),
-                ],
                 const SizedBox(height: 14),
-                _cardActions(requestId, status, primaryAction),
+                action,
               ],
             ),
           ),
@@ -433,62 +472,67 @@ class _RequestsScreenState extends State<RequestsScreen> {
     );
   }
 
-  String _initials(String name) {
-    final trimmed = name.trim();
-    if (trimmed.isEmpty) return '?';
-    return trimmed.split(RegExp(r'\s+')).take(2).map((w) => w[0].toUpperCase()).join();
-  }
-
-  Widget _terminalNote(String text) {
+  Widget _urgencyTag(String? urgency, bool muted) {
+    final (label, bg, fg) = switch (urgency) {
+      'critical' => ('Critical', AppColors.red100, AppColors.red700),
+      'urgent' => ('Urgent', AppColors.statusUrgentBg, AppColors.statusUrgentText),
+      _ => ('Normal', AppColors.warmDivider, AppColors.ink2),
+    };
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(color: AppColors.warmPageBackground, borderRadius: BorderRadius.circular(8)),
-      child: Text(text, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(color: muted ? AppColors.warmDivider : bg, borderRadius: BorderRadius.circular(6)),
+      child: Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: muted ? AppColors.ink2 : fg)),
     );
   }
 
-  Widget _cardActions(String requestId, String status, _CardAction primaryAction) {
-    switch (primaryAction) {
-      case _CardAction.viewDetail:
-        return ElevatedButton(
-          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => RequestDetailScreen(requestId: requestId))),
-          child: const Text('View request'),
-        );
-      case _CardAction.viewContact:
-        return Row(
-          children: [
-            Expanded(
-              child: ElevatedButton(
-                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => MatchContactScreen(requestId: requestId))),
-                child: const Text('Call or view'),
+  Widget _sectionLabel(String text) => Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Text(text, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.ink2)),
+      );
+
+  Widget _error(VoidCallback retry) => ListView(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+        children: [RbStatePanel.error(title: 'Couldn’t load requests', message: 'Check your connection and try again.', onRetry: retry)],
+      );
+
+  Widget _createRequestCta() {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(AppTheme.controlRadius),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppTheme.controlRadius),
+        onTap: () => _open(const CreateRequestScreen()),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppTheme.controlRadius),
+            border: Border.all(color: AppColors.warmBorder),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: const BoxDecoration(color: AppColors.red100, shape: BoxShape.circle),
+                alignment: Alignment.center,
+                child: const Icon(LucideIcons.plus, size: 18, color: AppColors.brandRed),
               ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(child: _messageButton(requestId)),
-          ],
-        );
-      case _CardAction.track:
-        return Row(
-          children: [
-            Expanded(
-              child: OutlinedButton(
-                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => TrackingScreen(requestId: requestId))),
-                child: const Text('Track status'),
-              ),
-            ),
-            if (status == 'open') ...[
-              const SizedBox(width: 8),
+              const SizedBox(width: 13),
               Expanded(
-                child: OutlinedButton(onPressed: () => _cancel(requestId), child: const Text('Cancel request')),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Need blood yourself?', style: AppTextStyles.display(fontSize: 17, color: AppColors.ink)),
+                    const SizedBox(height: 2),
+                    const Text('Alert compatible donors near the hospital', style: TextStyle(fontSize: 13, color: AppColors.ink2)),
+                  ],
+                ),
               ),
-            ] else if (status == 'matched') ...[
-              const SizedBox(width: 8),
-              Expanded(child: _messageButton(requestId)),
+              const Icon(LucideIcons.chevronRight, size: 18, color: AppColors.chevronMuted),
             ],
-          ],
-        );
-    }
+          ),
+        ),
+      ),
+    );
   }
 }
-
-enum _CardAction { viewDetail, viewContact, track }

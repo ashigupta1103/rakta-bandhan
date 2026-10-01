@@ -1,29 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../screens/call_screen.dart';
 import '../screens/chat_screen.dart';
 import '../services/backend.dart';
 import '../theme/app_colors.dart';
 
-/// The matched pair's ways to reach each other, in order of preference:
-/// an in-app voice call (no numbers exchanged), an in-app message, and —
-/// deliberately small — the phone number as a fallback for when the other
-/// person doesn't have the app open (in-app calls only ring while it is,
-/// until push is enabled on the Blaze plan). Sits on the ember field.
+/// The matched pair's ways to reach each other: an in-app voice call and an
+/// in-app message. Phone numbers are never shown or dialled — the in-app
+/// call rings their phone through a push notification. Sits on the ember
+/// field.
 class ContactActions extends StatelessWidget {
   final String requestId;
   final String peerUid;
   final String peerName;
-  final String peerPhone;
 
   const ContactActions({
     super.key,
     required this.requestId,
     required this.peerUid,
     required this.peerName,
-    required this.peerPhone,
   });
 
   Future<void> _call(BuildContext context) async {
@@ -35,15 +31,7 @@ class ContactActions extends StatelessWidget {
       peerUid: peerUid,
       peerName: peerName,
       myName: me?['name'] as String? ?? 'Rakta Bandhan user',
-      peerPhone: peerPhone,
     );
-  }
-
-  Future<void> _dial(BuildContext context) async {
-    final ok = await launchUrl(Uri(scheme: 'tel', path: peerPhone));
-    if (!ok && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not open the dialer. Their number is $peerPhone.')));
-    }
   }
 
   @override
@@ -65,16 +53,6 @@ class ContactActions extends StatelessWidget {
           icon: const Icon(LucideIcons.messageSquare, size: 15),
           label: const Text('Message'),
         ),
-        if (peerPhone.isNotEmpty) ...[
-          const SizedBox(height: 4),
-          TextButton(
-            onPressed: () => _dial(context),
-            child: Text(
-              'Or call from your phone · $peerPhone',
-              style: const TextStyle(fontSize: 12.5, color: AppColors.onEmberFaint, fontFeatures: [FontFeature.tabularFigures()]),
-            ),
-          ),
-        ],
       ],
     );
   }

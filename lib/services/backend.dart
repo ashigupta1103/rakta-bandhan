@@ -422,6 +422,36 @@ class Backend {
   /// Account deletion: the ID image document goes with the profile.
   Future<void> deleteMyIdProof() => _idProofRef(_uid).delete();
 
+  /// Profile photo, shown only on the owner's own My Page. Stored privately
+  /// at `avatars/{uid}/profile` (storage.rules: owner-only read/write, image,
+  /// < 2 MB; the caller passes an image_picker-downscaled file). The
+  /// download URL lives on the private `donors/{uid}` doc, never public.
+  Future<String> uploadProfilePhoto(XFile photo) async {
+    final bytes = await photo.readAsBytes();
+    final contentType = switch (photo.mimeType) {
+      'image/png' => 'image/png',
+      'image/webp' => 'image/webp',
+      _ => 'image/jpeg',
+    };
+    final ref = FirebaseStorage.instance.ref('avatars/$_uid/profile');
+    await ref.putData(bytes, SettableMetadata(contentType: contentType));
+    final url = await ref.getDownloadURL();
+    await _db.collection('donors').doc(_uid).update({'photo_url': url, 'photo_updated_at': FieldValue.serverTimestamp()});
+    return url;
+  }
+
+  /// Removes the profile photo (file and link). Also used by account deletion.
+  Future<void> removeProfilePhoto({bool keepProfileField = false}) async {
+    try {
+      await FirebaseStorage.instance.ref('avatars/$_uid/profile').delete();
+    } on FirebaseException catch (e) {
+      if (e.code != 'object-not-found') rethrow;
+    }
+    if (!keepProfileField) {
+      await _db.collection('donors').doc(_uid).update({'photo_url': FieldValue.delete(), 'photo_updated_at': FieldValue.delete()});
+    }
+  }
+
   Future<void> setAvailability(bool available) async {
     // The rules refuse this during the post-donation rest period anyway;
     // checking first gives the UI a clear reason instead of a denied write.
@@ -657,6 +687,7 @@ class Backend {
   /// points at a request that's no longer actually active (matched
   /// elsewhere finished/cancelled without this donor's client seeing it).
   Future<void> acceptRequest(String requestId) async {
+    if (await completeMyDonationIfConfirmed()) throw const DonorOnCooldownException();
     await _db.runTransaction((tx) async {
       final donorRef = _db.collection('donors').doc(_uid);
       final donorSnap = await tx.get(donorRef);
@@ -669,6 +700,11 @@ class Backend {
         final activeSnap = await tx.get(_db.collection('requests').doc(activeId));
         final stillActive = activeSnap.exists && activeSnap.data()?['status'] == 'matched';
         if (stillActive) throw const DonorAlreadyMatchedException();
+        // Completed while this app wasn't looking: its cooldown applies
+        // first (completeMyDonationIfConfirmed, run before this transaction).
+        if (activeSnap.data()?['status'] == 'fulfilled' && activeSnap.data()?['matched_donor_id'] == _uid) {
+          throw const DonorOnCooldownException();
+        }
       }
 
       final reqRef = _db.collection('requests').doc(requestId);
@@ -712,15 +748,19 @@ class Backend {
     _logEvent('request_released', {'request_id': requestId});
   }
 
-  /// Donation completion is confirmed by BOTH people. The donor's "I've
-  /// donated" writes their history record and starts their own 90-day
-  /// cooldown straight away (only the donor can write their profile, and
-  /// they're the one who knows they donated); the request only becomes
-  /// `fulfilled` once the requester has confirmed too — whichever side
-  /// confirms second closes it. An admin can still confirm on either's
-  /// behalf (adminConfirmDonation). Returns true if this closed it.
+  /// Donation completion is confirmed by BOTH people, and only the second
+  /// confirmation completes it (`fulfilled`). Nothing changes for the donor
+  /// on a confirmation alone: their 90-day cooldown, availability-off and
+  /// donation record are applied once, at completion —
+  ///   - here, when the donor's confirmation is the second one;
+  ///   - by the `onRequestUpdated` Cloud Function when the requester's is
+  ///     (a requester can't write the donor's profile);
+  ///   - by [completeMyDonationIfConfirmed] as an in-app fallback.
+  /// The donor's `active_request_id` lock is the "apply once" guard: it is
+  /// cleared in the same write, and the history record is keyed by the
+  /// request id, so no path can double-apply. Returns true if this
+  /// confirmation completed the request.
   Future<bool> donorConfirmDonation(String requestId) async {
-    final reactivateAt = DateTime.now().add(const Duration(days: donorCooldownDays));
     var closed = false;
     var alreadyConfirmed = false;
 
@@ -733,47 +773,36 @@ class Backend {
       alreadyConfirmed = req['donor_confirmed_at'] != null;
       if (alreadyConfirmed) return;
       closed = req['requester_confirmed_at'] != null;
+      final donor = closed ? (await tx.get(_db.collection('donors').doc(_uid))).data() : null;
       tx.update(reqRef, {
         'donor_confirmed_at': FieldValue.serverTimestamp(),
         if (closed) 'status': 'fulfilled',
         if (closed) 'fulfilled_at': FieldValue.serverTimestamp(),
       });
-      tx.update(_db.collection('donors').doc(_uid), {
-        'last_donation_date': FieldValue.serverTimestamp(),
-        'is_available': false,
-        'active_request_id': null,
-        'reactivation_scheduled_at': Timestamp.fromDate(reactivateAt),
-      });
-      tx.update(_db.collection('donors_public').doc(_uid), {
-        'is_available': false,
-        'updated_at': FieldValue.serverTimestamp(),
-      });
-      tx.set(_db.collection('donation_history').doc(), {
-        'donor_id': _uid,
-        'request_id': requestId,
-        'donation_date': FieldValue.serverTimestamp(),
-        'confirmed_by': 'self',
-        'hospital': req['location_label'] ?? '',
-        'blood_group': req['blood_group'] ?? '',
-      });
+      if (closed && donor?['active_request_id'] == requestId) {
+        _writeDonorCompletion(tx, _uid, requestId, req, confirmedBy: 'self');
+      }
     });
     if (alreadyConfirmed) return false;
-    await _bumpImpactCounter();
+    if (closed) await _bumpImpactCounter();
     _logEvent('donation_confirmed', {'request_id': requestId, 'by': 'donor'});
     return closed;
   }
 
-  /// The requester's half of [donorConfirmDonation]: "I received the
-  /// donation". Closes the request if the donor already confirmed.
+  /// The requester's half: "I received the donation". Completes the request
+  /// if the donor already confirmed; the donor's cooldown and record are
+  /// then applied by the function / the donor's app (see above).
   Future<bool> requesterConfirmDonation(String requestId) async {
     var closed = false;
+    var alreadyConfirmed = false;
     await _db.runTransaction((tx) async {
       final reqRef = _db.collection('requests').doc(requestId);
       final req = (await tx.get(reqRef)).data();
       if (req == null || req['status'] != 'matched' || req['requester_uid'] != _uid) {
         throw StateError('This request is no longer active.');
       }
-      if (req['requester_confirmed_at'] != null) return;
+      alreadyConfirmed = req['requester_confirmed_at'] != null;
+      if (alreadyConfirmed) return;
       closed = req['donor_confirmed_at'] != null;
       tx.update(reqRef, {
         'requester_confirmed_at': FieldValue.serverTimestamp(),
@@ -781,8 +810,56 @@ class Backend {
         if (closed) 'fulfilled_at': FieldValue.serverTimestamp(),
       });
     });
+    if (alreadyConfirmed) return false;
+    if (closed) await _bumpImpactCounter();
     _logEvent('donation_confirmed', {'request_id': requestId, 'by': 'requester'});
     return closed;
+  }
+
+  /// Applies the donor's side of a donation the requester completed, if the
+  /// function hasn't already (e.g. functions not deployed, or offline).
+  /// Idempotent; cheap no-op when there's nothing to apply. Returns true if
+  /// it applied something.
+  Future<bool> completeMyDonationIfConfirmed() async {
+    final uid = currentUser?.uid;
+    if (uid == null) return false;
+    final activeId = (await myDonorDoc()).data()?['active_request_id'] as String?;
+    if (activeId == null) return false;
+    return _db.runTransaction((tx) async {
+      final donor = (await tx.get(_db.collection('donors').doc(uid))).data();
+      final req = (await tx.get(_db.collection('requests').doc(activeId))).data();
+      if (donor?['active_request_id'] != activeId || req == null) return false;
+      if (req['status'] != 'fulfilled' || req['matched_donor_id'] != uid) return false;
+      _writeDonorCompletion(tx, uid, activeId, req, confirmedBy: 'self');
+      return true;
+    });
+  }
+
+  /// The donor-side effects of a completed donation, inside the caller's
+  /// transaction: cooldown, availability off (private + public), lock
+  /// released, and one history record keyed by the request id.
+  void _writeDonorCompletion(Transaction tx, String donorId, String requestId, Map<String, dynamic> req,
+      {required String confirmedBy, String? verifiedBy}) {
+    final reactivateAt = DateTime.now().add(const Duration(days: donorCooldownDays));
+    tx.update(_db.collection('donors').doc(donorId), {
+      'last_donation_date': FieldValue.serverTimestamp(),
+      'is_available': false,
+      'active_request_id': null,
+      'reactivation_scheduled_at': Timestamp.fromDate(reactivateAt),
+    });
+    tx.update(_db.collection('donors_public').doc(donorId), {
+      'is_available': false,
+      'updated_at': FieldValue.serverTimestamp(),
+    });
+    tx.set(_db.collection('donation_history').doc(requestId), {
+      'donor_id': donorId,
+      'request_id': requestId,
+      'donation_date': FieldValue.serverTimestamp(),
+      'confirmed_by': confirmedBy,
+      'verified_by': ?verifiedBy,
+      'hospital': req['location_label'] ?? '',
+      'blood_group': req['blood_group'] ?? '',
+    });
   }
 
   /// Public, signed-in-readable donation counter for the Community → Impact
@@ -928,9 +1005,7 @@ class Backend {
   /// trusts the caller is the matched donor) since the admin isn't
   /// necessarily acting on their own uid.
   Future<void> adminConfirmDonation(String requestId) async {
-    final reactivateAt = DateTime.now().add(const Duration(days: donorCooldownDays));
     late String donorId;
-    var donorAlreadyConfirmed = false;
 
     await _db.runTransaction((tx) async {
       final reqRef = _db.collection('requests').doc(requestId);
@@ -939,37 +1014,18 @@ class Backend {
       final req = reqSnap.data()!;
       if (req['status'] != 'matched') throw StateError('Request is not currently matched.');
       donorId = req['matched_donor_id'] as String;
-      donorAlreadyConfirmed = req['donor_confirmed_at'] != null;
+      final donor = (await tx.get(_db.collection('donors').doc(donorId))).data();
 
       tx.update(reqRef, {
         'status': 'fulfilled',
         'fulfilled_at': FieldValue.serverTimestamp(),
         'fulfilled_by': _uid,
       });
-      // The donor's own confirmation already started their cooldown and
-      // wrote the history record — don't restart or duplicate either.
-      if (donorAlreadyConfirmed) return;
-      tx.update(_db.collection('donors').doc(donorId), {
-        'last_donation_date': FieldValue.serverTimestamp(),
-        'is_available': false,
-        'active_request_id': null,
-        'reactivation_scheduled_at': Timestamp.fromDate(reactivateAt),
-      });
-      tx.update(_db.collection('donors_public').doc(donorId), {
-        'is_available': false,
-        'updated_at': FieldValue.serverTimestamp(),
-      });
-      tx.set(_db.collection('donation_history').doc(), {
-        'donor_id': donorId,
-        'request_id': requestId,
-        'donation_date': FieldValue.serverTimestamp(),
-        'confirmed_by': 'admin',
-        'verified_by': _uid,
-        'hospital': req['location_label'] ?? '',
-        'blood_group': req['blood_group'] ?? '',
-      });
+      if (donor?['active_request_id'] == requestId) {
+        _writeDonorCompletion(tx, donorId, requestId, req, confirmedBy: 'admin', verifiedBy: _uid);
+      }
     });
-    if (!donorAlreadyConfirmed) await _bumpImpactCounter();
+    await _bumpImpactCounter();
     await _logAdminAction('confirm_donation', requestId);
     _logEvent('donation_fulfilled', {'request_id': requestId, 'confirmed_by': 'admin'});
   }

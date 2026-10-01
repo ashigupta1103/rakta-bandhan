@@ -62,7 +62,6 @@ class Conversation {
   final bool amRequester;
   final String peerUid;
   final String peerName;
-  final String peerPhone;
   final String bloodGroup;
   final String status;
   final bool closedByBlock;
@@ -78,7 +77,6 @@ class Conversation {
     required this.amRequester,
     required this.peerUid,
     required this.peerName,
-    required this.peerPhone,
     required this.bloodGroup,
     required this.status,
     required this.closedByBlock,
@@ -110,7 +108,6 @@ class Conversation {
       amRequester: amRequester,
       peerUid: (amRequester ? donorUid : r['requester_uid']) as String? ?? '',
       peerName: (amRequester ? r['matched_donor_name'] : r['requester_name']) as String? ?? 'Donor',
-      peerPhone: (amRequester ? r['matched_donor_phone'] : r['requester_phone']) as String? ?? '',
       bloodGroup: r['blood_group'] as String? ?? '',
       status: r['status'] as String? ?? '',
       closedByBlock: r['chat_closed_by'] != null,

@@ -149,7 +149,6 @@ class _ConversationRow extends StatelessWidget {
       peerUid: c.peerUid,
       peerName: c.peerName,
       myName: me?['name'] as String? ?? 'Rakta Bandhan user',
-      peerPhone: c.peerPhone,
     );
   }
 

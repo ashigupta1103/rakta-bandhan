@@ -76,7 +76,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   Widget _bottomNav({required bool requestHasUnread}) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(8, 10, 8, 12),
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
       decoration: BoxDecoration(
         color: Colors.white,
         border: const Border(top: BorderSide(color: AppColors.warmBorder)),
@@ -99,48 +99,51 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     final showUnreadDot = (index == 2 && _communityHasUnread && !isActive) || (index == 0 && requestHasUnread);
     final dotColor = index == 0 ? AppColors.brandRed : AppColors.gold;
 
-    return GestureDetector(
-      onTap: () => setState(() => _currentIndex = index),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 7),
-        decoration: BoxDecoration(
-          color: isActive ? AppColors.red100 : Colors.transparent,
-          borderRadius: BorderRadius.circular(14),
-        ),
+    return Semantics(
+      button: true,
+      selected: isActive,
+      label: tab.label,
+      excludeSemantics: true,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => setState(() => _currentIndex = index),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            SizedBox(
-              height: 3,
-              width: 20,
-              child: isActive
-                  ? DecoratedBox(decoration: BoxDecoration(color: AppColors.brandRed, borderRadius: BorderRadius.circular(999)))
-                  : null,
-            ),
-            const SizedBox(height: 3),
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Icon(tab.icon, size: 22, color: isActive ? AppColors.brandRed : AppColors.ink2),
-                if (showUnreadDot)
-                  Positioned(
-                    right: -2,
-                    top: -2,
-                    child: Container(
-                      width: 7,
-                      height: 7,
-                      decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
+            // One indicator only: a tinted pill behind the active icon.
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOut,
+              width: 56,
+              height: 30,
+              decoration: BoxDecoration(color: isActive ? AppColors.red100 : Colors.transparent, borderRadius: BorderRadius.circular(999)),
+              alignment: Alignment.center,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Icon(tab.icon, size: 21, color: isActive ? AppColors.brandRed : AppColors.ink2),
+                  if (showUnreadDot)
+                    Positioned(
+                      right: -3,
+                      top: -2,
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 1.5)),
+                      ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
-            const SizedBox(height: 3),
+            const SizedBox(height: 4),
             Text(
               tab.label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: 10.5,
-                fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-                color: isActive ? AppColors.brandRed : AppColors.ink2,
+                fontSize: 11.5,
+                fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+                color: isActive ? AppColors.ink : AppColors.ink2,
               ),
             ),
           ],
