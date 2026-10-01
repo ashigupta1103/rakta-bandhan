@@ -115,7 +115,7 @@ would normally be a Cloud Function (`setAdminRole`). Do it once by hand:
 | `requests/{id}/messages/{mid}` | the two matched participants | in-app chat, only while `matched` and not blocked; a sender may delete their own messages (account deletion) |
 | `requests/{id}/calls/{cid}` (+ ICE-candidate subcollections) | the two matched participants | WebRTC signalling handshake only — audio is peer-to-peer and never stored |
 | `reports/{id}` | any signed-in user (create); admin (read, update) | chat/call block-and-report; no delete — stays on record regardless of triage outcome |
-| `donation_history/{id}` | donor (self-report) or admin | immutable |
+| `donation_history/{id}` | the donor, only for a request that is fulfilled with them as its matched donor (the doc id is the request id, so one record per request); admin | immutable; hospital and blood group must equal the request's, `donation_date` is the server time |
 | `admins/{uid}` | admin only (first one: manual) | existence = admin, no custom claims |
 | `hospitals/{id}` | admin only | reference data, readable by any signed-in user |
 | `audit_log/{id}` | admin only | admin actions, admin-only read |

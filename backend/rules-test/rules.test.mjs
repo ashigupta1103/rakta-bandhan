@@ -22,6 +22,7 @@ import {
   updateDoc,
   addDoc,
   collection,
+  writeBatch,
 } from 'firebase/firestore';
 import { ref, uploadBytes } from 'firebase/storage';
 
@@ -220,17 +221,27 @@ describe('two-sided donation completion', () => {
 });
 
 describe('accepting requests', () => {
+  /** The write Backend.acceptRequest makes: the request goes to matched and the donor's own lock moves, in one batch. */
+  async function accept(uid, requestId) {
+    const db = verified(uid);
+    const batch = writeBatch(db);
+    batch.update(doc(db, `requests/${requestId}`), {
+      status: 'matched',
+      matched_donor_id: uid,
+      matched_donor_name: 'D',
+      matched_donor_phone: '9',
+      matched_at: serverTimestamp(),
+    });
+    batch.update(doc(db, `donors/${uid}`), { active_request_id: requestId });
+    return batch.commit();
+  }
+
+  const seedDonor = (extra = {}) => seed((db) => setDoc(doc(db, 'donors/donor'), donorDoc(extra)));
+
   test('a verified donor can accept an open request', async () => {
+    await seedDonor();
     await seed((db) => setDoc(doc(db, 'requests/r1'), openRequest()));
-    await assertSucceeds(
-      updateDoc(doc(verified('donor'), 'requests/r1'), {
-        status: 'matched',
-        matched_donor_id: 'donor',
-        matched_donor_name: 'D',
-        matched_donor_phone: '9',
-        matched_at: serverTimestamp(),
-      }),
-    );
+    await assertSucceeds(accept('donor', 'r1'));
   });
 
   test('an unverified account cannot accept', async () => {
@@ -239,8 +250,154 @@ describe('accepting requests', () => {
   });
 
   test('a donor cannot accept on someone else\'s behalf', async () => {
+    await seedDonor();
     await seed((db) => setDoc(doc(db, 'requests/r1'), openRequest()));
     await assertFails(updateDoc(doc(verified('donor'), 'requests/r1'), { status: 'matched', matched_donor_id: 'someone-else' }));
+  });
+
+  describe('one active match per donor', () => {
+    const matchedTo = (uid, extra = {}) => openRequest({ status: 'matched', matched_donor_id: uid, ...extra });
+
+    test('accepting without taking the donor\'s own lock is refused', async () => {
+      await seedDonor();
+      await seed((db) => setDoc(doc(db, 'requests/r1'), openRequest()));
+      await assertFails(
+        updateDoc(doc(verified('donor'), 'requests/r1'), { status: 'matched', matched_donor_id: 'donor', matched_donor_name: 'D', matched_at: serverTimestamp() }),
+      );
+    });
+
+    test('a donor on a live match cannot take a second request', async () => {
+      await seedDonor({ active_request_id: 'r0' });
+      await seed(async (db) => {
+        await setDoc(doc(db, 'requests/r0'), matchedTo('donor'));
+        await setDoc(doc(db, 'requests/r1'), openRequest());
+      });
+      await assertFails(accept('donor', 'r1'));
+    });
+
+    test('a lock pointing at a cancelled request is replaced', async () => {
+      await seedDonor({ active_request_id: 'r0' });
+      await seed(async (db) => {
+        await setDoc(doc(db, 'requests/r0'), matchedTo('donor', { status: 'cancelled' }));
+        await setDoc(doc(db, 'requests/r1'), openRequest());
+      });
+      await assertSucceeds(accept('donor', 'r1'));
+    });
+
+    test('a lock pointing at a request that no longer exists is replaced', async () => {
+      await seedDonor({ active_request_id: 'ghost' });
+      await seed((db) => setDoc(doc(db, 'requests/r1'), openRequest()));
+      await assertSucceeds(accept('donor', 'r1'));
+    });
+
+    test('a lock pointing at someone else\'s match is replaced', async () => {
+      await seedDonor({ active_request_id: 'r0' });
+      await seed(async (db) => {
+        await setDoc(doc(db, 'requests/r0'), matchedTo('another-donor'));
+        await setDoc(doc(db, 'requests/r1'), openRequest());
+      });
+      await assertSucceeds(accept('donor', 'r1'));
+    });
+
+    test('a completed donation still owed its cooldown blocks a new match', async () => {
+      await seedDonor({ active_request_id: 'r0' });
+      await seed(async (db) => {
+        await setDoc(doc(db, 'requests/r0'), matchedTo('donor', { status: 'fulfilled' }));
+        await setDoc(doc(db, 'requests/r1'), openRequest());
+      });
+      await assertFails(accept('donor', 'r1'));
+    });
+
+    test('a resting donor cannot accept, and can once the rest is over', async () => {
+      await seedDonor({ reactivation_scheduled_at: future(30) });
+      await seed((db) => setDoc(doc(db, 'requests/r1'), openRequest()));
+      await assertFails(accept('donor', 'r1'));
+      await seedDonor({ reactivation_scheduled_at: past(1) });
+      await assertSucceeds(accept('donor', 'r1'));
+    });
+  });
+});
+
+describe('donation records', () => {
+  const fulfilled = (extra = {}) =>
+    openRequest({
+      status: 'fulfilled',
+      matched_donor_id: 'donor',
+      donor_confirmed_at: past(0.02),
+      requester_confirmed_at: past(0.01),
+      fulfilled_at: past(0.01),
+      ...extra,
+    });
+  const record = (extra = {}) => ({
+    donor_id: 'donor',
+    request_id: 'r1',
+    donation_date: serverTimestamp(),
+    confirmed_by: 'self',
+    hospital: 'Apollo Hospital, Greams Road',
+    blood_group: 'O+',
+    ...extra,
+  });
+
+  test('the donor who completes the request writes their record in the same transaction', async () => {
+    await seed((db) =>
+      setDoc(doc(db, 'requests/r1'), openRequest({ status: 'matched', matched_donor_id: 'donor', requester_confirmed_at: past(0.01) })),
+    );
+    const db = verified('donor');
+    const batch = writeBatch(db);
+    batch.update(doc(db, 'requests/r1'), { donor_confirmed_at: serverTimestamp(), status: 'fulfilled', fulfilled_at: serverTimestamp() });
+    batch.set(doc(db, 'donation_history/r1'), record());
+    await assertSucceeds(batch.commit());
+  });
+
+  test('the donor\'s app can write the record after the requester completed the request', async () => {
+    await seed((db) => setDoc(doc(db, 'requests/r1'), fulfilled()));
+    await assertSucceeds(setDoc(doc(verified('donor'), 'donation_history/r1'), record()));
+  });
+
+  test('a record for an unfinished request is refused', async () => {
+    await seed((db) => setDoc(doc(db, 'requests/r1'), openRequest({ status: 'matched', matched_donor_id: 'donor' })));
+    await assertFails(setDoc(doc(verified('donor'), 'donation_history/r1'), record()));
+  });
+
+  test('a record for a request that does not exist is refused', async () => {
+    await assertFails(setDoc(doc(verified('donor'), 'donation_history/r1'), record()));
+  });
+
+  test('a record for someone else\'s donation is refused', async () => {
+    await seed((db) => setDoc(doc(db, 'requests/r1'), fulfilled({ matched_donor_id: 'another-donor' })));
+    await assertFails(setDoc(doc(verified('donor'), 'donation_history/r1'), record()));
+  });
+
+  test('the record must be keyed by the request id', async () => {
+    await seed((db) => setDoc(doc(db, 'requests/r1'), fulfilled()));
+    await assertFails(addDoc(collection(verified('donor'), 'donation_history'), record()));
+    await assertFails(setDoc(doc(verified('donor'), 'donation_history/other'), record()));
+  });
+
+  test('a second record for the same request is refused', async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db, 'requests/r1'), fulfilled());
+      await setDoc(doc(db, 'donation_history/r1'), { ...record(), donation_date: past(1) });
+    });
+    await assertFails(setDoc(doc(verified('donor'), 'donation_history/r1'), record()));
+  });
+
+  test('extra fields, an admin stamp, a back-dated time or the wrong details are refused', async () => {
+    await seed((db) => setDoc(doc(db, 'requests/r1'), fulfilled()));
+    const d = verified('donor');
+    await assertFails(setDoc(doc(d, 'donation_history/r1'), record({ verified_by: 'donor' })));
+    await assertFails(setDoc(doc(d, 'donation_history/r1'), record({ confirmed_by: 'admin' })));
+    await assertFails(setDoc(doc(d, 'donation_history/r1'), record({ donation_date: past(30) })));
+    await assertFails(setDoc(doc(d, 'donation_history/r1'), record({ hospital: 'Somewhere else' })));
+    await assertFails(setDoc(doc(d, 'donation_history/r1'), record({ blood_group: 'AB-' })));
+    await assertFails(setDoc(doc(d, 'donation_history/r1'), record({ donor_id: 'someone-else' })));
+  });
+
+  test('an admin can still write any record', async () => {
+    await seed((db) => setDoc(doc(db, 'admins/boss'), { role: 'admin' }));
+    await assertSucceeds(
+      setDoc(doc(verified('boss'), 'donation_history/anything'), { ...record({ request_id: 'whatever' }), confirmed_by: 'admin', verified_by: 'boss' }),
+    );
   });
 });
 

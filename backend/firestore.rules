@@ -61,6 +61,19 @@ service cloud.firestore {
       return isSignedIn() && exists(profile) && get(profile).data.get('is_banned', false) == true;
     }
 
+    // A donation record a donor may write for themselves: for a request that
+    // is, after this same write, fulfilled with them as its matched donor,
+    // copying that request's hospital and blood group. getAfter() sees the
+    // request as the transaction leaves it, so the donor's own confirmation
+    // can be the one that completes the request.
+    function completedByDonor(requestId) {
+      let r = getAfter(/databases/$(database)/documents/requests/$(requestId)).data;
+      return r.status == 'fulfilled'
+        && r.get('matched_donor_id', null) == request.auth.uid
+        && request.resource.data.hospital == r.get('location_label', '')
+        && request.resource.data.blood_group == r.blood_group;
+    }
+
     // ---------------------------------------------------------------
     // donors/{uid} — private profile: name, phone, exact location.
     // Owner or admin only, ever. is_verified / is_banned are admin-set
@@ -155,6 +168,28 @@ service cloud.firestore {
         return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys);
       }
 
+      // One active match per donor, enforced where it can't be skipped.
+      // The accepting write must also set the donor's own lock to this
+      // request (getAfter sees the donor as the write leaves them), the donor
+      // must not be resting, and an existing lock may only be replaced when it
+      // points at nothing live: a request that is gone, belongs to someone
+      // else, or is neither matched nor fulfilled. A fulfilled request still
+      // owes this donor its cooldown and record, so it blocks a new match.
+      function canTakeMatch() {
+        let donorPath = /databases/$(database)/documents/donors/$(request.auth.uid);
+        let donor = get(donorPath).data;
+        let lock = donor.get('active_request_id', null);
+        let lockPath = /databases/$(database)/documents/requests/$(lock);
+        return getAfter(donorPath).data.active_request_id == id
+          && (donor.get('reactivation_scheduled_at', null) == null
+              || donor.reactivation_scheduled_at <= request.time)
+          && (lock == null
+              || lock == id
+              || !exists(lockPath)
+              || get(lockPath).data.get('matched_donor_id', null) != request.auth.uid
+              || !(get(lockPath).data.status in ['matched', 'fulfilled']));
+      }
+
       function previewUnchangedOrMine() {
         return request.resource.data.get('last_message', null) == resource.data.get('last_message', null)
           || request.resource.data.last_message.sender_uid == request.auth.uid;
@@ -189,7 +224,8 @@ service cloud.firestore {
             && request.resource.data.status == 'matched'
             && request.resource.data.matched_donor_id == request.auth.uid
             && isVerifiedUser()
-            && !isBanned())
+            && !isBanned()
+            && canTakeMatch())
           ||
           // two-sided completion: each side stamps only its own
           // confirmation; the request may become `fulfilled` only when the
@@ -314,13 +350,24 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // donation_history/{id} — immutable once written. Self-reported by
-    // the donor (the only real path today) or written by an admin.
+    // donation_history/{id} — immutable once written. The doc id IS the
+    // request id, so there is exactly one record per request: a second write
+    // would be an update, which only an admin may do. A donor can write their
+    // own record only for a request that is really fulfilled with them as the
+    // matched donor (completedByDonor), stamped with the server time, with
+    // nothing but the known fields. Admins, and the onRequestUpdated function
+    // (Admin SDK), can write any record.
     match /donation_history/{id} {
       allow read: if isAdmin() ||
         (isSignedIn() && resource.data.donor_id == request.auth.uid);
-      allow create: if isAdmin() ||
-        (isSignedIn() && request.resource.data.donor_id == request.auth.uid);
+      allow create: if isAdmin() || (isSignedIn()
+        && request.resource.data.keys().hasOnly(
+             ['donor_id', 'request_id', 'donation_date', 'confirmed_by', 'hospital', 'blood_group'])
+        && request.resource.data.donor_id == request.auth.uid
+        && request.resource.data.request_id == id
+        && request.resource.data.confirmed_by == 'self'
+        && request.resource.data.donation_date == request.time
+        && completedByDonor(id));
       allow update, delete: if isAdmin();
     }
 
