@@ -6,7 +6,7 @@
 1. phone verification (Truecaller check, OTP send/verify, Firebase sign-in token);
 2. push notifications for messages, calls and urgent requests;
 3. call-relay (TURN) credentials;
-4. a nightly job to expire old requests.
+4. a job every 15 minutes that expires old requests.
 
 ## Year 1
 
@@ -19,7 +19,7 @@
 | Cloud Functions | 2M invocations/month free; we use about 0.3M. Container storage is the only charge | ₹500 |
 | Push notifications | FCM | ₹0 |
 | Maps on screen | Google Maps SDK for Android/iOS: mobile map loads are free and unlimited | ₹0 |
-| Address lookup | Phone's built-in geocoder (free), LocationIQ free tier (5,000/day) as backup | ₹0 |
+| Address lookup | LocationIQ free tier (5,000/day); OpenStreetMap Nominatim only in development | ₹0 |
 | Call relay (TURN) | Cloudflare Realtime: 1,000 GB/month free, about 0.6 MB per relayed call minute | ₹0 |
 | Hosting (admin panel, legal pages) | Firebase Hosting free tier, on the `.web.app` address | ₹0 |
 | iOS builds without a Mac | Codemagic free tier (500 build minutes/month) | ₹0 |
@@ -86,7 +86,7 @@ Storage isn't the cost:
 - 1 lakh donor profiles plus requests come to well under 1 GB, which is free.
 - The ID photo has already moved out of the profile and is deleted after verification.
 
-## Community posts with photos (not built yet)
+## Community posts with photos (built)
 
 - **Compress on the phone before upload:** a feed image at ~1080 px WebP (≈150 KB) plus a thumbnail at ~320 px (≈20 KB). That keeps storage and downloads inside the free tiers: Firebase Storage's 5 GB, or Cloudflare R2's 10 GB with free downloads.
 - **Keep it to photos.** Video is where the cost would jump.

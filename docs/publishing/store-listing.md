@@ -11,7 +11,7 @@ If app behaviour changes, update all four together.
 
 **App name:** Rakta Bandhan
 **Subtitle (iOS, 30 characters):** Find blood donors near you
-**Short description (Play, 80 characters):** Reach willing blood donors nearby in minutes. Chat and call without sharing numbers.
+**Short description (Play, 80 characters):** Reach blood donors nearby in minutes. Chat and call without sharing numbers.
 
 **Full description**
 

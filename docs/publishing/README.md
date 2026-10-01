@@ -21,7 +21,7 @@ Legend: ✅ done in the repo · ⬜ someone must do it (needs an account, a deci
 
 ## Done in this branch
 
-- ✅ **Real sign-in.** Email + password with Firebase's verification email (free, 100,000/day on Blaze), password reset, and password re-check before account deletion. The old any-code test login is gone. Firestore and Storage rules only let **verified** accounts create anything.
+- ✅ **Real sign-in.** Passwordless: a 6-digit code is emailed to the user and exchanged for a Firebase sign-in token (needs the Blaze functions and an email provider — see `docs/launch/AFTER_BLAZE_UPGRADE.md`). Account deletion needs no password. The old any-code test login is gone. Firestore and Storage rules only let **verified** accounts create anything.
 - ✅ **Push notifications** (Cloud Functions in `functions/`): chat messages, missed calls, request accepted / released / cancelled / expired, two-sided donation confirmation prompts, nearby compatible donors on every new request (urgent alerts on a loud channel), and admin broadcasts to FCM topics.
 - ✅ **Ringing calls when the app is closed** (Android): a high-priority data push opens the native incoming-call screen with ringtone (flutter_callkit_incoming). Answer goes straight into the call; Decline tells the caller at once. iOS gets a time-sensitive "Incoming call" alert until PushKit + CallKit are added.
 - ✅ **Two-sided completion.** Donor taps "I donated" → their 90-day rest starts and history + certificate are written; the request becomes *completed* only when the requester also confirms (or an admin does). Enforced in the rules.
@@ -56,9 +56,9 @@ Not testable here: real push delivery, real calls between two phones, and the Go
 1. **Billing account in the club's name**, linked to the project; upgrade to Blaze.
    - Budget: **₹3,000/month**, alerts at 50% / 90% / 100% (Cloud Console › Billing › Budgets & alerts). Blaze has no hard cap; the alerts are the guardrail.
    - The payment method can be changed any time (Billing › Payment method), and the project can be moved to a different billing account (Billing › Account management › Change billing) — no downtime.
-2. **Authentication** › Sign-in method › enable **Email/Password**. Templates › customise the verification email sender name ("Rakta Bandhan") and, optionally, a custom domain.
+2. **Authentication** › Sign-in method › enable **Email/Password**. Only the two admin consoles use it; users sign in with an emailed code, which needs the `SMTP_URL` secret (see `docs/launch/AFTER_BLAZE_UPGRADE.md`).
 3. **Storage**: Build › Storage › Get started (location same as Firestore).
-4. Check `REGION` in `functions/src/index.ts` equals the Firestore location (Firestore › the location shown at the top). Change it if needed.
+4. Check `REGION` in `functions/src/app.ts` equals the Firestore location (Firestore › the location shown at the top). Change it if needed.
 5. Deploy everything:
    ```
    cd admin/frontend && npm run build && cd ../..
@@ -98,8 +98,8 @@ Not testable here: real push delivery, real calls between two phones, and the Go
    4. New personal developer accounts must run a closed test with at least 12 testers for 14 days before production access.
    5. App content › **Foreground service** declaration: *Phone call* (see `store-listing.md`).
 6. **Two-phone checklist** on the internal-testing build (one phone signed in as a requester, one as a donor):
-   - [ ] Create account → verification email arrives → tapping the link moves the app on by itself.
-   - [ ] Forgot password email arrives.
+   - [ ] Sign in with an email address → the 6-digit code arrives by email → entering it opens the app (a new account continues to registration).
+   - [ ] A wrong code is refused, and a resent code arrives after the 30-second wait.
    - [ ] Donor registers (mobile number, area by GPS and by "Pin on map").
    - [ ] Requester raises an urgent request → donor's phone gets a notification **with the app closed** (and the loud urgent alert if urgent alerts are on).
    - [ ] Donor accepts → requester gets "A donor accepted your request".
@@ -108,7 +108,7 @@ Not testable here: real push delivery, real calls between two phones, and the Go
    - [ ] Donor taps "Mark as donated" → requester is asked to confirm → after both confirm, the request shows *Completed*, the donor's availability switch is locked off for 90 days, and the certificate opens from Donation history (Save and Share both work).
    - [ ] Community: post with a photo, open it full-screen, report it from the other phone, see it in the admin inbox, delete it.
    - [ ] Admin: verification checklist → Verify; broadcast to "All donors" arrives on both phones.
-   - [ ] Settings › Delete my account asks for the password and removes the account.
+   - [ ] Settings › Delete my account asks to confirm, then removes the account (the sign-in account too).
 
 ### 4. iOS → App Store (needs a Mac or Codemagic)
 1. In the Apple Developer account, create the App ID `com.raktabandhan.app` with the Push Notifications capability.

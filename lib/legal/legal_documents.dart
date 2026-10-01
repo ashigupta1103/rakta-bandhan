@@ -47,7 +47,8 @@ const privacyPolicy = LegalDocument(
     ]),
     LegalSection('collect', 'What we collect', [
       'Account and profile — what you give us:',
-      '- Your email address, used to sign in. There is no password: each time you sign in we email you a 6-digit code that works once and expires after a few minutes.',
+      '- Your email address, used to sign you in. Each time you sign in we email you a one-time 6-digit code; there is no password. A code works once, expires after 10 minutes, and we keep it only in hashed form.',
+      '- Sign-in safeguards: to stop abuse we keep a small record holding a hash of your email address (not the address itself), when we last sent you a code, how many codes were sent today and how many wrong tries were made. We also count sign-in requests per network, using a hash of the IP address.',
       '- Your name and mobile number. Your number is never shown to other users — matched people reach each other through in-app messages and calls.',
       '- Your blood group.',
       '- The area you register from: a location label you choose and its map coordinates.',
@@ -84,7 +85,8 @@ const privacyPolicy = LegalDocument(
       'A small team of Rakta Bandhan administrators can see donor profiles including phone numbers, submitted ID photos, requests, and safety reports. They can read the chat on a request to review a report of abuse. Administrators cannot listen to calls — there is no recording to listen to. Every verification, ban and administrative change is written to an audit log.',
     ]),
     LegalSection('processors', 'Services we rely on', [
-      '- Google Firebase (Google LLC) — sign-in and email verification, the database that stores everything above, photo storage for community posts and profile photos, server functions that send notifications, Firebase Cloud Messaging (push notifications) and analytics. Data is stored on Google Cloud servers, which may be located outside India.',
+      '- Google Firebase (Google LLC) — sign-in, the database that stores everything above, photo storage for community posts and profile photos, server functions that send notifications and sign-in codes, Firebase Cloud Messaging (push notifications) and analytics. Data is stored on Google Cloud servers, which may be located outside India.',
+      '- Our email-delivery provider (Resend) — delivers the sign-in code email. It sees your email address and the message.',
       '- OpenStreetMap — when you search for an address, the text you type is sent to the OpenStreetMap Foundation’s Nominatim service. When you use your current location to fill in an address, your coordinates are sent to that service to look up the street name. Map images are loaded from OpenStreetMap’s tile servers, which see your IP address and the area of the map you are viewing.',
       '- Google’s public STUN servers — used for a moment at the start of each in-app call to help the two phones find each other. They see your IP address, not the call.',
       'These providers process data under their own privacy terms. We do not give your data to anyone else, except where the law requires it — for example a valid order from a court or government authority.',
@@ -108,7 +110,7 @@ const privacyPolicy = LegalDocument(
       '- Nominate someone to exercise these rights on your behalf in the event of death or incapacity.',
     ]),
     LegalSection('security', 'How we protect it', [
-      'We adopt reasonable technical and organisational measures to protect personal information from unauthorised access, alteration, disclosure or misuse. Data is encrypted in transit and at rest by Google Cloud. Only accounts with a verified email can post requests, message or call. Access is enforced by database security rules: your phone number and ID photo sit in a private record only you and administrators can read, and the public donor listing never contains a phone number. In-app calls are encrypted end to end between the two phones (WebRTC DTLS-SRTP). No system is perfectly secure; if a breach affects you, we will tell you and the Data Protection Board as the law requires.',
+      'We adopt reasonable technical and organisational measures to protect personal information from unauthorised access, alteration, disclosure or misuse. Data is encrypted in transit and at rest by Google Cloud. Only accounts that have confirmed their email with a sign-in code can post requests, message or call. Access is enforced by database security rules: your phone number and ID photo sit in a private record only you and administrators can read, and the public donor listing never contains a phone number. In-app calls are encrypted end to end between the two phones (WebRTC DTLS-SRTP). No system is perfectly secure; if a breach affects you, we will tell you and the Data Protection Board as the law requires.',
     ]),
     LegalSection('children', 'Age limit', [
       'Rakta Bandhan is for people aged 18 and over — the minimum age to donate blood in India. It is not intended for use by children, and we do not knowingly collect data from anyone under 18. A parent or guardian may raise a request on a child’s behalf from their own account. If you believe a child has registered, contact us and we will delete the account.',
