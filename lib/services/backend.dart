@@ -847,13 +847,11 @@ class Backend {
         return (data['donations_this_month'] as num? ?? 0).toInt();
       });
 
+  /// The donor's own donation records — written the moment they confirm
+  /// ("I donated"), so the count matches their cooldown and certificate
+  /// even while the requester's confirmation is still pending.
   Future<int> myDonationCount() async {
-    final snap = await _db
-        .collection('requests')
-        .where('matched_donor_id', isEqualTo: _uid)
-        .where('status', isEqualTo: 'fulfilled')
-        .count()
-        .get();
+    final snap = await _db.collection('donation_history').where('donor_id', isEqualTo: _uid).count().get();
     return snap.count ?? 0;
   }
 
@@ -1487,8 +1485,21 @@ class Backend {
 
     final local = first(['suburb', 'neighbourhood', 'quarter', 'village', 'hamlet', 'residential', 'city_district']);
     final city = first(['city', 'town', 'municipality', 'county', 'state_district', 'state']);
-    final parts = [?local, if (city != null && city != local) city];
+    final parts = [?_tidyPlace(local), if (city != null && city != local) ?_tidyPlace(city)];
     return parts.isEmpty ? null : parts.join(', ');
+  }
+
+  /// Drops administrative noise from OSM names: "Zone 5 Royapuram" →
+  /// "Royapuram", "Chennai Corporation" → "Chennai", "Ward 58" → null.
+  static String? _tidyPlace(String? name) {
+    if (name == null) return null;
+    var t = name
+        .replaceAll(RegExp(r'^(Zone|Ward|Division)\s*\d+\s*', caseSensitive: false), '')
+        .replaceAll(RegExp(r'\s+(Municipal\s+)?Corporation$', caseSensitive: false), '')
+        .replaceAll(RegExp(r'\s+(District|Taluk)$', caseSensitive: false), '')
+        .trim();
+    if (RegExp(r'^(Zone|Ward)\s*\d*$', caseSensitive: false).hasMatch(t)) t = '';
+    return t.isEmpty ? null : t;
   }
 
   /// Short display form of a stored free-text address: the first two

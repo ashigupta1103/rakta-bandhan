@@ -52,6 +52,7 @@ Future<void> waitFor(WidgetTester t, Finder f, {Duration timeout = const Duratio
     await t.pump(const Duration(milliseconds: 200));
     if (f.evaluate().isNotEmpty) return;
   }
+  await snap(t, 'zz_timeout');
   throw TestFailure('Timed out waiting for ${why ?? f}');
 }
 
@@ -246,6 +247,7 @@ void main() {
       'callerUid': _requesterUid,
       'callerName': 'Priya (test)',
     });
+    await pumpFor(t, const Duration(seconds: 4)); // native activity / heads-up
     await snap(t, '09_incoming_call_native');
     await PushService.endNativeCall('e2e_call_native');
     await pumpFor(t, const Duration(seconds: 2));
