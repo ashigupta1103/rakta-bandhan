@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import '../services/backend.dart';
 import 'package:flutter/services.dart';
 
 import '../theme/app_colors.dart';
@@ -90,7 +91,7 @@ class _BannerState extends State<_Banner> with SingleTickerProviderStateMixin {
   String get _initials {
     final t = widget.name.trim();
     if (t.isEmpty) return '?';
-    return t.split(RegExp(r'\s+')).take(2).map((w) => w[0].toUpperCase()).join();
+    return initialsOf(t);
   }
 
   @override

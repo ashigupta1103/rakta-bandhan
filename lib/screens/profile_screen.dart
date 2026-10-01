@@ -52,7 +52,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _initials(String name) {
     final trimmed = name.trim();
     if (trimmed.isEmpty) return '?';
-    return trimmed.split(RegExp(r'\s+')).take(2).map((w) => w[0].toUpperCase()).join();
+    return initialsOf(trimmed);
   }
 
   @override

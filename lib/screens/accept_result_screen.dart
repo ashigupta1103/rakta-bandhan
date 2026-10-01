@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import '../services/backend.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
@@ -126,7 +127,7 @@ class _SuccessConnection extends StatelessWidget {
               final request = requestSnap.data!.data() ?? {};
               final bloodGroup = request['blood_group'] as String? ?? '';
               final units = request['units_needed'] ?? 1;
-              final location = (request['location_label'] as String?)?.isNotEmpty == true ? request['location_label'] as String : 'the requester';
+              final location = Backend.shortPlace(request['location_label'] as String?, fallback: 'the requester');
               // requester_name is denormalized onto the request doc at
               // creation (see Backend.createRequest) specifically so this
               // screen never needs to read donors/{requester_uid} directly
@@ -134,7 +135,7 @@ class _SuccessConnection extends StatelessWidget {
               final name = request['requester_name'] as String? ?? 'the requester';
               final initials = name.trim().isEmpty || name == 'the requester'
                   ? '?'
-                  : name.trim().split(RegExp(r'\s+')).take(2).map((w) => w[0].toUpperCase()).join();
+                  : initialsOf(name.trim());
 
               return Column(
                 children: [

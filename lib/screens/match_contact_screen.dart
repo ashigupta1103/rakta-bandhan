@@ -108,7 +108,7 @@ class _MatchContactScreenState extends State<MatchContactScreen> {
               final isLive = status == 'matched' && request['matched_donor_id'] == Backend.instance.currentUser?.uid;
               final iConfirmed = request['donor_confirmed_at'] != null;
               final theyConfirmed = request['requester_confirmed_at'] != null;
-              final initials = name.trim().isEmpty ? '?' : name.trim().split(RegExp(r'\s+')).take(2).map((w) => w[0].toUpperCase()).join();
+              final initials = name.trim().isEmpty ? '?' : initialsOf(name.trim());
 
               return Column(
                 children: [

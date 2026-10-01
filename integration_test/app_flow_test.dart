@@ -63,6 +63,17 @@ Future<void> tapWhenReady(WidgetTester t, Finder f) async {
   await t.pump();
 }
 
+/// The app draws its own back arrows, so pop routes directly.
+Future<void> popToRoot(WidgetTester t) async {
+  t.state<NavigatorState>(find.byType(Navigator).first).popUntil((r) => r.isFirst);
+  await pumpFor(t, const Duration(seconds: 1));
+}
+
+Future<void> popOnce(WidgetTester t) async {
+  t.state<NavigatorState>(find.byType(Navigator).first).pop();
+  await pumpFor(t, const Duration(seconds: 1));
+}
+
 Map<String, dynamic> _value(Object? v) => switch (v) {
       null => {'nullValue': null},
       bool b => {'booleanValue': b},
@@ -257,8 +268,7 @@ void main() {
     await snap(t, '11_cooldown');
 
     // 7. My Page: availability locked, certificate from donation history.
-    await t.pageBack();
-    await pumpFor(t, const Duration(seconds: 1));
+    await popToRoot(t);
     await tapWhenReady(t, find.text('My Page'));
     await waitFor(t, find.textContaining('Resting after your donation'), why: 'locked availability');
     await snap(t, '12_profile_cooldown');
@@ -268,10 +278,7 @@ void main() {
     await tapWhenReady(t, find.text('View certificate'));
     await waitFor(t, find.text('Certificate of donation'));
     await snap(t, '13_certificate');
-    await t.pageBack();
-    await pumpFor(t, const Duration(seconds: 1));
-    await t.pageBack();
-    await pumpFor(t, const Duration(seconds: 1));
+    await popToRoot(t);
 
     // 8. Find: the donor map with neighbourhood names.
     await tapWhenReady(t, find.text('Find'));

@@ -864,7 +864,7 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
   Map<String, dynamic> _donorCardData(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data();
     final name = data['name'] as String? ?? 'Donor';
-    final initials = name.trim().isEmpty ? '?' : name.trim().split(RegExp(r'\s+')).take(2).map((w) => w[0].toUpperCase()).join();
+    final initials = name.trim().isEmpty ? '?' : initialsOf(name.trim());
     final lat = (data['lat'] as num?)?.toDouble();
     final lng = (data['lng'] as num?)?.toDouble();
     final km = (_position != null && lat != null && lng != null) ? distanceKm(_position!.latitude, _position!.longitude, lat, lng) : null;

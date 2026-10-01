@@ -45,7 +45,7 @@ class FirestoreDonorMatchService implements DonorMatchService {
   final _db = FirebaseFirestore.instance;
 
   String _initialsOf(String name) =>
-      name.trim().isEmpty ? '?' : name.trim().split(RegExp(r'\s+')).take(2).map((w) => w[0].toUpperCase()).join();
+      name.trim().isEmpty ? '?' : initialsOf(name.trim());
 
   @override
   Future<DonorMatch> fetchMatch(String requestId) async {

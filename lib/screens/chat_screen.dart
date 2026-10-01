@@ -637,7 +637,7 @@ class _Peer {
   String get initials {
     final t = name.trim();
     if (t.isEmpty) return '?';
-    return t.split(RegExp(r'\s+')).take(2).map((w) => w[0].toUpperCase()).join();
+    return initialsOf(t);
   }
 }
 
