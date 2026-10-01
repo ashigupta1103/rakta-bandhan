@@ -9,6 +9,7 @@ import '../screens/donation_confirm_screen.dart';
 import '../screens/donation_history_screen.dart';
 import '../screens/login_screen.dart';
 import '../screens/main_navigation_screen.dart';
+import '../screens/preview_gallery_screen.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/rb_icon.dart';
@@ -124,12 +125,24 @@ class DemoHubScreen extends StatelessWidget {
               for (final (glyph, title, go) in scenes) RbRow(icon: glyph, tone: RbTone.neutral, title: title, onTap: go),
             ],
           ),
+          const RbSectionLabel('Screen gallery'),
+          RbListGroup(
+            children: [
+              RbRow(
+                icon: RbGlyph.page,
+                tone: RbTone.neutral,
+                title: 'Browse every screen',
+                subtitle: 'Static layouts with sample data, for design review',
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PreviewGalleryScreen())),
+              ),
+            ],
+          ),
           const RbSectionLabel('Demo codes'),
           const RbCard(
             color: AppColors.goldTint,
             child: Text(
               'Email ${Demo.email} · sign-in code ${Demo.emailCode}\nPhone code during registration ${Demo.phoneOtp}\n'
-              'While a demo runs, the small “Demo” tab at the top right resets it, moves the story forward, or exits.',
+              'While a demo runs, the small “Preview” tab on the left edge resets it, moves the story forward, or exits.',
               style: TextStyle(fontSize: 13, color: AppColors.goldDeepest, height: 1.55),
             ),
           ),

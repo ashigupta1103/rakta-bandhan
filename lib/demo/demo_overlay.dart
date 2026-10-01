@@ -48,7 +48,7 @@ class DemoOverlay extends StatelessWidget {
                     padding: EdgeInsets.symmetric(horizontal: 3, vertical: 10),
                     child: RotatedBox(
                       quarterTurns: 3,
-                      child: Text('Demo', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: AppColors.goldTint)),
+                      child: Text('Preview', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: AppColors.goldTint)),
                     ),
                   ),
                 ),
@@ -140,7 +140,7 @@ class _DemoControls extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Demo controls', style: AppTextStyles.display(fontSize: 20, color: AppColors.ink)),
+            Text('Client preview', style: AppTextStyles.display(fontSize: 20, color: AppColors.ink)),
             const SizedBox(height: 4),
             Text(
               'Playing as ${d.myName} (${requester ? 'needs blood' : 'donor'}). Simulated data — nothing is sent or saved.',
