@@ -32,7 +32,8 @@ class TestimonialsScreen extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: Row(
                   children: [
-                    IconButton(icon: const RbIcon(RbGlyph.back, color: AppColors.textPrimaryWarm), onPressed: () => Navigator.pop(context)),
+                    IconButton(
+                      tooltip: 'Back',icon: const RbIcon(RbGlyph.back, color: AppColors.textPrimaryWarm), onPressed: () => Navigator.pop(context)),
                     const SizedBox(width: 4),
                     const Text('Testimonials', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
                   ],
@@ -96,46 +97,29 @@ class TestimonialsScreen extends StatelessWidget {
     );
   }
 
+  /// Client demo only: fictional sample testimonials, labelled as such.
   List<Widget> _previewContent() {
     return [
-      Row(
-        children: [
-          const RbIcon(RbGlyph.eye, size: 13, color: AppColors.goldDeep),
-          const SizedBox(width: 6),
-          const Text('Preview data — sample layout, not real testimonials', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: AppColors.goldDeep)),
-        ],
-      ),
-      const SizedBox(height: 14),
+      const Text('Demo · sample testimonials from fictional people', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.goldDeep)),
+      const SizedBox(height: 12),
       _quoteCard(
-        quote: '"I got a call within twenty minutes of raising a request for my father. The app showed me exactly who accepted and how to reach them — I didn\'t have to call a single stranger myself."',
-        name: 'Demo Recipient 02',
-        subtitle: 'Requester · sample content',
-        timeAgo: '2 weeks ago · sample',
+        quote: '"A donor accepted my father’s request within the hour. We messaged in the app, met at the blood bank, and I never had to hand out my number to a stranger."',
+        name: 'Meera I.',
+        subtitle: 'Requester · demo',
+        timeAgo: '2 weeks ago',
         avatarIcon: RbGlyph.community,
       ),
       const SizedBox(height: 12),
       _quoteCard(
-        quote: '"I keep my availability on so I show up when someone nearby needs my blood group. Knowing my number is only shared once I actually accept a request made it an easy yes."',
-        name: 'Demo Donor 01',
-        subtitle: 'Donor · sample content',
-        timeAgo: '1 month ago · sample',
+        quote: '"I keep “Available to donate” on. When a request near me matches my group I get an alert, read the details, and decide. It takes the guesswork out of helping."',
+        name: 'Aarav M.',
+        subtitle: 'Donor · demo',
+        timeAgo: '1 month ago',
         avatarIcon: RbGlyph.droplet,
-      ),
-      const SizedBox(height: 12),
-      _quoteCard(
-        quote: '"Our hospital posted an urgent need and had a compatible donor confirmed before the shift changed. Being able to see status update in real time made a stressful night a lot calmer."',
-        name: 'Demo Requester 03',
-        subtitle: 'Hospital coordinator · sample content',
-        timeAgo: '3 weeks ago · sample',
-        avatarIcon: RbGlyph.building,
-      ),
-      const SizedBox(height: 10),
-      const Text(
-        'These cards are fictional sample content for demonstrating the layout — not real people, and not written by or attributed to any real donor, recipient or partner.',
-        style: TextStyle(fontSize: 11.5, color: AppColors.disabledTint, height: 1.4),
       ),
     ];
   }
+
 
   /// Shown when nothing is published yet (or there is no backend to ask).
   Widget _fallbackContent() => Column(

@@ -31,6 +31,7 @@ class CooldownScreen extends StatelessWidget {
                   Align(
                     alignment: Alignment.centerLeft,
                     child: IconButton(
+                      tooltip: 'Back',
                       icon: const RbIcon(RbGlyph.back, color: AppColors.textPrimaryWarm),
                       onPressed: () => Navigator.of(context).maybePop(),
                     ),

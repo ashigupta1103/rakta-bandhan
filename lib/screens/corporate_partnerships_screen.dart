@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../preview_mode.dart';
 import '../services/backend.dart';
+import '../demo/demo.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/filter_chip_row.dart';
@@ -38,7 +38,8 @@ class CorporatePartnershipsScreen extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: Row(
                   children: [
-                    IconButton(icon: const RbIcon(RbGlyph.back, color: AppColors.textPrimaryWarm), onPressed: () => Navigator.pop(context)),
+                    IconButton(
+                      tooltip: 'Back',icon: const RbIcon(RbGlyph.back, color: AppColors.textPrimaryWarm), onPressed: () => Navigator.pop(context)),
                     const SizedBox(width: 4),
                     const Text('Partner with us', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
                   ],
@@ -74,13 +75,14 @@ class CorporatePartnershipsScreen extends StatelessWidget {
                         _sponsorCard(RbGlyph.community, AppColors.successBg, AppColors.successText, 'Corporate volunteering'),
                       ],
                     ),
-                    if (kEnablePreviewUi) ...[
+                    // Sample partners exist only inside a client demo.
+                    if (Demo.on) ...[
                       const SizedBox(height: 22),
                       Row(
                         children: [
                           const RbIcon(RbGlyph.eye, size: 13, color: AppColors.goldDeep),
                           const SizedBox(width: 6),
-                          const Text('Preview data — sample partner layout', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: AppColors.goldDeep)),
+                          const Text('Demo · sample partner layout', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.goldDeep)),
                         ],
                       ),
                       const SizedBox(height: 12),
@@ -253,6 +255,10 @@ class _ConversationSheetState extends State<_ConversationSheet> {
       _error = null;
     });
     if (!formOk || _interest == null) return;
+    if (Demo.on) {
+      setState(() => _error = 'Demo · enquiries aren’t sent from the demo.');
+      return;
+    }
 
     setState(() => _submitting = true);
     try {

@@ -4,7 +4,9 @@ import '../screens/donation_confirm_screen.dart';
 import '../screens/login_screen.dart';
 import '../screens/main_navigation_screen.dart';
 import '../screens/call_screen.dart';
+import '../screens/urgent_alert_screen.dart';
 import '../services/call_service.dart';
+import '../services/urgent_alert_service.dart' show UrgentAlert;
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/rb_icon.dart';
@@ -32,24 +34,24 @@ class DemoOverlay extends StatelessWidget {
           child,
           if (Demo.on)
             Positioned(
-              // Top centre: clear of back buttons (left) and header
-              // actions (right).
-              top: MediaQuery.paddingOf(context).top + 2,
+              // A slim tab on the left edge, mid-screen: clear of app bars,
+              // bottom navigation and the 20px content gutter.
               left: 0,
-              right: 0,
-              child: Center(
-                child: Material(
-                color: AppColors.goldDeepest,
-                borderRadius: BorderRadius.circular(99),
+              top: MediaQuery.sizeOf(context).height * 0.44,
+              child: Material(
+                color: AppColors.goldDeepest.withValues(alpha: 0.92),
+                borderRadius: const BorderRadius.horizontal(right: Radius.circular(8)),
                 child: InkWell(
-                  borderRadius: BorderRadius.circular(99),
-                  onTap: () => _openControls(),
+                  borderRadius: const BorderRadius.horizontal(right: Radius.circular(8)),
+                  onTap: _openControls,
                   child: const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                    child: Text('Demo', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.goldTint)),
+                    padding: EdgeInsets.symmetric(horizontal: 3, vertical: 10),
+                    child: RotatedBox(
+                      quarterTurns: 3,
+                      child: Text('Demo', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: AppColors.goldTint)),
+                    ),
                   ),
                 ),
-              ),
               ),
             ),
         ],
@@ -88,6 +90,23 @@ class _DemoControls extends StatelessWidget {
     final requester = d.role == DemoRole.requester;
     final peerConfirmed = r?[requester ? 'donor_confirmed_at' : 'requester_confirmed_at'] != null;
     final steps = <(RbGlyph, String, VoidCallback)>[
+      if (!requester && status == 'open')
+        (RbGlyph.bell, 'Urgent request alert', () {
+          Navigator.pop(context);
+          _nav.push(MaterialPageRoute(
+            fullscreenDialog: true,
+            builder: (_) => const UrgentAlertScreen(
+              alert: UrgentAlert(
+                requestId: Demo.requestId,
+                bloodGroup: Demo.bloodGroup,
+                units: 1,
+                urgency: 'urgent',
+                locationLabel: Demo.hospital,
+                distanceKm: Demo.donorDistanceKm,
+              ),
+            ),
+          ));
+        }),
       if (requester && status == 'open')
         (RbGlyph.connect, '${Demo.donorName} accepts now', () {
           Navigator.pop(context);
@@ -135,6 +154,16 @@ class _DemoControls extends StatelessWidget {
             RbListGroup(
               children: [
                 RbRow(icon: RbGlyph.home, tone: RbTone.neutral, title: 'Go to home', onTap: () => _home(context)),
+                RbRow(
+                  icon: requester ? RbGlyph.heart : RbGlyph.droplet,
+                  tone: RbTone.neutral,
+                  title: requester ? 'Switch to the donor (${Demo.donorName})' : 'Switch to the requester (${Demo.requesterName})',
+                  subtitle: 'Starts that journey from the beginning',
+                  onTap: () {
+                    d.start(requester ? DemoRole.donor : DemoRole.requester);
+                    _home(context);
+                  },
+                ),
                 RbRow(
                   icon: RbGlyph.retry,
                   tone: RbTone.neutral,

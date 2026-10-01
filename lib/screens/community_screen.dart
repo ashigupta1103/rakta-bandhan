@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -306,6 +308,9 @@ class _CommunityScreenState extends State<CommunityScreen> {
               ],
             ),
           ),
+          // Client demo: a photo picked on this device, never uploaded.
+          if (data['image_bytes'] is Uint8List)
+            AspectRatio(aspectRatio: 4 / 5, child: Image.memory(data['image_bytes'] as Uint8List, fit: BoxFit.cover, width: double.infinity)),
           if (imageUrl != null)
             GestureDetector(
               onTap: () => Navigator.push(context, MaterialPageRoute(fullscreenDialog: true, builder: (_) => _PhotoViewer(url: imageUrl))),
@@ -642,7 +647,8 @@ class _PhotoViewer extends StatelessWidget {
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
         elevation: 0,
-        leading: IconButton(icon: const RbIcon(RbGlyph.close), onPressed: () => Navigator.pop(context)),
+        leading: IconButton(
+                      tooltip: 'Close',icon: const RbIcon(RbGlyph.close), onPressed: () => Navigator.pop(context)),
       ),
       body: Center(
         child: InteractiveViewer(

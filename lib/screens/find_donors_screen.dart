@@ -179,6 +179,11 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
   /// the map back to it.
   Future<void> _recenter() async {
     if (_recentering) return;
+    if (Demo.on) {
+      // The demo never reads GPS: back to the fixed demo point.
+      _moveMap(Demo.lat, Demo.lng, 13);
+      return;
+    }
     setState(() => _recentering = true);
     try {
       final p = await Backend.instance.preciseLocation();
@@ -696,7 +701,8 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
                 suffixIcon: _searching
                     ? const Padding(padding: EdgeInsets.all(14), child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)))
                     : (_searchedLabel != null
-                        ? IconButton(icon: const RbIcon(RbGlyph.close, size: 18, color: AppColors.textSecondary), onPressed: _clearSearch)
+                        ? IconButton(
+                      tooltip: 'Close',icon: const RbIcon(RbGlyph.close, size: 18, color: AppColors.textSecondary), onPressed: _clearSearch)
                         : null),
                 border: InputBorder.none,
                 enabledBorder: InputBorder.none,

@@ -100,9 +100,9 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
     }
     if (Demo.on) {
       // Kept in the demo's own feed only — never posted.
-      Demo.instance.addStory(body, _topic);
+      Demo.instance.addStory(body, _topic, photo: _photoBytes);
       Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Demo · added to the demo feed only. Nothing was posted.')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Demo · added to the demo feed on this device. Nothing was posted or uploaded.')));
       return;
     }
     setState(() => _submitting = true);
@@ -142,7 +142,8 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
               height: 48,
               child: Row(
                 children: [
-                  IconButton(icon: const RbIcon(RbGlyph.close, color: AppColors.textPrimaryWarm), onPressed: () => Navigator.pop(context)),
+                  IconButton(
+                      tooltip: 'Close',icon: const RbIcon(RbGlyph.close, color: AppColors.textPrimaryWarm), onPressed: () => Navigator.pop(context)),
                   const Text('Share an experience', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
                 ],
               ),
@@ -192,21 +193,7 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
                       ),
                     ),
                     const SizedBox(height: 14),
-                    if (Demo.on)
-                      // Honest unavailable state: a demo never uploads.
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
-                        decoration: BoxDecoration(color: AppColors.sand, borderRadius: BorderRadius.circular(12)),
-                        child: const Row(
-                          children: [
-                            RbIcon(RbGlyph.photoOff, size: 17, color: AppColors.ink2),
-                            SizedBox(width: 10),
-                            Expanded(child: Text('Photo upload is off in the demo.', style: TextStyle(fontSize: 13.5, color: AppColors.ink2))),
-                          ],
-                        ),
-                      )
-                    else if (_photoBytes != null)
+                    if (_photoBytes != null)
                       // Preview exactly as the feed will show it.
                       ClipRRect(
                         borderRadius: BorderRadius.circular(14),
@@ -259,6 +246,10 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
                           ),
                         ),
                       ),
+                    if (Demo.on) ...[
+                      const SizedBox(height: 8),
+                      const Text('Demo · a photo you pick stays on this device for the demo feed. Nothing is uploaded.', style: TextStyle(fontSize: 12, color: AppColors.goldDeep, height: 1.4)),
+                    ],
                     const SizedBox(height: 22),
                     const Text('Choose a topic', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.1, color: AppColors.ink2)),
                     const SizedBox(height: 10),

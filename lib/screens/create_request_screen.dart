@@ -232,6 +232,7 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
+          tooltip: 'Back',
           icon: const RbIcon(RbGlyph.back, color: AppColors.textPrimaryWarm),
           onPressed: () => Navigator.pop(context),
         ),
@@ -397,11 +398,8 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
     );
   }
 
-  /// Informational only — matches the final artifact's copy exactly, but
-  /// there is nowhere in the current Firestore schema to persist a
-  /// per-request consent flag, and backend.dart/the schema stay untouched
-  /// in this phase. The actual gate before a phone number is ever shown
-  /// lives where the number is revealed (MatchContactScreen), not here.
+  /// Informational only: phone numbers are never shown to anyone (see
+  /// phone_privacy.dart), whatever the urgency.
   Widget _criticalConsentNote() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -415,10 +413,10 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Critical requests can share your number', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.red700)),
+                Text('Your number stays private', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.red700)),
                 const SizedBox(height: 2),
                 Text(
-                  'A donor who accepts will be asked before they can call you directly.',
+                  'Even for critical requests. The donor who accepts reaches you through in-app messages and calls.',
                   style: TextStyle(fontSize: 11.5, color: AppColors.red800, height: 1.4),
                 ),
               ],

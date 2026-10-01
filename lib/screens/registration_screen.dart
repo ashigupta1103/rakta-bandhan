@@ -277,6 +277,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           backgroundColor: Colors.transparent,
           elevation: 0,
           leading: IconButton(
+            tooltip: 'Back',
             icon: const RbIcon(
               RbGlyph.back,
               color: AppColors.textPrimaryWarm,

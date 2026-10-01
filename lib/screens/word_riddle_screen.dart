@@ -239,6 +239,8 @@ class _LetterSlots extends StatelessWidget {
         children: [
           Opacity(
             opacity: 0,
+            // Keep the real input in the semantics tree (screen readers).
+            alwaysIncludeSemantics: true,
             child: SizedBox(
               height: 48,
               child: TextField(

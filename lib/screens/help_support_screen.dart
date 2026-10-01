@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/backend.dart';
+import '../demo/demo.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/filter_chip_row.dart';
@@ -30,11 +31,11 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
   static const _faqs = [
     (
       'How does verification work?',
-      'Signing in only needs a one-time code sent to your phone — no password, no document. The green "Verified" badge on your profile is separate: an administrator reviews your profile and marks it verified by hand.',
+      'Signing in only needs a one-time code sent to your email — no password, no document. The green "Verified" badge on your profile is separate: an administrator reviews your profile and marks it verified by hand.',
     ),
     (
       'Who can see my number?',
-      'Nobody sees it just by browsing. The donor and request lists only ever show name, blood group and distance — never a phone number. Your number is shared with exactly one person: whoever you match with on a specific request (the donor you accept, or the donor who accepts your request), and only for that match.',
+      'Nobody. The donor and request lists only show name, blood group and approximate distance, and your number is never shown — not even after a match. You only ever see its last three digits yourself. Matched people talk through in-app messages and calls.',
     ),
     (
       'Why am I in a 90-day cooldown?',
@@ -42,7 +43,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
     ),
     (
       'How do I change my community name?',
-      "This isn't available yet — there is no community-name field in the app today. Your profile only stores the name, phone number and blood group you registered with, and none of those can currently be edited after registration.",
+      "This isn't available yet — there is no community-name field in the app today. Your profile only stores the name, phone number and blood group you registered with, and you can change your name and mobile number in My Page › Personal information.",
     ),
     (
       'How do I create a blood request?',
@@ -50,7 +51,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
     ),
     (
       'How do I find compatible donors?',
-      'Open the Find tab to search the map for available donors near a location, filtered by blood group. Tapping a donor shows their distance and blood group — never their phone number until you’re matched on a specific request.',
+      'Open the Find tab to search the map for available donors near a location, filtered by blood group. Tapping a donor shows their distance and blood group — never their phone number.',
     ),
     (
       'How does donor matching work?',
@@ -113,7 +114,8 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: Row(
                   children: [
-                    IconButton(icon: const RbIcon(RbGlyph.back, color: AppColors.textPrimaryWarm), onPressed: () => Navigator.pop(context)),
+                    IconButton(
+                      tooltip: 'Back',icon: const RbIcon(RbGlyph.back, color: AppColors.textPrimaryWarm), onPressed: () => Navigator.pop(context)),
                     const SizedBox(width: 4),
                     const Text('Help & support', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
                   ],
@@ -148,6 +150,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                             suffixIcon: _query.isEmpty
                                 ? null
                                 : IconButton(
+                                  tooltip: 'Close',
                                     icon: const RbIcon(RbGlyph.close, size: 15, color: AppColors.disabledTint),
                                     onPressed: () => setState(() {
                                       _searchController.clear();
@@ -271,6 +274,10 @@ class _ReportIssueSheetState extends State<_ReportIssueSheet> {
 
   Future<void> _submit() async {
     if (_reason == null || _submitting) return;
+    if (Demo.on) {
+      setState(() => _error = 'Demo · reports aren’t sent from the demo.');
+      return;
+    }
     setState(() {
       _submitting = true;
       _error = null;

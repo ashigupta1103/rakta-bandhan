@@ -7,7 +7,7 @@
 // _handleBack).
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:rakta_bandhan/widgets/rb_icon.dart';
 
 import 'package:rakta_bandhan/screens/login_screen.dart';
 import 'package:rakta_bandhan/screens/registration_screen.dart';
@@ -20,7 +20,7 @@ void main() {
     expect(find.byType(RegistrationScreen), findsOneWidget);
     expect(Navigator.canPop(tester.element(find.byType(RegistrationScreen))), isFalse, reason: 'this screen is always a fresh stack root in the real app');
 
-    await tester.tap(find.byIcon(LucideIcons.arrowLeft));
+    await tester.tap(_glyph(RbGlyph.back));
     await tester.pumpAndSettle();
 
     expect(find.byType(LoginScreen), findsOneWidget, reason: 'backing out of a rootless registration screen must land on Login, not a black/empty screen');
@@ -31,10 +31,12 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: RegistrationScreen(phoneNumber: '9999999999')));
     await tester.pump();
 
-    await tester.tap(find.byIcon(LucideIcons.arrowLeft));
-    await tester.tap(find.byIcon(LucideIcons.arrowLeft));
+    await tester.tap(_glyph(RbGlyph.back));
+    await tester.tap(_glyph(RbGlyph.back));
     await tester.pumpAndSettle();
 
     expect(find.byType(LoginScreen), findsOneWidget, reason: 'a second rapid tap must be a no-op, not a second navigation attempt');
   });
 }
+
+Finder _glyph(RbGlyph g) => find.byWidgetPredicate((w) => w is RbIcon && w.glyph == g);

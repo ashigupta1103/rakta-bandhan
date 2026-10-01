@@ -241,6 +241,8 @@ class CodeBoxes extends StatelessWidget {
           // paste and autofill.
           Opacity(
             opacity: 0,
+            // Keep the real input in the semantics tree (screen readers).
+            alwaysIncludeSemantics: true,
             child: SizedBox(
               height: 56,
               child: TextField(

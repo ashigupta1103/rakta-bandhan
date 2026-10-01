@@ -46,6 +46,14 @@ class _CertificateScreenState extends State<CertificateScreen> {
     return data!.buffer.asUint8List();
   }
 
+  static const _months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+  /// Records carry a "D Month YYYY" date; only today's donation says "today".
+  bool get _isToday {
+    final n = DateTime.now();
+    return record.date == '${n.day} ${_months[n.month - 1]} ${n.year}';
+  }
+
   String get _fileName => 'rakta-bandhan-certificate-$donationNumber';
 
   Future<void> _save() async {
@@ -105,6 +113,7 @@ class _CertificateScreenState extends State<CertificateScreen> {
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: IconButton(
+                    tooltip: 'Close',
                     icon: const RbIcon(RbGlyph.close, color: AppColors.onEmberWarm),
                     onPressed: () => Navigator.pop(context),
                   ),
@@ -125,7 +134,7 @@ class _CertificateScreenState extends State<CertificateScreen> {
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        'You helped someone today',
+                        _isToday ? 'You helped someone today' : 'Thank you for donating',
                         textAlign: TextAlign.center,
                         style: AppTextStyles.display(fontSize: 28, height: 1.2, color: AppColors.onEmberWarm),
                       ),
@@ -179,7 +188,7 @@ class _CertificateScreenState extends State<CertificateScreen> {
   Widget _certificateCard(String name) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(20, 22, 20, 22),
+      padding: const EdgeInsets.fromLTRB(20, 22, 20, 28),
       decoration: BoxDecoration(
         color: const Color(0xFFFDFAF4),
         borderRadius: BorderRadius.circular(12),
@@ -264,6 +273,8 @@ class _CertificateScreenState extends State<CertificateScreen> {
                   ],
                 ),
               ),
+              const SizedBox(height: 10),
+              const Text('Platform by Elmatics', style: TextStyle(fontSize: 10, color: AppColors.mutedInk)),
             ],
           ),
         ],

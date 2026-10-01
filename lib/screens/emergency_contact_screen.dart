@@ -110,6 +110,7 @@ class _EmergencyContactScreenState extends State<EmergencyContactScreen> {
                   Align(
                     alignment: Alignment.centerLeft,
                     child: IconButton(
+                      tooltip: 'Back',
                       icon: const RbIcon(RbGlyph.back, color: AppColors.textPrimaryWarm),
                       onPressed: () => Navigator.pop(context),
                     ),

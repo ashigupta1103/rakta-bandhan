@@ -13,6 +13,9 @@ import '../widgets/step_tracker.dart';
 import 'call_screen.dart';
 import 'cancel_confirm_screen.dart';
 import 'chat_screen.dart';
+import 'create_experience_screen.dart';
+import 'donor_details_screen.dart';
+import 'testimonials_screen.dart';
 import 'create_request_screen.dart';
 import '../widgets/rb_icon.dart';
 
@@ -109,6 +112,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
         backgroundColor: AppColors.warmPageBackground,
         elevation: 0,
         leading: IconButton(
+          tooltip: 'Back',
           icon: const RbIcon(RbGlyph.back, color: AppColors.textPrimaryWarm),
           onPressed: () => Navigator.pop(context),
         ),
@@ -235,6 +239,29 @@ class _TrackingScreenState extends State<TrackingScreen> {
                                       isFulfilled ? 'Donated for this request' : (donorConfirmed ? 'Says they have donated' : 'Accepted your request'),
                                       style: const TextStyle(fontSize: 13, color: AppColors.ink2),
                                     ),
+                                    if (_demo)
+                                      GestureDetector(
+                                        onTap: () => Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) => const DonorDetailsScreen(
+                                              donorId: Demo.donorUid,
+                                              name: Demo.donorName,
+                                              initials: 'AM',
+                                              bloodGroup: Demo.bloodGroup,
+                                              isVerified: true,
+                                              distanceKm: Demo.donorDistanceKm,
+                                              isAvailable: true,
+                                              matched: true,
+                                              donationCount: Demo.donorPriorDonations,
+                                            ),
+                                          ),
+                                        ),
+                                        child: const Padding(
+                                          padding: EdgeInsets.only(top: 4),
+                                          child: Text('View profile', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.brandRed)),
+                                        ),
+                                      ),
                                   ],
                                 ),
                               ),
@@ -284,6 +311,41 @@ class _TrackingScreenState extends State<TrackingScreen> {
                             : const RbIcon(RbGlyph.verified, size: 16),
                         label: const Text('Mark donation received'),
                       ),
+                  ],
+                  if (isFulfilled) ...[
+                    const SizedBox(height: 16),
+                    RbCard(
+                      color: AppColors.successBg,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const RbIcon(RbGlyph.heart, size: 26, color: AppColors.successText),
+                          const SizedBox(height: 10),
+                          Text('Donation received', style: AppTextStyles.display(fontSize: 21, color: AppColors.ink)),
+                          const SizedBox(height: 4),
+                          Text(
+                            'You and ${donorName ?? 'your donor'} both confirmed it. If you’d like, tell others what this meant to you.',
+                            style: const TextStyle(fontSize: 13.5, color: AppColors.ink2, height: 1.45),
+                          ),
+                          const SizedBox(height: 14),
+                          ElevatedButton.icon(
+                            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TestimonialsScreen())),
+                            icon: const RbIcon(RbGlyph.quote, size: 16),
+                            label: const Text('Add a testimonial'),
+                          ),
+                          const SizedBox(height: 8),
+                          OutlinedButton.icon(
+                            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateExperienceScreen())),
+                            icon: const RbIcon(RbGlyph.pen, size: 16),
+                            label: const Text('Share in Community'),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.of(context).popUntil((r) => r.isFirst),
+                            child: const Text('Go home'),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                   if (isTerminalBad) ...[
                     const SizedBox(height: 14),

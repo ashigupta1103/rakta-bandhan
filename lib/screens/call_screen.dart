@@ -79,6 +79,7 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
   Timer? _hintTimer;
   bool _showHint = false;
   bool _closing = false;
+  bool _demoLogged = false;
 
   ActiveCall? _call;
   _Stage _stage = _Stage.starting;
@@ -173,6 +174,11 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
     }
     _lastPhase = call.phase;
 
+    if (call.phase == CallPhase.ended && call.simulated && !_demoLogged && call.isCaller) {
+      // A demo call shows up in the demo chat like a real call row.
+      _demoLogged = true;
+      Demo.instance.logCall(call.connectedAt == null ? null : DateTime.now().difference(call.connectedAt!).inSeconds);
+    }
     if (call.phase == CallPhase.ended && !_closing && _stage == _Stage.live) {
       final unanswered = call.isCaller && call.connectedAt == null && call.endReason != 'Call cancelled';
       if (unanswered) {

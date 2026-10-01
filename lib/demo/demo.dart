@@ -75,6 +75,7 @@ class Demo extends ChangeNotifier {
   final List<Map<String, dynamic>> stories = [];
   bool riddleStarted = false;
   bool _available = true;
+  bool _newUser = false;
   bool urgentAlerts = true;
 
   void setUrgentAlerts(bool v) {
@@ -95,9 +96,10 @@ class Demo extends ChangeNotifier {
   /// Starts (or restarts) a session in [role]. [registered] false walks
   /// the new-user registration first.
   void start(DemoRole r, {bool registered = true}) {
-    _reset();
     role = r;
+    _reset();
     this.registered = registered;
+    _newUser = !registered;
     _active = true;
     if (r == DemoRole.donor) _request = _incomingRequest();
     notifyListeners();
@@ -284,8 +286,9 @@ class Demo extends ChangeNotifier {
 
   // ------------------------------------------------------------ community
 
-  void addStory(String body, String topic) {
+  void addStory(String body, String topic, {Uint8List? photo}) {
     stories.insert(0, {
+      'image_bytes': ?photo,
       'author_uid': myUid,
       'author_name': myName,
       'topic': topic,
@@ -319,7 +322,8 @@ class Demo extends ChangeNotifier {
   Map<String, dynamic> get myProfile => {
         'name': myName,
         'blood_group': bloodGroup,
-        'is_verified': true,
+        // A brand-new demo registration is still awaiting verification.
+        'is_verified': !_newUser,
         'is_available': _available && recoveryUntil == null,
         'location_label': area,
         'phone': demoPhone,

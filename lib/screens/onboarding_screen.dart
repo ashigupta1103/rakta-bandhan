@@ -67,7 +67,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> with SingleTickerPr
       dark: false,
       ringScale: 0.90,
       headline: "Help, without exposing what shouldn't be",
-      body: 'You see distance. Names and numbers stay sealed until someone accepts.',
+      body: 'You see an approximate distance. Phone numbers are never shown — you talk in the app.',
     ),
   ];
 

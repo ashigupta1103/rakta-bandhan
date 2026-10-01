@@ -17,7 +17,7 @@
 // screen "behind" another one is not a reliable signal either way.
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:rakta_bandhan/widgets/rb_icon.dart';
 
 import 'package:rakta_bandhan/theme/app_theme.dart';
 import 'package:rakta_bandhan/widgets/app_header.dart';
@@ -58,7 +58,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull, reason: 'AppHeader must not overflow its own preferredSize');
 
-      await tester.tap(find.byIcon(LucideIcons.ellipsis));
+      await tester.tap(_glyph(RbGlyph.more));
       await tester.pumpAndSettle();
       expect(find.text('More'), findsOneWidget, reason: 'the More sheet should have opened');
       final sheetRoute = log.stack.last;
@@ -84,3 +84,5 @@ void main() {
     });
   }
 }
+
+Finder _glyph(RbGlyph g) => find.byWidgetPredicate((w) => w is RbIcon && w.glyph == g);

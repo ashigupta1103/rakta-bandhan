@@ -654,7 +654,8 @@ class _BackOnlyHeader extends StatelessWidget {
         height: 60,
         child: Align(
           alignment: Alignment.centerLeft,
-          child: IconButton(icon: const RbIcon(RbGlyph.back, size: 20, color: AppColors.ink), onPressed: onBack),
+          child: IconButton(
+                      tooltip: 'Back',icon: const RbIcon(RbGlyph.back, size: 20, color: AppColors.ink), onPressed: onBack),
         ),
       );
 }
