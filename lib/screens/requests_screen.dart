@@ -27,12 +27,22 @@ class RequestsScreen extends StatefulWidget {
 class _RequestsScreenState extends State<RequestsScreen> {
   String _activeTab = 'My requests';
   String? _myBloodGroup;
+  // Requests near the donor's registered area — created once, so a rebuild
+  // doesn't tear down and re-bill the geohash listeners.
+  Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>>? _nearbyOpen;
 
   @override
   void initState() {
     super.initState();
     Backend.instance.myDonorDoc().then((snap) {
-      if (mounted) setState(() => _myBloodGroup = snap.data()?['blood_group'] as String?);
+      if (!mounted) return;
+      final data = snap.data();
+      final lat = (data?['lat'] as num?)?.toDouble();
+      final lng = (data?['lng'] as num?)?.toDouble();
+      setState(() {
+        _myBloodGroup = data?['blood_group'] as String?;
+        if (lat != null && lng != null) _nearbyOpen = Backend.instance.openRequestsNearStream(lat, lng);
+      });
     });
   }
 
@@ -163,8 +173,8 @@ class _RequestsScreenState extends State<RequestsScreen> {
     final compatible = Backend.instance.compatibleRecipientGroups(_myBloodGroup!);
     final myUid = Backend.instance.currentUser?.uid;
 
-    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: Backend.instance.openRequestsStream(),
+    return StreamBuilder<List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
+      stream: _nearbyOpen ?? Stream.value(const []),
       builder: (context, openSnapshot) {
         return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
           stream: FirebaseFirestore.instance
@@ -176,7 +186,7 @@ class _RequestsScreenState extends State<RequestsScreen> {
             if (!openSnapshot.hasData || !matchedSnapshot.hasData) {
               return const Center(child: CircularProgressIndicator(strokeWidth: 2));
             }
-            final openDocs = openSnapshot.data!.docs
+            final openDocs = openSnapshot.data!
                 .where((d) => d.data()['requester_uid'] != myUid && compatible.contains(d.data()['blood_group']))
                 .toList();
             final matchedDocs = matchedSnapshot.data!.docs;

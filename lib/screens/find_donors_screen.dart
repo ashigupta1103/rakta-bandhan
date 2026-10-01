@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart' as gm;
 import 'package:latlong2/latlong.dart' hide Path;
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../services/backend.dart';
@@ -13,6 +14,7 @@ import '../theme/app_text_styles.dart';
 import '../theme/app_theme.dart';
 import '../widgets/blood_group_droplet.dart';
 import '../widgets/filter_chip_row.dart';
+import '../widgets/map_markers.dart';
 import '../widgets/map_tiles.dart';
 import '../widgets/state_card.dart';
 import 'donor_details_screen.dart';
@@ -45,6 +47,7 @@ class FindDonorsScreen extends StatefulWidget {
 class _FindDonorsScreenState extends State<FindDonorsScreen> {
   final TextEditingController _searchController = TextEditingController();
   final MapController _mapController = MapController();
+  gm.GoogleMapController? _gmap;
   final DraggableScrollableController _sheetController = DraggableScrollableController();
   Position? _position;
   _MapPermissionState _permissionState = _MapPermissionState.checking;
@@ -160,7 +163,7 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
         _searchController.clear();
         _searchedLabel = null;
       });
-      _mapController.move(LatLng(p.latitude, p.longitude), 15);
+      _moveMap(p.latitude, p.longitude, 15);
     } finally {
       if (mounted) setState(() => _recentering = false);
     }
@@ -203,7 +206,59 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
       );
       _suggestions = [];
     });
-    _mapController.move(LatLng(lat, lng), _mapController.camera.zoom);
+    _moveMap(lat, lng, null);
+  }
+
+  /// Moves whichever map engine is on screen; a null [zoom] keeps the
+  /// current zoom level.
+  void _moveMap(double lat, double lng, double? zoom) {
+    if (useGoogleMaps) {
+      final target = gm.LatLng(lat, lng);
+      _gmap?.animateCamera(zoom == null ? gm.CameraUpdate.newLatLng(target) : gm.CameraUpdate.newLatLngZoom(target, zoom));
+    } else {
+      _mapController.move(LatLng(lat, lng), zoom ?? _mapController.camera.zoom);
+    }
+  }
+
+  /// Native Google map with painted donor pins (DonorMarkerIcons); a pin
+  /// with no icon ready yet shows Google's default red marker for a frame.
+  Widget _googleMap(List<Map<String, dynamic>> mappable) {
+    final ratio = MediaQuery.devicePixelRatioOf(context);
+    final markers = <gm.Marker>{};
+    for (var i = 0; i < mappable.length; i++) {
+      final d = mappable[i];
+      final group = d['bloodGroup'] as String;
+      final primary = i == 0;
+      final highlighted = _highlightedDonorId == d['id'];
+      final icon = DonorMarkerIcons.peek(group, primary: primary, highlighted: highlighted);
+      if (icon == null) {
+        DonorMarkerIcons.warm(group, primary: primary, highlighted: highlighted, pixelRatio: ratio).then((_) {
+          if (mounted) setState(() {});
+        });
+      }
+      markers.add(gm.Marker(
+        markerId: gm.MarkerId(d['id'] as String),
+        position: gm.LatLng(d['lat'] as double, d['lng'] as double),
+        icon: icon ?? gm.BitmapDescriptor.defaultMarkerWithHue(gm.BitmapDescriptor.hueRed),
+        anchor: const Offset(0.5, 1),
+        zIndexInt: highlighted ? 2 : (primary ? 1 : 0),
+        onTap: () => setState(() => _highlightedDonorId = d['id'] as String),
+      ));
+    }
+    return gm.GoogleMap(
+      initialCameraPosition: gm.CameraPosition(target: gm.LatLng(_position!.latitude, _position!.longitude), zoom: 13),
+      onMapCreated: (c) => _gmap = c,
+      myLocationEnabled: !Backend.isFallback(_position!),
+      myLocationButtonEnabled: false,
+      zoomControlsEnabled: false,
+      mapToolbarEnabled: false,
+      compassEnabled: false,
+      rotateGesturesEnabled: false,
+      tiltGesturesEnabled: false,
+      // Keep Google's logo clear of the donor sheet.
+      padding: EdgeInsets.only(bottom: MediaQuery.sizeOf(context).height * _sheetExtent),
+      markers: markers,
+    );
   }
 
   void _clearSearch() {
@@ -297,6 +352,7 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
                   });
                 final mappable = donors.where((d) => d['lat'] != null && d['lng'] != null).toList();
 
+                if (useGoogleMaps) return _googleMap(mappable);
                 return FlutterMap(
                   mapController: _mapController,
                   options: MapOptions(
@@ -741,6 +797,18 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
                         Text(isAvailable ? 'Available' : 'Unavailable', style: const TextStyle(fontSize: 12.5, color: AppColors.ink2)),
                       ],
                     ),
+                    if ((donor['area'] as String).isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          const Icon(LucideIcons.mapPin, size: 11, color: AppColors.ink2),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(donor['area'] as String, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: AppColors.ink2)),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -811,6 +879,7 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
       'lat': lat,
       'lng': lng,
       'distanceKm': km,
+      'area': data['area'] as String? ?? '',
     };
   }
 }

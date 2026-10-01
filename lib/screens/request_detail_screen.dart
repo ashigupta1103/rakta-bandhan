@@ -78,6 +78,12 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
     } on RequestAlreadyClaimedException {
       if (!mounted) return;
       Navigator.push(context, MaterialPageRoute(builder: (context) => const AcceptResultScreen(outcome: AcceptOutcome.claimed)));
+    } on DonorOnCooldownException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    } on DonorAlreadyMatchedException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not accept. Please try again.')));

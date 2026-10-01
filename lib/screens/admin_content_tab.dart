@@ -1,6 +1,8 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../services/admin_service.dart';
+import '../services/backend.dart';
 import '../theme/app_colors.dart';
 import '../widgets/status_badge.dart';
 
@@ -80,6 +82,59 @@ class AdminContentTab extends StatelessWidget {
                 onConfirm: () => _service.deleteTestimonial(t.id),
               ),
             ),
+        const SizedBox(height: 12),
+        StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: Backend.instance.testimonialSubmissionsStream(),
+          builder: (context, snap) {
+            final docs = snap.data?.docs ?? const [];
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _sectionHeader('SUBMITTED BY MEMBERS', '${docs.length} waiting · members consented to publishing'),
+                if (docs.isEmpty)
+                  _emptyRow('No member submissions waiting.')
+                else
+                  for (final d in docs)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(color: Colors.white, border: Border.all(color: AppColors.cardBorderWarm), borderRadius: BorderRadius.circular(14)),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${d.data()['name'] ?? 'Member'}${(d.data()['role'] as String? ?? '').isEmpty ? '' : ' · ${d.data()['role']}'}',
+                            style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm),
+                          ),
+                          const SizedBox(height: 6),
+                          Text('"${d.data()['quote'] ?? ''}"', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.5)),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              TextButton.icon(
+                                onPressed: () => Backend.instance.adminApproveTestimonialSubmission(d.id, d.data()),
+                                icon: const Icon(LucideIcons.check, size: 15),
+                                label: const Text('Publish'),
+                              ),
+                              TextButton.icon(
+                                style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+                                onPressed: () => confirmAdminDelete(
+                                  context,
+                                  what: 'this submission',
+                                  onConfirm: () => Backend.instance.adminRejectTestimonialSubmission(d.id),
+                                ),
+                                icon: const Icon(LucideIcons.x, size: 15),
+                                label: const Text('Reject'),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+              ],
+            );
+          },
+        ),
         const SizedBox(height: 22),
         _sectionHeader('IMPACT COUNTER', 'Community → Impact, this month'),
         Container(

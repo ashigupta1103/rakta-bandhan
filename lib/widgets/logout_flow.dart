@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../screens/login_screen.dart';
 import '../services/backend.dart';
+import '../services/push_service.dart';
 import '../theme/app_colors.dart';
 
 /// Single logout confirmation + sign-out flow shared by every screen that
@@ -35,6 +36,10 @@ Future<void> confirmAndLogOut(
 
   setLoading(true);
   try {
+    // Stop this phone receiving that account's pushes first — clearing the
+    // saved token needs the session that's about to end.
+    await Backend.instance.clearPushToken().catchError((_) {});
+    await PushService.instance.unregisterDevice();
     await Backend.instance.signOut();
     if (!context.mounted) return;
     Navigator.pushAndRemoveUntil(

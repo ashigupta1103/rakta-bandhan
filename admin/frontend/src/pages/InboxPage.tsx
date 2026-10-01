@@ -146,7 +146,9 @@ export default function InboxPage() {
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium">{report.reason}</p>
                     <p className="text-xs text-muted-foreground font-mono mt-0.5">
-                      reported {report.reported_uid} · request {report.request_id}
+                      {report.story_id
+                        ? <>community post {report.story_id}</>
+                        : <>reported {report.reported_uid} · request {report.request_id}</>}
                     </p>
                     {report.details && (
                       <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">{report.details}</p>

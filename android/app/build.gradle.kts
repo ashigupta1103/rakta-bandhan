@@ -18,6 +18,15 @@ val keystoreProperties = Properties().apply {
 }
 val hasReleaseKey = keystoreProperties.getProperty("storeFile") != null
 
+// Google Maps key: MAPS_API_KEY in android/local.properties (git-ignored) or
+// the environment. Empty is fine — the app then uses its flutter_map
+// fallback (see lib/services/geo_config.dart, kUseGoogleMaps).
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) load(FileInputStream(file))
+}
+val mapsApiKey = localProperties.getProperty("MAPS_API_KEY") ?: System.getenv("MAPS_API_KEY") ?: ""
+
 android {
     namespace = "com.raktabandhan.app"
     compileSdk = flutter.compileSdkVersion
@@ -40,6 +49,7 @@ android {
         // flag during build.
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        manifestPlaceholders["mapsApiKey"] = mapsApiKey
     }
 
     signingConfigs {

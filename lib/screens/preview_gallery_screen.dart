@@ -25,7 +25,7 @@ import 'login_screen.dart';
 import 'no_donor_found_screen.dart';
 import 'notifications_screen.dart';
 import 'onboarding_screen.dart';
-import 'otp_screen.dart';
+import 'verify_email_screen.dart';
 import 'registration_screen.dart';
 import 'settings_screen.dart';
 import 'testimonials_screen.dart';
@@ -72,7 +72,7 @@ class PreviewGalleryScreen extends StatelessWidget {
                     _entry('Splash', () => const _UnavailablePreview(title: 'Splash', reason: "Resolves its destination using the signed-in user's Firebase Auth ID with no fallback for a signed-out preview session — opening it here would crash instead of showing anything useful. It's a 2-second brand animation with no interactive content to screenshot anyway.")),
                     _entry('Onboarding', () => const OnboardingScreen()),
                     _entry('Login', () => const LoginScreen()),
-                    _entry('OTP verification', () => const OtpScreen()),
+                    _entry('Verify email', () => const VerifyEmailScreen()),
                     _entry('Consent', () => const ConsentScreen()),
                     _entry('Registration', () => const RegistrationScreen(phoneNumber: '9999999999')),
                   ]),

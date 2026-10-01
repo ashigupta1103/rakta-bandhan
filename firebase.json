@@ -1,1 +1,76 @@
-{"firestore":{"rules":"backend/firestore.rules","indexes":"backend/firestore.indexes.json"},"hosting":{"public":"admin/frontend/build","ignore":["firebase.json","**/.*","**/node_modules/**"],"rewrites":[{"source":"**","destination":"/index.html"}]},"flutter":{"platforms":{"android":{"default":{"projectId":"rakta-bandhan2026","appId":"1:686452527533:android:1612485ff7a2ebc715d124","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"rakta-bandhan2026","configurations":{"android":"1:686452527533:android:1612485ff7a2ebc715d124","web":"1:686452527533:web:96e80f3e108d8f3015d124"}}}}}}
+{
+  "firestore": {
+    "rules": "backend/firestore.rules",
+    "indexes": "backend/firestore.indexes.json"
+  },
+  "hosting": {
+    "public": "admin/frontend/build",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "rakta-bandhan2026",
+          "appId": "1:686452527533:android:1612485ff7a2ebc715d124",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "rakta-bandhan2026",
+          "configurations": {
+            "android": "1:686452527533:android:1612485ff7a2ebc715d124",
+            "web": "1:686452527533:web:96e80f3e108d8f3015d124"
+          }
+        }
+      }
+    }
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "*.log",
+        "src"
+      ],
+      "predeploy": [
+        "npm --prefix \"$RESOURCE_DIR\" run build"
+      ]
+    }
+  ],
+  "storage": {
+    "rules": "backend/storage.rules"
+  },
+  "emulators": {
+    "auth": {
+      "port": 9099
+    },
+    "firestore": {
+      "port": 8080
+    },
+    "storage": {
+      "port": 9199
+    },
+    "functions": {
+      "port": 5001
+    },
+    "ui": {
+      "enabled": false
+    },
+    "singleProjectMode": true
+  }
+}

@@ -2,6 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'firebase_options.dart';
+import 'services/push_service.dart';
 import 'theme/app_colors.dart';
 import 'theme/app_theme.dart';
 import 'screens/splash_screen.dart';
@@ -9,6 +10,9 @@ import 'screens/splash_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  // Background message handler, notification taps, and the native
+  // incoming-call screen's accept/decline events.
+  await PushService.instance.init();
   runApp(const MyApp());
 }
 

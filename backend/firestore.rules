@@ -1,12 +1,13 @@
 rules_version = '2';
 
-// Rakta Bandhan — Firestore security rules (Spark/free-plan).
+// Rakta Bandhan — Firestore security rules.
 //
-// No Cloud Functions run behind this app (see backend/README.md) — every
-// invariant that a Cloud Function would normally enforce (single-active
-// -match locking, contact reveal, admin-only verification/ban) is enforced
-// here instead, against the same client-side transactions in
-// lib/services/backend.dart.
+// The app writes directly to Firestore; every invariant (single-active-
+// match locking, contact reveal, admin-only verification/ban, two-sided
+// donation completion, the 90-day cooldown) is enforced here, against the
+// client-side transactions in lib/services/backend.dart. Cloud Functions
+// (functions/) only send push notifications and expire old requests —
+// they use the Admin SDK, which bypasses these rules.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -26,14 +27,36 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == uid;
     }
 
+    // Accounts must confirm their email (Firebase verification link) — or,
+    // later, a phone number — before they can create anything. Stops
+    // throwaway sign-ups from posting requests or messaging donors.
+    function isVerifiedUser() {
+      return isSignedIn()
+        && (request.auth.token.get('email_verified', false) == true
+            || request.auth.token.get('phone_number', null) != null);
+    }
+
+    // The post-donation rest period can't be shortened, removed, or ignored
+    // by the donor: while it runs, the new value may only move later, and
+    // the donor can't mark themselves available.
+    function cooldownRespected() {
+      let before = resource.data.get('reactivation_scheduled_at', null);
+      let after = request.resource.data.get('reactivation_scheduled_at', null);
+      return (before == null || before <= request.time || (after != null && after >= before))
+        && (request.resource.data.get('is_available', false) != true
+            || after == null || after <= request.time);
+    }
+
     // True account disable needs the Admin SDK (Blaze-only) — this is the
     // Spark stand-in: a banned donor's own donors/{uid} doc is flagged,
     // and every write that matters (their own profile, new requests,
     // accepting a request) is denied while it's set, everywhere the
     // signed-in user's own uid is checkable without an extra read.
     function isBanned() {
-      return isSignedIn() &&
-        get(/databases/$(database)/documents/donors/$(request.auth.uid)).data.is_banned == true;
+      let profile = /databases/$(database)/documents/donors/$(request.auth.uid);
+      // exists() first: get() on a missing profile is a rules error, which
+      // would silently deny everyone who hasn't registered a profile yet.
+      return isSignedIn() && exists(profile) && get(profile).data.get('is_banned', false) == true;
     }
 
     // ---------------------------------------------------------------
@@ -44,6 +67,7 @@ service cloud.firestore {
       allow read: if isOwner(uid) || isAdmin();
 
       allow create: if isOwner(uid)
+        && isVerifiedUser()
         && request.resource.data.is_verified == false
         && request.resource.data.is_banned == false;
 
@@ -51,7 +75,8 @@ service cloud.firestore {
         || (isOwner(uid)
             && resource.data.is_banned == false
             && request.resource.data.is_verified == resource.data.is_verified
-            && request.resource.data.is_banned == resource.data.is_banned);
+            && request.resource.data.is_banned == resource.data.is_banned
+            && cooldownRespected());
 
       // Owner delete = in-app account deletion (App Store 5.1.1(v) /
       // Google Play account-deletion policy). See AccountService.
@@ -83,7 +108,7 @@ service cloud.firestore {
       allow read: if isSignedIn();
 
       // A fresh donor always starts unverified (see registerDonor).
-      allow create: if (isOwner(uid) || isAdmin())
+      allow create: if ((isOwner(uid) && isVerifiedUser()) || isAdmin())
         && !('phone' in request.resource.data)
         && request.resource.data.is_verified == false;
 
@@ -146,7 +171,7 @@ service cloud.firestore {
          || resource.data.matched_donor_id == request.auth.uid
          || isAdmin());
 
-      allow create: if isSignedIn()
+      allow create: if isVerifiedUser()
         && !isBanned()
         && request.resource.data.requester_uid == request.auth.uid
         && request.resource.data.status == 'open';
@@ -161,12 +186,30 @@ service cloud.firestore {
           (resource.data.status == 'open'
             && request.resource.data.status == 'matched'
             && request.resource.data.matched_donor_id == request.auth.uid
+            && isVerifiedUser()
             && !isBanned())
           ||
-          // the matched donor self-reports the donation done
+          // two-sided completion: each side stamps only its own
+          // confirmation; the request may become `fulfilled` only when the
+          // other side has already confirmed (see donorConfirmDonation /
+          // requesterConfirmDonation in backend.dart)
           (resource.data.status == 'matched'
             && resource.data.matched_donor_id == request.auth.uid
-            && request.resource.data.status == 'fulfilled')
+            && resource.data.get('donor_confirmed_at', null) == null
+            && request.resource.data.donor_confirmed_at == request.time
+            && onlyChanges(['donor_confirmed_at', 'status', 'fulfilled_at'])
+            && (request.resource.data.status == 'matched'
+                || (request.resource.data.status == 'fulfilled'
+                    && resource.data.get('requester_confirmed_at', null) != null)))
+          ||
+          (resource.data.status == 'matched'
+            && resource.data.requester_uid == request.auth.uid
+            && resource.data.get('requester_confirmed_at', null) == null
+            && request.resource.data.requester_confirmed_at == request.time
+            && onlyChanges(['requester_confirmed_at', 'status', 'fulfilled_at'])
+            && (request.resource.data.status == 'matched'
+                || (request.resource.data.status == 'fulfilled'
+                    && resource.data.get('donor_confirmed_at', null) != null)))
           ||
           // lazy expiry (stands in for the Blaze-only expireOldRequests
           // scheduled function) — any signed-in user, only once genuinely
@@ -218,7 +261,7 @@ service cloud.firestore {
       // delete their own messages — used by account deletion).
       match /messages/{messageId} {
         allow read: if isParticipant() || isAdmin();
-        allow create: if isParticipant() && conversationOpen()
+        allow create: if isParticipant() && conversationOpen() && isVerifiedUser()
           && request.resource.data.sender_uid == request.auth.uid
           && request.resource.data.kind in ['text', 'call', 'location']
           && request.resource.data.text is string
@@ -234,7 +277,7 @@ service cloud.firestore {
       match /calls/{callId} {
         allow read: if isSignedIn()
           && (resource.data.caller_uid == request.auth.uid || resource.data.callee_uid == request.auth.uid);
-        allow create: if isParticipant() && conversationOpen()
+        allow create: if isParticipant() && conversationOpen() && isVerifiedUser()
           && request.resource.data.caller_uid == request.auth.uid
           && request.resource.data.callee_uid != request.auth.uid
           && (request.resource.data.callee_uid == req().requester_uid
@@ -262,7 +305,7 @@ service cloud.firestore {
 
     // reports/{id} — chat/call abuse reports, reviewed by admins only.
     match /reports/{reportId} {
-      allow create: if isSignedIn()
+      allow create: if isVerifiedUser()
         && request.resource.data.reporter_uid == request.auth.uid
         && request.resource.data.reason is string;
       allow read, update: if isAdmin();
@@ -310,13 +353,13 @@ service cloud.firestore {
     // update/delete is allowed. Everything an admin writes there is
     // mirrored into audit_log by the caller.
     match /issue_reports/{id} {
-      allow create: if isSignedIn() && request.resource.data.reporter_uid == request.auth.uid;
+      allow create: if isVerifiedUser() && request.resource.data.reporter_uid == request.auth.uid;
       allow read: if isAdmin();
       allow update, delete: if isAdmin();
     }
 
     match /partnership_inquiries/{id} {
-      allow create: if isSignedIn() && request.resource.data.requester_uid == request.auth.uid;
+      allow create: if isVerifiedUser() && request.resource.data.requester_uid == request.auth.uid;
       allow read: if isAdmin();
       allow update, delete: if isAdmin();
     }
@@ -326,11 +369,32 @@ service cloud.firestore {
     // own uid, and never edited by the author afterwards. Admins moderate:
     // `is_hidden` (reversible — the feed filters it out client-side) or an
     // outright delete.
+    // Photo posts: `image_path` must point into the author's own folder in
+    // this project's Storage bucket (see storage.rules), never an arbitrary
+    // external link. Authors may delete their own post.
     match /community_stories/{id} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn() && request.resource.data.author_uid == request.auth.uid;
+      allow create: if isVerifiedUser() && !isBanned()
+        && request.resource.data.author_uid == request.auth.uid
+        && request.resource.data.body is string
+        && request.resource.data.body.size() <= 2000
+        && (request.resource.data.get('image_path', null) == null
+            || request.resource.data.image_path.matches('community/' + request.auth.uid + '/[^/]+'));
       allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow delete: if isAdmin() || (isSignedIn() && resource.data.author_uid == request.auth.uid);
+    }
+
+    // broadcasts/{id} — admin push to every phone (or one blood group's
+    // topic). Writing the doc is the whole API: the onBroadcast function
+    // delivers it and stamps status/topic back onto it.
+    match /broadcasts/{id} {
+      allow read: if isAdmin();
+      allow create: if isAdmin()
+        && request.resource.data.title is string
+        && request.resource.data.title.size() <= 80
+        && request.resource.data.body is string
+        && request.resource.data.body.size() <= 300;
+      allow update, delete: if false;
     }
 
     // announcements/{id} — Community → What's New. Admin-authored only;
@@ -347,6 +411,20 @@ service cloud.firestore {
     match /testimonials/{id} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
+    }
+
+    // testimonial_submissions/{id} — a member offering their own quote, with
+    // explicit consent to publish it under their name. Private queue: only
+    // admins read it, and approving copies it into `testimonials`.
+    match /testimonial_submissions/{id} {
+      allow create: if isVerifiedUser() && !isBanned()
+        && request.resource.data.author_uid == request.auth.uid
+        && request.resource.data.consent_to_publish == true
+        && request.resource.data.quote is string
+        && request.resource.data.quote.size() >= 10
+        && request.resource.data.quote.size() <= 600;
+      allow read, delete: if isAdmin();
+      allow update: if false;
     }
 
     // public_stats/impact — the Community Impact counter. A normal user

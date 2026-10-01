@@ -1,4 +1,5 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <uses-permission android:name="android.permission.CAMERA"/>
@@ -13,13 +14,51 @@
     <!-- Urgent-request alerts: Android 13+ notification permission, haptics -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.VIBRATE"/>
-    <!-- Deliberately NOT requested: USE_FULL_SCREEN_INTENT (Play restricts it
-         to calling/alarm apps on Android 14+), CALL_PHONE and READ_CALL_LOG
-         ("call from your phone" uses the dialer intent, which needs neither). -->
+    <!-- Incoming in-app calls while the app is closed (flutter_callkit_incoming):
+         a phone-call foreground service while ringing. The plugin also asks for
+         permissions this app doesn't need — removed below so the Play listing
+         and Data safety answers stay minimal:
+         - USE_FULL_SCREEN_INTENT: Play restricts it to apps whose core function
+           is calling/alarms (Android 14+). Without it the call rings as a
+           heads-up notification with Answer / Decline instead of taking over
+           the lock screen.
+         - camera foreground service: calls are audio-only.
+         CALL_PHONE and READ_CALL_LOG are not requested either ("call from your
+         phone" uses the dialer intent, which needs neither). -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" tools:node="remove"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" tools:node="remove"/>
+    <!-- No ads: Firebase Analytics must not collect the Advertising ID (keeps
+         the Play Data safety answer "Advertising ID: not collected" true). -->
+    <uses-permission android:name="com.google.android.gms.permission.AD_ID" tools:node="remove"/>
+    <uses-permission android:name="android.permission.ACCESS_ADSERVICES_ATTRIBUTION" tools:node="remove"/>
+    <uses-permission android:name="android.permission.ACCESS_ADSERVICES_AD_ID" tools:node="remove"/>
     <application
         android:label="Rakta Bandhan"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <!-- Push notifications (FCM): small status-bar icon, accent colour, and
+             the channel used when a message names none. Channels are created
+             in MainActivity.kt. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_stat_notify" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/notification_accent" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="general" />
+        <meta-data android:name="google_analytics_adid_collection_enabled" android:value="false" />
+        <meta-data android:name="google_analytics_default_allow_ad_personalization_signals" android:value="false" />
+        <!-- Google Maps SDK key (from MAPS_API_KEY — see app/build.gradle.kts). -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="${mapsApiKey}" />
+        <!-- Audio-only calls: drop the camera type from the plugin's service. -->
+        <service
+            android:name="com.hiennv.flutter_callkit_incoming.CallkitNotificationService"
+            android:foregroundServiceType="phoneCall|microphone"
+            tools:replace="android:foregroundServiceType" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

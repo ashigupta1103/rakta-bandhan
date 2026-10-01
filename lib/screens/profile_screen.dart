@@ -76,6 +76,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             final isVerified = data['is_verified'] as bool? ?? false;
             final isAvailable = data['is_available'] as bool? ?? false;
             final reactivateAt = (data['reactivation_scheduled_at'] as Timestamp?)?.toDate();
+            final resting = Backend.onCooldown(data);
 
             return FutureBuilder<int>(
               future: Backend.instance.myDonationCount(),
@@ -164,7 +165,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     isAvailable ? 'Available to donate' : 'Not available',
                                     style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm),
                                   ),
-                                  const Text('Toggle off if you can\'t donate right now', style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                                  Text(
+                                    resting && reactivateAt != null
+                                        ? 'Resting after your donation · back on in ${_eligibleInDays(reactivateAt)} days'
+                                        : 'Toggle off if you can\'t donate right now',
+                                    style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+                                  ),
                                 ],
                               ),
                             ),
@@ -174,10 +180,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               activeTrackColor: AppColors.primaryLightTint,
                               inactiveThumbColor: AppColors.textMuted,
                               inactiveTrackColor: AppColors.dividerWarm,
-                              onChanged: (val) async {
-                                await Backend.instance.setAvailability(val);
-                                _showSnackBar(val ? 'You are now available for donation' : 'You are now offline');
-                              },
+                              // Locked off during the 90-day rest period; it
+                              // turns itself back on afterwards (maybeReactivate).
+                              onChanged: resting
+                                  ? null
+                                  : (val) async {
+                                      try {
+                                        await Backend.instance.setAvailability(val);
+                                        _showSnackBar(val ? 'You are now available for donation' : 'You are now offline');
+                                      } on DonorOnCooldownException catch (e) {
+                                        _showSnackBar(e.toString());
+                                      } catch (_) {
+                                        _showSnackBar('Could not update your availability. Please try again.');
+                                      }
+                                    },
                             ),
                           ],
                         ),

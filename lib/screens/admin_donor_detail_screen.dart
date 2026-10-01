@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../services/admin_service.dart';
 import '../services/backend.dart';
 import '../theme/app_colors.dart';
@@ -93,18 +94,17 @@ class AdminDonorDetailScreen extends StatelessWidget {
                   Text('ID proof', style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
                   const SizedBox(height: 8),
                   _IdProofView(donorId: donor.id),
+                  if (donor.status == DonorVerificationStatus.pending) ...[
+                    const SizedBox(height: 20),
+                    _VerificationChecklist(
+                      donorName: donor.name,
+                      phone: donor.phone,
+                      onVerify: () => service.verifyDonor(donor.id),
+                    ),
+                  ],
                   const SizedBox(height: 20),
                   Row(
                     children: [
-                      if (donor.status != DonorVerificationStatus.verified)
-                        Expanded(
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(backgroundColor: AppColors.warmGreenText),
-                            onPressed: () => service.verifyDonor(donor.id),
-                            child: const Text('Verify'),
-                          ),
-                        ),
-                      if (donor.status != DonorVerificationStatus.verified) const SizedBox(width: 8),
                       Expanded(
                         child: donor.status == DonorVerificationStatus.banned
                             ? OutlinedButton(onPressed: () => service.unbanDonor(donor.id), child: const Text('Unban'))
@@ -147,6 +147,94 @@ class AdminDonorDetailScreen extends StatelessWidget {
         Text(label, style: const TextStyle(fontSize: 13.5, color: AppColors.textSecondary)),
         Text(value, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
       ],
+    );
+  }
+}
+
+/// Verification is a checklist, not a single tap: each step must be ticked
+/// before "Verify donor" unlocks, so every admin checks the same things.
+/// Verifying deletes the ID photo (Backend.adminVerifyDonor) — we keep only
+/// the fact and date it was checked.
+class _VerificationChecklist extends StatefulWidget {
+  final String donorName;
+  final String phone;
+  final Future<void> Function() onVerify;
+  const _VerificationChecklist({required this.donorName, required this.phone, required this.onVerify});
+
+  @override
+  State<_VerificationChecklist> createState() => _VerificationChecklistState();
+}
+
+class _VerificationChecklistState extends State<_VerificationChecklist> {
+  static const _steps = [
+    ('ID photo is clear and readable', 'Aadhaar, PAN, driving licence, voter ID or passport'),
+    ('Name on the ID matches the profile', 'Minor spelling differences are fine'),
+    ('Donor is 18 or older', 'Check the date of birth on the ID'),
+    ('Phone number answered and confirmed', 'Call or WhatsApp the number and confirm they registered'),
+    ('Blood group confirmed with the donor', 'Ask how they know it — donor card, lab report or earlier donation'),
+  ];
+  final _checked = List<bool>.filled(_steps.length, false);
+  bool _busy = false;
+
+  Future<void> _verify() async {
+    setState(() => _busy = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await widget.onVerify();
+      messenger.showSnackBar(SnackBar(content: Text('${widget.donorName} is verified. Their ID photo has been deleted.')));
+    } catch (_) {
+      messenger.showSnackBar(const SnackBar(content: Text('Could not verify. Please try again.')));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final allDone = _checked.every((c) => c);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
+      decoration: BoxDecoration(color: Colors.white, border: Border.all(color: AppColors.cardBorderWarm), borderRadius: BorderRadius.circular(16)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text('Verification steps', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
+              ),
+              Text('${_checked.where((c) => c).length}/${_steps.length}', style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          for (var i = 0; i < _steps.length; i++)
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              controlAffinity: ListTileControlAffinity.leading,
+              activeColor: AppColors.warmGreenText,
+              value: _checked[i],
+              onChanged: (v) => setState(() => _checked[i] = v ?? false),
+              title: Text(_steps[i].$1, style: const TextStyle(fontSize: 13.5, color: AppColors.textPrimaryWarm)),
+              subtitle: Text(_steps[i].$2, style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary)),
+            ),
+          if (widget.phone.isNotEmpty)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () => launchUrl(Uri(scheme: 'tel', path: widget.phone)),
+                icon: const Icon(LucideIcons.phone, size: 15),
+                label: Text('Call ${widget.phone}'),
+              ),
+            ),
+          const SizedBox(height: 6),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.warmGreenText),
+            onPressed: allDone && !_busy ? _verify : null,
+            child: Text(_busy ? 'Verifying…' : (allDone ? 'Verify donor' : 'Complete every step to verify')),
+          ),
+        ],
+      ),
     );
   }
 }

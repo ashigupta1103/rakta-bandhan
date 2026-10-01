@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../preview_mode.dart';
 import '../services/backend.dart';
 import '../theme/app_colors.dart';
@@ -28,10 +29,19 @@ enum _CommunityTab { stories, whatsNew, impact }
 class _CommunityScreenState extends State<CommunityScreen> {
   _CommunityTab _tab = _CommunityTab.stories;
   late Stream<int> _impactStream;
+  late final Stream<QuerySnapshot<Map<String, dynamic>>> _stories = Backend.instance.communityStoriesStream();
+
+  /// Authors this person chose to hide ("Hide posts from …") — kept on the
+  /// device, so blocking someone never needs to tell them.
+  Set<String> _hiddenAuthors = {};
+  static const _hiddenAuthorsKey = 'rb_hidden_story_authors';
 
   @override
   void initState() {
     super.initState();
+    SharedPreferences.getInstance().then((prefs) {
+      if (mounted) setState(() => _hiddenAuthors = (prefs.getStringList(_hiddenAuthorsKey) ?? const []).toSet());
+    }).catchError((_) {});
     // Reads the public_stats/impact counter, not a `requests` query: a
     // normal user is not allowed to query fulfilled requests (they carry
     // phone numbers), which is why the old query always errored out here.
@@ -166,7 +176,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
           ],
           const SizedBox(height: 26),
           StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-            stream: Backend.instance.communityStoriesStream(),
+            stream: _stories,
             builder: (context, snapshot) {
               if (snapshot.hasError) {
                 return Center(
@@ -184,12 +194,14 @@ class _CommunityScreenState extends State<CommunityScreen> {
               // `where is_hidden == false` would need a composite index and
               // would also drop every story written before moderation
               // existed (no such field at all).
-              final docs = snapshot.data!.docs.where((d) => d.data()['is_hidden'] != true).toList();
+              final docs = snapshot.data!.docs
+                  .where((d) => d.data()['is_hidden'] != true && !_hiddenAuthors.contains(d.data()['author_uid']))
+                  .toList();
               if (docs.isEmpty) return _storiesEmptyState();
               return Column(
                 children: [
                   for (final doc in docs) ...[
-                    _storyCard(doc.data()),
+                    _storyCard(doc.id, doc.data()),
                     const SizedBox(height: 10),
                   ],
                 ],
@@ -242,10 +254,16 @@ class _CommunityScreenState extends State<CommunityScreen> {
     );
   }
 
-  Widget _storyCard(Map<String, dynamic> data) {
+  /// Instagram-style post: author row, the photo edge to edge (4:5 to
+  /// 1.91:1, like Instagram's crop limits), then the text. Tap the photo
+  /// for a full-screen, pinch-to-zoom view.
+  Widget _storyCard(String id, Map<String, dynamic> data) {
     final created = (data['created_at'] as Timestamp?)?.toDate();
     final bloodGroup = data['blood_group'] as String?;
     final location = data['location_label'] as String?;
+    final imageUrl = data['image_url'] as String?;
+    final aspect = ((data['image_aspect'] as num?)?.toDouble() ?? 4 / 5).clamp(4 / 5, 1.91);
+    final isMine = data['author_uid'] == Backend.instance.currentUser?.uid;
     final subtitleBits = [
       data['topic'] as String? ?? '',
       if (location != null && location.isNotEmpty) location,
@@ -253,43 +271,136 @@ class _CommunityScreenState extends State<CommunityScreen> {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(color: Colors.white, border: Border.all(color: AppColors.warmBorder), borderRadius: BorderRadius.circular(16)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: const BoxDecoration(color: AppColors.sand, shape: BoxShape.circle),
-                alignment: Alignment.center,
-                child: Text(
-                  bloodGroup ?? (data['author_name'] as String? ?? '?').characters.first.toUpperCase(),
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.ink),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 4, 12),
+            child: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: const BoxDecoration(color: AppColors.sand, shape: BoxShape.circle),
+                  alignment: Alignment.center,
+                  child: Text(
+                    bloodGroup ?? (data['author_name'] as String? ?? '?').characters.first.toUpperCase(),
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.ink),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(data['author_name'] as String? ?? 'A donor', style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.ink)),
-                    if (subtitleBits.isNotEmpty)
-                      Text(subtitleBits, style: const TextStyle(fontSize: 11.5, color: AppColors.ink2)),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(data['author_name'] as String? ?? 'A donor', style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.ink)),
+                      if (subtitleBits.isNotEmpty)
+                        Text(subtitleBits, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11.5, color: AppColors.ink2)),
+                    ],
+                  ),
+                ),
+                if (created != null)
+                  Text(_timeAgo(created), style: const TextStyle(fontSize: 11, color: AppColors.ink2)),
+                PopupMenuButton<String>(
+                  tooltip: 'More',
+                  icon: const Icon(LucideIcons.ellipsisVertical, size: 18, color: AppColors.ink2),
+                  onSelected: (action) => _onStoryAction(action, id, data),
+                  itemBuilder: (_) => [
+                    if (isMine) const PopupMenuItem(value: 'delete', child: Text('Delete post')),
+                    if (!isMine) const PopupMenuItem(value: 'report', child: Text('Report post')),
+                    if (!isMine) PopupMenuItem(value: 'hide', child: Text('Hide posts from ${(data['author_name'] as String? ?? 'this person').split(' ').first}')),
                   ],
                 ),
-              ),
-              if (created != null)
-                Text(_timeAgo(created), style: const TextStyle(fontSize: 11, color: AppColors.ink2)),
-            ],
+              ],
+            ),
           ),
-          const SizedBox(height: 12),
-          Text(data['body'] as String? ?? '', style: const TextStyle(fontSize: 13.5, color: AppColors.ink, height: 1.5)),
+          if (imageUrl != null)
+            GestureDetector(
+              onTap: () => Navigator.push(context, MaterialPageRoute(fullscreenDialog: true, builder: (_) => _PhotoViewer(url: imageUrl))),
+              child: AspectRatio(
+                aspectRatio: aspect,
+                child: Hero(
+                  tag: imageUrl,
+                  child: Image.network(
+                    imageUrl,
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                    loadingBuilder: (context, child, progress) => progress == null
+                        ? child
+                        : Container(color: AppColors.sand, alignment: Alignment.center, child: const CircularProgressIndicator(strokeWidth: 2)),
+                    errorBuilder: (_, _, _) => Container(
+                      color: AppColors.sand,
+                      alignment: Alignment.center,
+                      child: const Icon(LucideIcons.imageOff, color: AppColors.ink2),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            child: Text(data['body'] as String? ?? '', style: const TextStyle(fontSize: 13.5, color: AppColors.ink, height: 1.5)),
+          ),
         ],
       ),
     );
+  }
+
+  Future<void> _onStoryAction(String action, String id, Map<String, dynamic> data) async {
+    final messenger = ScaffoldMessenger.of(context);
+    switch (action) {
+      case 'delete':
+        try {
+          await Backend.instance.deleteMyStory(id);
+          messenger.showSnackBar(const SnackBar(content: Text('Post deleted.')));
+        } catch (_) {
+          messenger.showSnackBar(const SnackBar(content: Text('Could not delete the post. Please try again.')));
+        }
+      case 'report':
+        final reason = await showModalBottomSheet<String>(
+          context: context,
+          backgroundColor: Colors.white,
+          shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+          builder: (sheet) => SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(20, 16, 20, 4),
+                  child: Align(alignment: Alignment.centerLeft, child: Text('Why are you reporting this post?', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600))),
+                ),
+                for (final r in const [
+                  'Asking for or offering money for blood',
+                  'Shares someone’s phone number or private details',
+                  'Harassment or hateful content',
+                  'Spam or advertising',
+                  'Fake or misleading',
+                  'Something else',
+                ])
+                  ListTile(title: Text(r), onTap: () => Navigator.pop(sheet, r)),
+              ],
+            ),
+          ),
+        );
+        if (reason == null) return;
+        try {
+          await Backend.instance.reportStory(id, reason: reason);
+          messenger.showSnackBar(const SnackBar(content: Text('Thanks — our team will review this post.')));
+        } catch (_) {
+          messenger.showSnackBar(const SnackBar(content: Text('Could not send the report. Please try again.')));
+        }
+      case 'hide':
+        final author = data['author_uid'] as String?;
+        if (author == null) return;
+        setState(() => _hiddenAuthors = {..._hiddenAuthors, author});
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setStringList(_hiddenAuthorsKey, _hiddenAuthors.toList());
+        } catch (_) {}
+        messenger.showSnackBar(const SnackBar(content: Text('You won’t see posts from this person.')));
+    }
   }
 
   String _timeAgo(DateTime time) {
@@ -629,6 +740,32 @@ class _CommunityScreenState extends State<CommunityScreen> {
           const SizedBox(height: 8),
           Text(message, textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, color: AppColors.ink2, height: 1.5)),
         ],
+      ),
+    );
+  }
+}
+
+/// Full-screen, pinch-to-zoom photo from a community post.
+class _PhotoViewer extends StatelessWidget {
+  final String url;
+  const _PhotoViewer({required this.url});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(icon: const Icon(LucideIcons.x), onPressed: () => Navigator.pop(context)),
+      ),
+      body: Center(
+        child: InteractiveViewer(
+          minScale: 1,
+          maxScale: 4,
+          child: Hero(tag: url, child: Image.network(url, fit: BoxFit.contain)),
+        ),
       ),
     );
   }

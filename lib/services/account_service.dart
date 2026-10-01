@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import 'backend.dart';
+import 'push_service.dart';
 import 'chat_service.dart';
 
 /// The user's data rights in-app: a full export (DPDP right to access) and
@@ -58,14 +59,15 @@ class AccountService {
   /// - every chat message this user sent is deleted;
   /// - donation_history rows stay (they only hold the now-orphaned uid —
   ///   an anonymous count, not personal data).
-  Future<void> deleteMyAccount() async {
+  Future<void> deleteMyAccount({required String password}) async {
     final user = _auth.currentUser;
     if (user == null) return;
 
     // Re-authenticate up front: Firebase refuses user.delete() on a stale
     // session, and failing *after* wiping Firestore would strand the
-    // account in a half-deleted state.
-    await Backend.instance.reauthenticateForSensitiveAction();
+    // account in a half-deleted state. A wrong password throws here, before
+    // anything is touched.
+    await Backend.instance.reauthenticateForSensitiveAction(password);
 
     final asRequester = await _db.collection('requests').where('requester_uid', isEqualTo: _uid).get();
     for (final doc in asRequester.docs) {
@@ -87,6 +89,7 @@ class AccountService {
       }
     }
 
+    await PushService.instance.unregisterDevice();
     await Backend.instance.deleteMyIdProof();
     await _db.collection('donors_public').doc(_uid).delete();
     await _db.collection('donors').doc(_uid).delete();

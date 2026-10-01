@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../services/backend.dart';
+import 'location_picker_screen.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/blood_group_droplet.dart';
@@ -230,18 +231,26 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
                         _card([
                           _row(
                             LucideIcons.mapPin,
-                            'Approximate area',
+                            'Registered area',
                             lat == null || lng == null
                                 ? 'Not set'
-                                : '${lat.toStringAsFixed(2)}, ${lng.toStringAsFixed(2)}',
+                                : Backend.shortPlace(data['location_label'] as String?, fallback: 'Pinned on the map'),
                             isLast: true,
                           ),
                         ]),
-                        const SizedBox(height: 10),
+                        const SizedBox(height: 6),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton.icon(
+                            onPressed: () => _changeArea(lat?.toDouble(), lng?.toDouble()),
+                            icon: const Icon(LucideIcons.mapPinned, size: 15),
+                            label: const Text('Change my area'),
+                          ),
+                        ),
                         const Padding(
                           padding: EdgeInsets.symmetric(horizontal: 4),
                           child: Text(
-                            'Other people only ever see your distance, never these coordinates or your address.',
+                            'Other people see only your neighbourhood (for example “Adyar, Chennai”) and your distance — never your address.',
                             style: TextStyle(fontSize: 11.5, color: AppColors.textMutedWarm, height: 1.5),
                           ),
                         ),
@@ -306,6 +315,25 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
         clipBehavior: Clip.antiAlias,
         child: Column(children: children),
       );
+
+  /// Moved house or job? Re-pin the area requests are matched against.
+  Future<void> _changeArea(double? lat, double? lng) async {
+    final picked = await LocationPickerScreen.open(
+      context,
+      title: 'Where do you usually live or work?',
+      confirmLabel: 'Use this area',
+      initialLat: lat,
+      initialLng: lng,
+    );
+    if (picked == null || !mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await Backend.instance.updateMyLocation(lat: picked.lat, lng: picked.lng, label: picked.label);
+      messenger.showSnackBar(const SnackBar(content: Text('Your area is updated. Nearby requests will now match your new area.')));
+    } catch (_) {
+      messenger.showSnackBar(const SnackBar(content: Text('Couldn’t update your area. Please try again.')));
+    }
+  }
 
   Widget _row(
     IconData icon,

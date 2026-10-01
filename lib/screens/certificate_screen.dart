@@ -1,24 +1,87 @@
+import 'dart:typed_data';
+import 'dart:ui' as ui;
+
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:gal/gal.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:share_plus/share_plus.dart';
 import '../services/backend.dart';
 import '../services/donation_history_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/blood_group_droplet.dart';
+import 'about_screen.dart';
 
-/// Certificate object per the final artifact's "Donation complete →
-/// certificate" section. All fields are real: donor name (Backend's own
-/// donor doc), and hospital/date/blood group/donation number from the real
-/// [DonationRecord] passed in. The certificate wording itself is copied
-/// verbatim from the design artifact, which states it is a placeholder pending
-/// official approval — no new legal/medical language is invented here, and
-/// no download/share action is offered since neither PDF export nor a real
-/// Community-posting capability exists yet.
-class CertificateScreen extends StatelessWidget {
+/// Donation certificate, opened from Donation history. Every field is real:
+/// the donor's name (their profile), and hospital/date/blood group/donation
+/// number from the [DonationRecord]. "Save" writes a high-resolution PNG to
+/// the photo gallery; "Share" hands the same image to WhatsApp, Instagram
+/// and the rest.
+class CertificateScreen extends StatefulWidget {
   final DonationRecord record;
   final int donationNumber;
 
   const CertificateScreen({super.key, required this.record, required this.donationNumber});
+
+  @override
+  State<CertificateScreen> createState() => _CertificateScreenState();
+}
+
+class _CertificateScreenState extends State<CertificateScreen> {
+  final _certificateKey = GlobalKey();
+  bool _busy = false;
+
+  DonationRecord get record => widget.record;
+  int get donationNumber => widget.donationNumber;
+
+  /// The card as a PNG at 3× its on-screen size — sharp enough to print.
+  Future<Uint8List> _renderPng() async {
+    final boundary = _certificateKey.currentContext!.findRenderObject()! as RenderRepaintBoundary;
+    final image = await boundary.toImage(pixelRatio: 3);
+    final data = await image.toByteData(format: ui.ImageByteFormat.png);
+    image.dispose();
+    return data!.buffer.asUint8List();
+  }
+
+  String get _fileName => 'rakta-bandhan-certificate-$donationNumber';
+
+  Future<void> _save() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final png = await _renderPng();
+      if (kIsWeb) {
+        await SharePlus.instance.share(ShareParams(files: [XFile.fromData(png, mimeType: 'image/png', name: '$_fileName.png')]));
+      } else {
+        if (!await Gal.hasAccess()) await Gal.requestAccess();
+        await Gal.putImageBytes(png, name: _fileName);
+        messenger.showSnackBar(const SnackBar(content: Text('Certificate saved to your photos.')));
+      }
+    } catch (_) {
+      messenger.showSnackBar(const SnackBar(content: Text('Couldn’t save the certificate. Allow photo access in Settings, or use Share.')));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _share() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final png = await _renderPng();
+      await SharePlus.instance.share(ShareParams(
+        files: [XFile.fromData(png, mimeType: 'image/png', name: '$_fileName.png')],
+        text: 'I donated blood through Rakta Bandhan. Find a donor — or become one: ${AboutScreen.shareUrl}',
+      ));
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Couldn’t open sharing. Please try again.')));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -70,14 +133,36 @@ class CertificateScreen extends StatelessWidget {
                         future: Backend.instance.myDonorDoc().then((d) => d.data()),
                         builder: (context, snapshot) {
                           final name = snapshot.data?['name'] as String? ?? 'A Rakta Bandhan donor';
-                          return _certificateCard(name);
+                          return RepaintBoundary(key: _certificateKey, child: _certificateCard(name));
                         },
                       ),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 20),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(foregroundColor: AppColors.onEmber, side: const BorderSide(color: AppColors.onEmberOutline)),
+                              onPressed: _busy ? null : _save,
+                              icon: const Icon(LucideIcons.download, size: 16),
+                              label: const Text('Save'),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: AppColors.brandRed),
+                              onPressed: _busy ? null : _share,
+                              icon: const Icon(LucideIcons.share2, size: 16),
+                              label: const Text('Share'),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
                       const Text(
-                        'Certificate wording is a placeholder. Any official or legal phrasing must be supplied and approved — nothing here is invented.',
+                        'Issued by Rakta Bandhan from the donation recorded in the app. It is not a medical record.',
                         textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 11.5, color: Color(0x998FEDE6), height: 1.5),
+                        style: TextStyle(fontSize: 11.5, color: AppColors.onEmberFaint, height: 1.5),
                       ),
                     ],
                   ),
@@ -133,9 +218,10 @@ class CertificateScreen extends StatelessWidget {
                 text: TextSpan(
                   style: const TextStyle(fontSize: 12.5, color: AppColors.ink2, height: 1.6),
                   children: [
-                    const TextSpan(text: 'donated one unit of '),
-                    TextSpan(text: record.bloodGroup, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w700)),
-                    TextSpan(text: ' blood\nat ${record.hospital}\non ${record.date.isEmpty ? 'an unrecorded date' : record.date}'),
+                    const TextSpan(text: 'voluntarily donated '),
+                    TextSpan(text: record.bloodGroup.isEmpty ? 'blood' : '${record.bloodGroup} blood', style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w700)),
+                    TextSpan(text: '\nat ${record.hospital}${record.date.isEmpty ? '' : '\non ${record.date}'}'),
+                    const TextSpan(text: ',\nanswering a request made through Rakta Bandhan.'),
                   ],
                 ),
               ),
@@ -172,8 +258,8 @@ class CertificateScreen extends StatelessWidget {
                         text: const TextSpan(
                           style: TextStyle(fontSize: 10.5, height: 1.4, color: AppColors.ink2),
                           children: [
-                            TextSpan(text: 'An initiative of\n'),
-                            TextSpan(text: 'Rotary Club of Madras Cosmos', style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.ink)),
+                            TextSpan(text: 'A service project of\n'),
+                            TextSpan(text: 'Rotary Club of Madras Cosmos &\nRotary Club of Chennai Capital', style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.ink)),
                           ],
                         ),
                       ),

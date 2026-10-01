@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart' as gm;
 import 'package:latlong2/latlong.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -30,6 +31,10 @@ class PickedLocation {
 /// address under the pin is looked up and shown. "Locate me" flies to the
 /// real GPS fix and draws its accuracy circle, so the user can see how much
 /// to trust it. Search jumps the map; the pin still has the final word.
+///
+/// On phones built with Google Maps (kUseGoogleMaps) the map is the native
+/// Google map — the same streets and landmarks people know from ride apps;
+/// otherwise flutter_map. The pin logic is identical for both.
 ///
 /// Returns a [PickedLocation] via Navigator.pop, or null if dismissed.
 class LocationPickerScreen extends StatefulWidget {
@@ -64,6 +69,7 @@ class LocationPickerScreen extends StatefulWidget {
 
 class _LocationPickerScreenState extends State<LocationPickerScreen> {
   final _map = MapController();
+  gm.GoogleMapController? _gmap;
   final _search = TextEditingController();
   Timer? _settle;
   Timer? _searchDebounce;
@@ -124,20 +130,57 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       _gps = p;
       _center ??= here;
     });
-    if (!initial) _map.move(here, 17.5);
+    if (!initial) _moveTo(here, 17.5);
     _resolve(here);
   }
 
-  void _onMove(MapCamera camera, bool hasGesture) {
-    _center = camera.center;
+  void _moveTo(LatLng at, double zoom) {
+    if (useGoogleMaps) {
+      _gmap?.animateCamera(gm.CameraUpdate.newLatLngZoom(gm.LatLng(at.latitude, at.longitude), zoom));
+    } else {
+      _map.move(at, zoom);
+    }
+  }
+
+  /// Called continuously while the map moves (either map engine).
+  void _onCenterMoved(LatLng center) {
+    _center = center;
     if (!_dragging) setState(() => _dragging = true);
     _settle?.cancel();
     _settle = Timer(const Duration(milliseconds: 450), () {
       if (!mounted) return;
       setState(() => _dragging = false);
       HapticFeedback.selectionClick();
-      _resolve(camera.center);
+      _resolve(center);
     });
+  }
+
+  Widget _googleMap(LatLng center) {
+    final gps = _gps;
+    return gm.GoogleMap(
+      initialCameraPosition: gm.CameraPosition(target: gm.LatLng(center.latitude, center.longitude), zoom: 17.5),
+      onMapCreated: (c) => _gmap = c,
+      onCameraMove: (pos) => _onCenterMoved(LatLng(pos.target.latitude, pos.target.longitude)),
+      myLocationEnabled: gps != null,
+      myLocationButtonEnabled: false,
+      zoomControlsEnabled: false,
+      mapToolbarEnabled: false,
+      compassEnabled: false,
+      rotateGesturesEnabled: false,
+      tiltGesturesEnabled: false,
+      minMaxZoomPreference: const gm.MinMaxZoomPreference(4, 20),
+      circles: {
+        if (gps != null)
+          gm.Circle(
+            circleId: const gm.CircleId('gps-accuracy'),
+            center: gm.LatLng(gps.latitude, gps.longitude),
+            radius: gps.accuracy.clamp(5, 500).toDouble(),
+            fillColor: AppColors.gpsAccuracyFill,
+            strokeColor: AppColors.gpsAccuracyBorder,
+            strokeWidth: 1,
+          ),
+      },
+    );
   }
 
   Future<void> _resolve(LatLng at) async {
@@ -179,15 +222,15 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       _center = at;
       _address = r['label'] as String;
     });
-    _map.move(at, 17.5);
+    _moveTo(at, 17.5);
   }
 
   void _confirm() {
     final c = _center;
     if (c == null) return;
-    final label = (_address == null || _address!.trim().isEmpty)
-        ? '${c.latitude.toStringAsFixed(5)}, ${c.longitude.toStringAsFixed(5)}'
-        : _address!;
+    // Never store raw coordinates as the place name — they'd show up on
+    // request cards and notifications.
+    final label = (_address == null || _address!.trim().isEmpty) ? 'Pinned location' : _address!;
     Navigator.of(context).pop(PickedLocation(lat: c.latitude, lng: c.longitude, label: label));
   }
 
@@ -199,7 +242,9 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
-          if (center != null)
+          if (center != null && useGoogleMaps)
+            _googleMap(center)
+          else if (center != null)
             FlutterMap(
               mapController: _map,
               options: MapOptions(
@@ -208,7 +253,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                 minZoom: 4,
                 maxZoom: 19,
                 interactionOptions: const InteractionOptions(flags: InteractiveFlag.all & ~InteractiveFlag.rotate),
-                onPositionChanged: _onMove,
+                onPositionChanged: (camera, _) => _onCenterMoved(camera.center),
               ),
               children: [
                 ...appMapBase(),

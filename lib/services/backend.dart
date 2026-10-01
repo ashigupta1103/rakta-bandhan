@@ -5,7 +5,9 @@ import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/painting.dart' show decodeImageFromList;
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart' show XFile;
@@ -159,6 +161,14 @@ class RequestAlreadyClaimedException implements Exception {
   String toString() => 'Someone else already accepted this request.';
 }
 
+/// Thrown when a donor still inside their post-donation cooldown tries to
+/// accept a request.
+class DonorOnCooldownException implements Exception {
+  const DonorOnCooldownException();
+  @override
+  String toString() => 'You donated recently. You can accept requests again once your 90-day rest period ends.';
+}
+
 /// Thrown when a donor tries to accept a second request while already
 /// matched on another one. `request_detail_screen.dart` checks this
 /// proactively (`_findExistingActiveMatch`) before calling acceptRequest;
@@ -190,51 +200,78 @@ class Backend {
     _analytics.logEvent(name: name, parameters: parameters).catchError((_) {});
   }
 
-  static const _fakeAuthPassword = 'RaktaBandhan#2026Demo';
-  static const _fakeAuthEmailDomain = 'phone.raktabandhan.local';
-
   User? get currentUser => _auth.currentUser;
   Stream<User?> get authState => _auth.authStateChanges();
   String get _uid => _auth.currentUser!.uid;
 
-  String _emailForPhone(String phone) => 'p$phone@$_fakeAuthEmailDomain';
+  // ------------------------------------------------------------ Sign-in
+  //
+  // Email + password, with the address confirmed through Firebase's own
+  // verification email (free; 100,000/day on Blaze). Phone verification
+  // (Truecaller / WhatsApp OTP) can be layered on later without changing
+  // accounts — see docs/publishing/cost-estimate.md. Firestore rules only
+  // let a verified account write (see isVerifiedUser in firestore.rules).
 
-  /// Fake OTP: any correctly-formatted 6-digit code is accepted client-side
-  /// (see otp_screen.dart) — this just signs in/up a stable account keyed
-  /// by phone number, so the same phone always lands on the same profile.
-  Future<User> verifyFakeOtp(String phone) async {
-    final email = _emailForPhone(phone);
-    try {
-      final cred = await _auth.signInWithEmailAndPassword(
-        email: email,
-        password: _fakeAuthPassword,
-      );
-      return cred.user!;
-    } on FirebaseAuthException catch (e) {
-      if (e.code == 'user-not-found' || e.code == 'invalid-credential') {
-        final cred = await _auth.createUserWithEmailAndPassword(
-          email: email,
-          password: _fakeAuthPassword,
-        );
-        return cred.user!;
-      }
-      rethrow;
-    }
+  /// Creates the account and sends the verification email.
+  Future<User> signUpWithEmail(String email, String password) async {
+    final cred = await _auth.createUserWithEmailAndPassword(email: email.trim(), password: password);
+    await cred.user!.sendEmailVerification();
+    _logEvent('sign_up', {'method': 'email'});
+    return cred.user!;
   }
+
+  Future<User> signInWithEmail(String email, String password) async {
+    final cred = await _auth.signInWithEmailAndPassword(email: email.trim(), password: password);
+    _logEvent('login', {'method': 'email'});
+    return cred.user!;
+  }
+
+  Future<void> resendVerificationEmail() async => _auth.currentUser?.sendEmailVerification();
+
+  /// Re-reads the account from Firebase. After the user taps the link in
+  /// the email, `emailVerified` only flips once the account is reloaded,
+  /// and the ID token Firestore rules see only carries the new claim once
+  /// it's force-refreshed — both happen here.
+  Future<bool> refreshEmailVerified() async {
+    final user = _auth.currentUser;
+    if (user == null) return false;
+    await user.reload();
+    final fresh = _auth.currentUser;
+    if (fresh == null || !fresh.emailVerified) return false;
+    await fresh.getIdToken(true);
+    return true;
+  }
+
+  bool get isEmailVerified => _auth.currentUser?.emailVerified ?? false;
+
+  Future<void> sendPasswordReset(String email) => _auth.sendPasswordResetEmail(email: email.trim());
 
   Future<void> signOut() => _auth.signOut();
 
-  /// Firebase requires a fresh sign-in before destructive account actions
-  /// (user.delete()). With the fake-OTP scheme the credential is derivable
-  /// from the session itself; once real phone auth lands this becomes a
-  /// fresh OTP round-trip instead.
-  Future<void> reauthenticateForSensitiveAction() async {
+  /// Firebase requires a recent sign-in before destructive account actions
+  /// (user.delete()) — the caller asks for the password again.
+  Future<void> reauthenticateForSensitiveAction(String password) async {
     final user = _auth.currentUser;
     final email = user?.email;
     if (user == null || email == null) return;
-    await user.reauthenticateWithCredential(
-      EmailAuthProvider.credential(email: email, password: _fakeAuthPassword),
-    );
+    await user.reauthenticateWithCredential(EmailAuthProvider.credential(email: email, password: password));
+  }
+
+  /// Human wording for the FirebaseAuthException codes the sign-in screens
+  /// can hit. Never echoes raw exception text.
+  static String authErrorMessage(Object e) {
+    final code = e is FirebaseAuthException ? e.code : '';
+    return switch (code) {
+      'invalid-email' => 'That email address doesn’t look right.',
+      'email-already-in-use' => 'An account already exists for this email. Sign in instead.',
+      'weak-password' => 'Choose a stronger password — at least 8 characters.',
+      'user-not-found' || 'wrong-password' || 'invalid-credential' => 'Incorrect email or password.',
+      'user-disabled' => 'This account has been disabled. Contact support.',
+      'too-many-requests' => 'Too many attempts. Wait a few minutes and try again.',
+      'network-request-failed' => 'No internet connection. Check your network and try again.',
+      'requires-recent-login' => 'Please sign in again to continue.',
+      _ => 'Something went wrong. Please try again.',
+    };
   }
 
   /// ~1.1 km precision. donors_public is readable by every signed-in user,
@@ -265,6 +302,10 @@ class Backend {
   }) async {
     final geohash = encodeGeohash(lat, lng);
     final now = FieldValue.serverTimestamp();
+    // Neighbourhood-level name ("Adyar, Chennai") for the public listing —
+    // looked up from the already-coarsened point, so it can never be more
+    // precise than the ~1 km the listing promises.
+    final area = await reverseGeocodeArea(_coarse(lat), _coarse(lng)) ?? '';
 
     // A real transaction, not a batch: donors_public's create rule reads
     // donors/{uid} (get()) to confirm is_verified/is_available match —
@@ -275,6 +316,7 @@ class Backend {
       tx.set(_db.collection('donors').doc(_uid), {
         'name': name,
         'phone': phone,
+        'email': _auth.currentUser?.email ?? '',
         'blood_group': bloodGroup,
         'location_label': locationLabel ?? '',
         'geohash': geohash,
@@ -292,12 +334,40 @@ class Backend {
         'geohash': encodeGeohash(_coarse(lat), _coarse(lng), precision: 6),
         'lat': _coarse(lat),
         'lng': _coarse(lng),
+        'area': area,
         'is_available': true,
         'is_verified': false,
         'updated_at': now,
       });
     });
     _logEvent('donor_registered', {'blood_group': bloodGroup});
+  }
+
+  /// The donor moved: new exact point on the private profile, and the
+  /// coarse point + neighbourhood name on the public listing.
+  Future<void> updateMyLocation({required double lat, required double lng, required String label}) async {
+    final area = await reverseGeocodeArea(_coarse(lat), _coarse(lng)) ?? '';
+    await _db.runTransaction((tx) async {
+      tx.update(_db.collection('donors').doc(_uid), {
+        'lat': lat,
+        'lng': lng,
+        'geohash': encodeGeohash(lat, lng),
+        'location_label': label,
+      });
+      tx.update(_db.collection('donors_public').doc(_uid), {
+        'lat': _coarse(lat),
+        'lng': _coarse(lng),
+        'geohash': encodeGeohash(_coarse(lat), _coarse(lng), precision: 6),
+        'area': area,
+        'updated_at': FieldValue.serverTimestamp(),
+      });
+    });
+  }
+
+  /// True while the donor's post-donation cooldown is running.
+  static bool onCooldown(Map<String, dynamic>? donor) {
+    final until = (donor?['reactivation_scheduled_at'] as Timestamp?)?.toDate();
+    return until != null && until.isAfter(DateTime.now());
   }
 
   /// Base64-encodes the donor's picked ID proof photo directly onto their
@@ -344,6 +414,9 @@ class Backend {
   Future<void> deleteMyIdProof() => _idProofRef(_uid).delete();
 
   Future<void> setAvailability(bool available) async {
+    // The rules refuse this during the post-donation rest period anyway;
+    // checking first gives the UI a clear reason instead of a denied write.
+    if (available && onCooldown((await myDonorDoc()).data())) throw const DonorOnCooldownException();
     await _db.runTransaction((tx) async {
       tx.update(_db.collection('donors').doc(_uid), {'is_available': available});
       tx.update(_db.collection('donors_public').doc(_uid), {
@@ -365,6 +438,9 @@ class Backend {
         'fcm_token': token,
         'fcm_token_updated_at': FieldValue.serverTimestamp(),
       });
+
+  /// Sign-out: this phone should stop getting pushes for this account.
+  Future<void> clearPushToken() => _db.collection('donors').doc(_uid).update({'fcm_token': FieldValue.delete()});
 
   /// Client-side stand-in for scheduledReactivation.js — call on profile load.
   Future<void> maybeReactivate() async {
@@ -453,9 +529,41 @@ class Backend {
     return controller.stream;
   }
 
-  /// Open requests, newest first. Blood-group compatibility is filtered
-  /// client-side (see note on encodeGeohash above) to avoid needing an
-  /// extra composite index for a demo-scale dataset.
+  /// Open requests within [radiusKm] of a point, newest first — a bounded
+  /// geohash-cell query (at most 9 × 60 documents), not every open request
+  /// in the country. This is what the donor-facing feeds use: at 1 lakh
+  /// users a nationwide listener re-bills every open request to every
+  /// phone. Needs the (status, geohash) index.
+  Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>> openRequestsNearStream(
+    double lat,
+    double lng, {
+    double radiusKm = 50,
+  }) {
+    final cells = _geohashCellsAround(lat, lng, _precisionForRadius(lat, radiusKm));
+    return _geohashRangeStream(
+      collection: 'requests',
+      cells: cells,
+      extraFilters: (q) => q.where('status', isEqualTo: 'open').limit(60),
+    ).map((docs) {
+      final near = docs.where((d) {
+        final r = d.data();
+        final rLat = (r['lat'] as num?)?.toDouble();
+        final rLng = (r['lng'] as num?)?.toDouble();
+        return rLat != null && rLng != null && distanceKm(lat, lng, rLat, rLng) <= radiusKm;
+      }).toList();
+      // A just-created request has no server timestamp yet: newest.
+      final pending = DateTime.now().millisecondsSinceEpoch + 60000;
+      near.sort((a, b) {
+        final ta = (a.data()['created_at'] as Timestamp?)?.millisecondsSinceEpoch ?? pending;
+        final tb = (b.data()['created_at'] as Timestamp?)?.millisecondsSinceEpoch ?? pending;
+        return tb.compareTo(ta);
+      });
+      return near;
+    });
+  }
+
+  /// Every open request, nationwide. Admin/preview use only — user-facing
+  /// screens use [openRequestsNearStream].
   Stream<QuerySnapshot<Map<String, dynamic>>> openRequestsStream() => _db
       .collection('requests')
       .where('status', isEqualTo: 'open')
@@ -545,6 +653,7 @@ class Backend {
       final donorSnap = await tx.get(donorRef);
       if (!donorSnap.exists) throw StateError('No donor profile.');
       final donor = donorSnap.data()!;
+      if (onCooldown(donor)) throw const DonorOnCooldownException();
 
       final activeId = donor['active_request_id'] as String?;
       if (activeId != null && activeId != requestId) {
@@ -594,18 +703,31 @@ class Backend {
     _logEvent('request_released', {'request_id': requestId});
   }
 
-  /// Matched donor self-reports the donation done, writes the immutable
-  /// history record, and starts their own 90-day cooldown (admin
-  /// confirmation of the same donation is also possible — see
-  /// AdminService — but self-report is the only path the app's own UI
-  /// drives today).
-  Future<void> markFulfilled(String requestId) async {
+  /// Donation completion is confirmed by BOTH people. The donor's "I've
+  /// donated" writes their history record and starts their own 90-day
+  /// cooldown straight away (only the donor can write their profile, and
+  /// they're the one who knows they donated); the request only becomes
+  /// `fulfilled` once the requester has confirmed too — whichever side
+  /// confirms second closes it. An admin can still confirm on either's
+  /// behalf (adminConfirmDonation). Returns true if this closed it.
+  Future<bool> donorConfirmDonation(String requestId) async {
     final reactivateAt = DateTime.now().add(const Duration(days: donorCooldownDays));
+    var closed = false;
+    var alreadyConfirmed = false;
 
     await _db.runTransaction((tx) async {
-      tx.update(_db.collection('requests').doc(requestId), {
-        'status': 'fulfilled',
-        'fulfilled_at': FieldValue.serverTimestamp(),
+      final reqRef = _db.collection('requests').doc(requestId);
+      final req = (await tx.get(reqRef)).data();
+      if (req == null || req['status'] != 'matched' || req['matched_donor_id'] != _uid) {
+        throw StateError('This request is no longer active.');
+      }
+      alreadyConfirmed = req['donor_confirmed_at'] != null;
+      if (alreadyConfirmed) return;
+      closed = req['requester_confirmed_at'] != null;
+      tx.update(reqRef, {
+        'donor_confirmed_at': FieldValue.serverTimestamp(),
+        if (closed) 'status': 'fulfilled',
+        if (closed) 'fulfilled_at': FieldValue.serverTimestamp(),
       });
       tx.update(_db.collection('donors').doc(_uid), {
         'last_donation_date': FieldValue.serverTimestamp(),
@@ -622,10 +744,36 @@ class Backend {
         'request_id': requestId,
         'donation_date': FieldValue.serverTimestamp(),
         'confirmed_by': 'self',
+        'hospital': req['location_label'] ?? '',
+        'blood_group': req['blood_group'] ?? '',
       });
     });
+    if (alreadyConfirmed) return false;
     await _bumpImpactCounter();
-    _logEvent('donation_fulfilled', {'request_id': requestId});
+    _logEvent('donation_confirmed', {'request_id': requestId, 'by': 'donor'});
+    return closed;
+  }
+
+  /// The requester's half of [donorConfirmDonation]: "I received the
+  /// donation". Closes the request if the donor already confirmed.
+  Future<bool> requesterConfirmDonation(String requestId) async {
+    var closed = false;
+    await _db.runTransaction((tx) async {
+      final reqRef = _db.collection('requests').doc(requestId);
+      final req = (await tx.get(reqRef)).data();
+      if (req == null || req['status'] != 'matched' || req['requester_uid'] != _uid) {
+        throw StateError('This request is no longer active.');
+      }
+      if (req['requester_confirmed_at'] != null) return;
+      closed = req['donor_confirmed_at'] != null;
+      tx.update(reqRef, {
+        'requester_confirmed_at': FieldValue.serverTimestamp(),
+        if (closed) 'status': 'fulfilled',
+        if (closed) 'fulfilled_at': FieldValue.serverTimestamp(),
+      });
+    });
+    _logEvent('donation_confirmed', {'request_id': requestId, 'by': 'requester'});
+    return closed;
   }
 
   /// Public, signed-in-readable donation counter for the Community → Impact
@@ -773,6 +921,7 @@ class Backend {
   Future<void> adminConfirmDonation(String requestId) async {
     final reactivateAt = DateTime.now().add(const Duration(days: donorCooldownDays));
     late String donorId;
+    var donorAlreadyConfirmed = false;
 
     await _db.runTransaction((tx) async {
       final reqRef = _db.collection('requests').doc(requestId);
@@ -781,12 +930,16 @@ class Backend {
       final req = reqSnap.data()!;
       if (req['status'] != 'matched') throw StateError('Request is not currently matched.');
       donorId = req['matched_donor_id'] as String;
+      donorAlreadyConfirmed = req['donor_confirmed_at'] != null;
 
       tx.update(reqRef, {
         'status': 'fulfilled',
         'fulfilled_at': FieldValue.serverTimestamp(),
         'fulfilled_by': _uid,
       });
+      // The donor's own confirmation already started their cooldown and
+      // wrote the history record — don't restart or duplicate either.
+      if (donorAlreadyConfirmed) return;
       tx.update(_db.collection('donors').doc(donorId), {
         'last_donation_date': FieldValue.serverTimestamp(),
         'is_available': false,
@@ -803,9 +956,11 @@ class Backend {
         'donation_date': FieldValue.serverTimestamp(),
         'confirmed_by': 'admin',
         'verified_by': _uid,
+        'hospital': req['location_label'] ?? '',
+        'blood_group': req['blood_group'] ?? '',
       });
     });
-    await _bumpImpactCounter();
+    if (!donorAlreadyConfirmed) await _bumpImpactCounter();
     await _logAdminAction('confirm_donation', requestId);
     _logEvent('donation_fulfilled', {'request_id': requestId, 'confirmed_by': 'admin'});
   }
@@ -878,6 +1033,52 @@ class Backend {
       await _db.collection('testimonials').doc(id).update(data);
       await _logAdminAction('edit_testimonial', id);
     }
+  }
+
+  /// A member offers their own testimonial. It goes to a private queue
+  /// (`testimonial_submissions`, admin-read only) and appears on the
+  /// Testimonials page only after an admin approves it — with the member's
+  /// explicit consent to publish it under their name.
+  Future<void> submitTestimonial({required String quote, required String role}) async {
+    final donor = (await myDonorDoc()).data();
+    await _db.collection('testimonial_submissions').add({
+      'author_uid': _uid,
+      'name': donor?['name'] ?? '',
+      'quote': quote.trim(),
+      'role': role.trim(),
+      'consent_to_publish': true,
+      'created_at': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Stream<QuerySnapshot<Map<String, dynamic>>> testimonialSubmissionsStream() => _db
+      .collection('testimonial_submissions')
+      .orderBy('created_at', descending: true)
+      .limit(50)
+      .snapshots();
+
+  /// Publishes a member's submission as a testimonial and clears it from
+  /// the queue, in one batch.
+  Future<void> adminApproveTestimonialSubmission(String id, Map<String, dynamic> data) async {
+    final batch = _db.batch();
+    final ref = _db.collection('testimonials').doc();
+    batch.set(ref, {
+      'quote': (data['quote'] as String? ?? '').trim(),
+      'name': (data['name'] as String? ?? '').trim(),
+      'role': (data['role'] as String? ?? '').trim(),
+      'author_uid': data['author_uid'],
+      'submitted_by_member': true,
+      'created_at': FieldValue.serverTimestamp(),
+      'updated_at': FieldValue.serverTimestamp(),
+    });
+    batch.delete(_db.collection('testimonial_submissions').doc(id));
+    await batch.commit();
+    await _logAdminAction('approve_testimonial', ref.id);
+  }
+
+  Future<void> adminRejectTestimonialSubmission(String id) async {
+    await _db.collection('testimonial_submissions').doc(id).delete();
+    await _logAdminAction('reject_testimonial', id);
   }
 
   Future<void> adminDeleteTestimonial(String id) async {
@@ -991,12 +1192,22 @@ class Backend {
     await _logAdminAction('delete_request', requestId);
   }
 
-  /// Not a real broadcast — sending a push needs a server (Cloud Function
-  /// + FCM Admin SDK), which is exactly what Spark doesn't allow. This
-  /// just records the intent in the audit trail so the admin UI's
-  /// broadcast action isn't silently dead; see backend/README.md.
-  Future<void> adminSendBroadcast(String message, String audience) =>
-      _logAdminAction('broadcast[$audience]', message);
+  /// Push to every phone, or to one blood group's donors. Writing the
+  /// `broadcasts` doc is the whole API: the onBroadcast Cloud Function
+  /// delivers it to the matching FCM topic and stamps the result back.
+  /// [audience] is "All donors" or a blood group ("A+").
+  Future<void> adminSendBroadcast(String message, String audience, {String title = 'Rakta Bandhan'}) async {
+    final group = bloodCompatibility.containsKey(audience) ? audience : null;
+    final ref = await _db.collection('broadcasts').add({
+      'title': title.trim().isEmpty ? 'Rakta Bandhan' : title.trim(),
+      'body': message.trim().length > 300 ? message.trim().substring(0, 300) : message.trim(),
+      'blood_group': group,
+      'created_by': _uid,
+      'created_at': FieldValue.serverTimestamp(),
+      'status': 'queued',
+    });
+    await _logAdminAction('broadcast[${group ?? 'all'}]', ref.id);
+  }
 
   /// Edit the donor's own name / phone. `is_verified` and `is_banned` stay
   /// untouched here — the rules reject an owner write that changes either.
@@ -1012,22 +1223,75 @@ class Backend {
 
   /// Community stories ("Share an experience"). Public to signed-in users,
   /// authored under the poster's own uid; admins can moderate/remove.
+  ///
+  /// An optional photo goes to Cloud Storage at `community/{uid}/{postId}`
+  /// (storage.rules: own folder, images only, < 2 MB). The caller passes an
+  /// already-downscaled image (image_picker maxWidth/imageQuality), ~150–300
+  /// KB. Deleting the post deletes the photo (onStoryDeleted function).
   Future<void> submitCommunityStory({
     required String topic,
     required String body,
     String? bloodGroup,
     String? locationLabel,
+    XFile? photo,
   }) async {
     final donor = (await myDonorDoc()).data();
-    await _db.collection('community_stories').add({
+    final ref = _db.collection('community_stories').doc();
+    String? imageUrl;
+    String? imagePath;
+    double? imageAspect;
+    if (photo != null) {
+      final bytes = await photo.readAsBytes();
+      final contentType = switch (photo.mimeType) {
+        'image/png' => 'image/png',
+        'image/webp' => 'image/webp',
+        _ => 'image/jpeg',
+      };
+      final ext = contentType.split('/').last.replaceAll('jpeg', 'jpg');
+      imagePath = 'community/$_uid/${ref.id}.$ext';
+      final storageRef = FirebaseStorage.instance.ref(imagePath);
+      await storageRef.putData(bytes, SettableMetadata(contentType: contentType, cacheControl: 'public, max-age=604800'));
+      imageUrl = await storageRef.getDownloadURL();
+      try {
+        final image = await decodeImageFromList(bytes);
+        if (image.height > 0) imageAspect = image.width / image.height;
+        image.dispose();
+      } catch (_) {}
+    }
+    await ref.set({
       'author_uid': _uid,
       'author_name': donor?['name'] ?? 'A donor',
       'topic': topic,
       'body': body.trim(),
       'blood_group': bloodGroup,
       'location_label': locationLabel,
+      'image_url': ?imageUrl,
+      'image_path': ?imagePath,
+      'image_aspect': ?imageAspect,
       'created_at': FieldValue.serverTimestamp(),
     });
+    _logEvent('story_posted', {'has_photo': photo != null ? 1 : 0});
+  }
+
+  /// The author removes their own post (the photo goes with it).
+  Future<void> deleteMyStory(String storyId) => _db.collection('community_stories').doc(storyId).delete();
+
+  /// Report a community post for review (Apple guideline 1.2 — user
+  /// content must be reportable). Admins see it in the reports inbox.
+  Future<void> reportStory(String storyId, {required String reason}) => _db.collection('reports').add({
+        'reporter_uid': _uid,
+        'reason': reason,
+        'kind': 'story',
+        'story_id': storyId,
+        'status': 'new',
+        'created_at': FieldValue.serverTimestamp(),
+      });
+
+  /// The neighbourhood name shown on this donor's public listing
+  /// ("Adyar, Chennai") — safe to tag on a post.
+  Future<String?> myPublicArea() async {
+    final area = (await _db.collection('donors_public').doc(_uid).get()).data()?['area'] as String?;
+    return (area == null || area.trim().isEmpty) ? null : area.trim();
   }
 
   Stream<QuerySnapshot<Map<String, dynamic>>> communityStoriesStream() => _db
@@ -1156,6 +1420,56 @@ class Backend {
     } catch (_) {
       return null;
     }
+  }
+
+  /// Neighbourhood + city ("Adyar, Chennai") for a point — what other
+  /// people are shown instead of coordinates or a street address.
+  Future<String?> reverseGeocodeArea(double lat, double lng) async {
+    try {
+      final response = await http.get(
+        _geocodeUri('/reverse', {
+          'lat': lat.toString(),
+          'lon': lng.toString(),
+          'format': 'json',
+          'zoom': '14',
+          'addressdetails': '1',
+        }),
+        headers: {'User-Agent': 'RaktaBandhan/1.0'},
+      );
+      if (response.statusCode != 200) return null;
+      final address = (jsonDecode(response.body) as Map<String, dynamic>)['address'] as Map<String, dynamic>?;
+      if (address == null) return null;
+      return areaFromAddress(address);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Picks the most useful locality + city pair out of a Nominatim /
+  /// LocationIQ `address` object.
+  static String? areaFromAddress(Map<String, dynamic> address) {
+    String? first(List<String> keys) {
+      for (final k in keys) {
+        final v = (address[k] as String?)?.trim();
+        if (v != null && v.isNotEmpty) return v;
+      }
+      return null;
+    }
+
+    final local = first(['suburb', 'neighbourhood', 'quarter', 'village', 'hamlet', 'residential', 'city_district']);
+    final city = first(['city', 'town', 'municipality', 'county', 'state_district', 'state']);
+    final parts = [?local, if (city != null && city != local) city];
+    return parts.isEmpty ? null : parts.join(', ');
+  }
+
+  /// Short display form of a stored free-text address: the first two
+  /// comma-separated parts ("Apollo Hospital, Greams Road"), so cards never
+  /// show a raw coordinate or a six-line Nominatim string.
+  static String shortPlace(String? label, {String fallback = 'Location shared'}) {
+    final text = label?.trim() ?? '';
+    if (text.isEmpty || RegExp(r'^-?\d+(\.\d+)?\s*,\s*-?\d+(\.\d+)?$').hasMatch(text)) return fallback;
+    final parts = text.split(',').map((p) => p.trim()).where((p) => p.isNotEmpty && !RegExp(r'^\d+$').hasMatch(p)).toList();
+    return parts.take(2).join(', ');
   }
 
   Position _fallbackPosition() => Position(

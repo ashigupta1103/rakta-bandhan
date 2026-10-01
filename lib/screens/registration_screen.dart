@@ -14,9 +14,11 @@ import 'consent_screen.dart';
 import 'login_screen.dart';
 
 class RegistrationScreen extends StatefulWidget {
+  /// Pre-fills the mobile field when known (preview gallery); the email
+  /// sign-in flow leaves it empty for the donor to type.
   final String phoneNumber;
 
-  const RegistrationScreen({super.key, required this.phoneNumber});
+  const RegistrationScreen({super.key, this.phoneNumber = ''});
 
   @override
   State<RegistrationScreen> createState() => _RegistrationScreenState();
@@ -156,16 +158,16 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     setState(() {
       _nameError = name.isEmpty ? 'Name is required' : null;
       _whatsappError = whatsapp.isEmpty
-          ? 'WhatsApp number is required'
-          : whatsapp.length != 10
-              ? 'Enter a valid 10-digit number'
+          ? 'Mobile number is required'
+          : !RegExp(r'^[6-9]\d{9}$').hasMatch(whatsapp)
+              ? 'Enter a valid 10-digit Indian mobile number'
               : null;
       _bloodGroupError = _selectedBloodGroup == null
           ? 'Please select a blood group'
           : null;
     });
 
-    if (name.isEmpty || whatsapp.length != 10 || _selectedBloodGroup == null) return;
+    if (_nameError != null || _whatsappError != null || _bloodGroupError != null) return;
 
     setState(() => _isSubmitting = true);
     try {
@@ -223,21 +225,25 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     return '(${e.runtimeType}) ';
   }
 
-  // This screen is always reached via Navigator.pushAndRemoveUntil right
-  // after OTP verification (see otp_screen.dart) — it is the new stack
-  // root with nothing beneath it, not a normal pushed route. A plain
-  // Navigator.pop() here empties the Navigator and leaves a black screen.
-  // Splash already sends an authenticated-but-incomplete-profile user to
-  // LoginScreen (see splash_screen.dart's _resolveDestination), so backing
-  // out here does the same thing directly instead of popping into nothing.
+  // This screen is usually reached via Navigator.pushAndRemoveUntil right
+  // after email verification (see verify_email_screen.dart) — it is the
+  // new stack root with nothing beneath it. A plain Navigator.pop() here
+  // would empty the Navigator and leave a black screen, so backing out
+  // signs out and returns to the sign-in screen instead.
   bool _backHandled = false;
-  void _handleBack() {
+  Future<void> _handleBack() async {
     if (_backHandled) return;
     if (Navigator.canPop(context)) {
       Navigator.pop(context);
       return;
     }
     _backHandled = true;
+    try {
+      await Backend.instance.signOut();
+    } catch (_) {
+      // Offline (or no Firebase at all, in widget tests) — still leave.
+    }
+    if (!mounted) return;
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(builder: (context) => const LoginScreen()),
@@ -328,7 +334,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
                 // WhatsApp Field
                 const Text(
-                  'WhatsApp number',
+                  'Mobile number (WhatsApp)',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
@@ -350,7 +356,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                     }
                   },
                   decoration: const InputDecoration(
-                    hintText: 'Enter WhatsApp number',
+                    hintText: '10-digit mobile number',
+                    prefixText: '+91  ',
+                    helperText: 'Shared only with the person you are matched with.',
                   ),
                 ),
                 if (_whatsappError != null) ...[

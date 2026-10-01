@@ -48,6 +48,10 @@ class TestimonialsScreen extends StatelessWidget {
                     Text('Stories we\'ve been given permission to tell', style: AppTextStyles.display(fontSize: 25, color: AppColors.ink, height: 1.25)),
                     const SizedBox(height: 8),
                     const Text('Curated and verified by Rakta Bandhan. Member stories live in Community.', style: TextStyle(fontSize: 13, color: AppColors.ink2)),
+                    if (Firebase.apps.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      const _ShareTestimonialButton(),
+                    ],
                     const SizedBox(height: 20),
                     // No Firebase app (widget tests, or an init failure) means
                     // no stream to build — fall back rather than throw on
@@ -189,6 +193,105 @@ class TestimonialsScreen extends StatelessWidget {
               Text(timeAgo, style: const TextStyle(fontSize: 10.5, color: AppColors.disabledTint)),
             ],
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// "Share your testimonial" — a member offers a quote for this page. It is
+/// published only after an admin reviews it, and only with the member's
+/// explicit consent to use their name.
+class _ShareTestimonialButton extends StatelessWidget {
+  const _ShareTestimonialButton();
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      onPressed: () => showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.white,
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+        builder: (_) => const _TestimonialSheet(),
+      ),
+      icon: const Icon(LucideIcons.quote, size: 15),
+      label: const Text('Share your testimonial'),
+    );
+  }
+}
+
+class _TestimonialSheet extends StatefulWidget {
+  const _TestimonialSheet();
+
+  @override
+  State<_TestimonialSheet> createState() => _TestimonialSheetState();
+}
+
+class _TestimonialSheetState extends State<_TestimonialSheet> {
+  final _quote = TextEditingController();
+  final _role = TextEditingController();
+  bool _consent = false;
+  bool _sending = false;
+
+  @override
+  void dispose() {
+    _quote.dispose();
+    _role.dispose();
+    super.dispose();
+  }
+
+  Future<void> _send() async {
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _sending = true);
+    try {
+      await Backend.instance.submitTestimonial(quote: _quote.text, role: _role.text);
+      navigator.pop();
+      messenger.showSnackBar(const SnackBar(content: Text('Thank you! Our team will review it before it appears here.')));
+    } catch (_) {
+      if (mounted) setState(() => _sending = false);
+      messenger.showSnackBar(const SnackBar(content: Text('Could not send it. Please try again.')));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final length = _quote.text.trim().length;
+    final ready = length >= 10 && length <= 600 && _consent && !_sending;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 18, 20, 20 + MediaQuery.of(context).viewInsets.bottom),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('Your testimonial', style: AppTextStyles.display(fontSize: 21, color: AppColors.ink)),
+          const SizedBox(height: 6),
+          const Text('A few lines about what Rakta Bandhan meant to you. It is published under your registered name after review.', style: TextStyle(fontSize: 13, color: AppColors.ink2, height: 1.45)),
+          const SizedBox(height: 14),
+          TextField(
+            controller: _quote,
+            minLines: 3,
+            maxLines: 6,
+            maxLength: 600,
+            onChanged: (_) => setState(() {}),
+            decoration: const InputDecoration(hintText: 'What happened, and how did it feel?'),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _role,
+            maxLength: 60,
+            decoration: const InputDecoration(hintText: 'Who you are, e.g. “Donor, Adyar” or “Patient’s son”'),
+          ),
+          CheckboxListTile(
+            contentPadding: EdgeInsets.zero,
+            controlAffinity: ListTileControlAffinity.leading,
+            value: _consent,
+            onChanged: (v) => setState(() => _consent = v ?? false),
+            title: const Text('I agree to Rakta Bandhan publishing this with my name.', style: TextStyle(fontSize: 13, color: AppColors.ink)),
+          ),
+          const SizedBox(height: 6),
+          ElevatedButton(onPressed: ready ? _send : null, child: Text(_sending ? 'Sending…' : 'Send for review')),
         ],
       ),
     );

@@ -6,6 +6,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/blood_group_droplet.dart';
 import '../widgets/state_card.dart';
+import 'certificate_screen.dart';
 
 /// Donation history — rebuilt per Visual Richness Proposal #09: "a real
 /// vertical timeline replaces the date column... the impact trail at the
@@ -128,7 +129,8 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
                                 padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
                                 child: Column(
                                   children: [
-                                    for (var i = 0; i < history.length; i++) _timelineRow(history[i], isLast: i == history.length - 1),
+                                    for (var i = 0; i < history.length; i++)
+                                      _timelineRow(history[i], isLast: i == history.length - 1, donationNumber: history.length - i),
                                   ],
                                 ),
                               ),
@@ -144,7 +146,7 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
     );
   }
 
-  Widget _timelineRow(DonationRecord record, {required bool isLast}) {
+  Widget _timelineRow(DonationRecord record, {required bool isLast, required int donationNumber}) {
     final (day, month) = _dayMonth(record.date);
     return IntrinsicHeight(
       child: Row(
@@ -178,6 +180,21 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
                   ),
                   const SizedBox(height: 3),
                   Text(record.bloodGroup, style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary)),
+                  const SizedBox(height: 6),
+                  GestureDetector(
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => CertificateScreen(record: record, donationNumber: donationNumber)),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(LucideIcons.award, size: 13, color: AppColors.primary),
+                        SizedBox(width: 5),
+                        Text('View certificate', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primary)),
+                      ],
+                    ),
+                  ),
                   if (isLast) ...[
                     const SizedBox(height: 7),
                     const Text('Your first donation', style: TextStyle(fontSize: 11, color: AppColors.textMuted)),

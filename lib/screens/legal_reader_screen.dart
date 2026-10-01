@@ -22,8 +22,13 @@ class LegalReaderScreen extends StatefulWidget {
 
   const LegalReaderScreen.privacy({super.key}) : title = 'Privacy policy';
   const LegalReaderScreen.terms({super.key}) : title = 'Terms of use';
+  const LegalReaderScreen.guidelines({super.key}) : title = 'Community guidelines';
 
-  LegalDocument get document => title.toLowerCase().startsWith('terms') ? termsOfUse : privacyPolicy;
+  LegalDocument get document => switch (title.toLowerCase()) {
+        final t when t.startsWith('terms') => termsOfUse,
+        final t when t.startsWith('community') => communityGuidelines,
+        _ => privacyPolicy,
+      };
 
   @override
   State<LegalReaderScreen> createState() => _LegalReaderScreenState();

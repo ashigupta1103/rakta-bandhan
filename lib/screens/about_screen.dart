@@ -1,17 +1,47 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import '../preview_mode.dart';
+import 'package:share_plus/share_plus.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
+import 'legal_reader_screen.dart';
 
-/// About Rakta Bandhan — per the final artifact's "Trust & brand" section.
-/// Copy, figures and the team roster are explicitly marked as placeholders
-/// in the design itself ("copy and people = placeholders") — the three
-/// impact figures render as "—" because the design's own canonical frame
-/// shows dashes, not invented numbers, pending confirmation of a real
-/// source for them.
+/// About Rakta Bandhan — mission, vision, the project's story and team, as
+/// supplied by the Rakta Bandhan / Rotary team. Team photographs are still
+/// to come; each member shows their initials until then.
 class AboutScreen extends StatelessWidget {
   const AboutScreen({super.key});
+
+  /// Public share page with a social preview card (tool/make_share_page.py);
+  /// it links on to the store listing.
+  static const shareUrl = 'https://rakta-bandhan2026.web.app/app/';
+
+  static const _missionPoints = [
+    (LucideIcons.users, 'Empower', 'patients and caregivers with access to nearby blood donors.'),
+    (LucideIcons.zap, 'Enable', 'donors to respond swiftly, safely and meaningfully.'),
+    (LucideIcons.building2, 'Engage', 'hospitals, blood banks and communities to build a responsive donor network.'),
+    (LucideIcons.repeat, 'Encourage', 'responsible repeat donation through reminders and appropriate scheduling.'),
+  ];
+
+  static const _team = [
+    _Member(
+      name: 'PHF Rtn. Radhika Dhruv',
+      role: 'Project Chairman · Visionary & Principal Sponsor',
+      detail: 'Immediate Past President, Rotary Club of Madras Cosmos',
+      bio: 'Radhika Dhruv conceptualised Rakta Bandhan from the thought that reaching a blood donor should be faster and more seamless in an emergency. Her vision has driven the development of the platform, and the app’s development has been majorly sponsored by her.',
+    ),
+    _Member(
+      name: 'CSK',
+      role: 'Management Trustee',
+      detail: 'Rakta Bandhan project trust',
+      bio: 'As Management Trustee, CSK oversees the governance of the project on behalf of the partner trusts — making sure Rakta Bandhan is run responsibly, transparently and in the service of donors and patients.',
+    ),
+    _Member(
+      name: 'Adarsh Betala',
+      role: 'President',
+      detail: 'Rakta Bandhan',
+      bio: 'As President, Adarsh Betala leads the day-to-day direction of Rakta Bandhan — bringing together the clubs, volunteers, hospitals and the technology team so that every request reaches willing donors quickly.',
+    ),
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -28,7 +58,14 @@ class AboutScreen extends StatelessWidget {
                   children: [
                     IconButton(icon: const Icon(LucideIcons.arrowLeft, color: AppColors.textPrimaryWarm), onPressed: () => Navigator.pop(context)),
                     const SizedBox(width: 4),
-                    const Text('About', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
+                    const Expanded(child: Text('About', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm))),
+                    IconButton(
+                      tooltip: 'Share Rakta Bandhan',
+                      icon: const Icon(LucideIcons.share2, size: 19, color: AppColors.textPrimaryWarm),
+                      onPressed: () => SharePlus.instance.share(ShareParams(
+                        text: 'Rakta Bandhan helps people who urgently need blood reach willing donors nearby. Find your Bloodmate here: $shareUrl',
+                      )),
+                    ),
                   ],
                 ),
               ),
@@ -52,13 +89,17 @@ class AboutScreen extends StatelessWidget {
                             child: Image.asset('assets/branding/final-logo-transparent.png', fit: BoxFit.contain),
                           ),
                           const SizedBox(height: 18),
-                          Text('Find your blood mate.', textAlign: TextAlign.center, style: AppTextStyles.display(fontSize: 24, color: AppColors.onEmberWarm).copyWith(fontStyle: FontStyle.italic)),
-                          const SizedBox(height: 12),
+                          Text('Find your Bloodmate here.', textAlign: TextAlign.center, style: AppTextStyles.display(fontSize: 24, color: AppColors.onEmberWarm).copyWith(fontStyle: FontStyle.italic)),
+                          const SizedBox(height: 6),
+                          const Text('Your match is a call away.', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.5, color: AppColors.onEmberMuted)),
+                          const SizedBox(height: 14),
                           const Text.rich(
                             TextSpan(
-                              text: 'An initiative of\n',
-                              style: TextStyle(fontSize: 12.5, color: Color(0xB3FBEDE6)),
-                              children: [TextSpan(text: 'Rotary Club of Madras Cosmos', style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.gold))],
+                              text: 'A service project of\n',
+                              style: TextStyle(fontSize: 12.5, color: AppColors.onEmberMuted, height: 1.5),
+                              children: [
+                                TextSpan(text: 'Rotary Club of Madras Cosmos & Rotary Club of Chennai Capital', style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.gold)),
+                              ],
                             ),
                             textAlign: TextAlign.center,
                           ),
@@ -66,88 +107,62 @@ class AboutScreen extends StatelessWidget {
                       ),
                     ),
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 22, 20, 24),
+                      padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          if (kEnablePreviewUi) ...[
-                            Row(
-                              children: [
-                                const Icon(LucideIcons.eye, size: 13, color: AppColors.goldDeep),
-                                const SizedBox(width: 6),
-                                const Text('Preview data — sample copy, not approved', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: AppColors.goldDeep)),
-                              ],
-                            ),
-                            const SizedBox(height: 14),
-                            _textBlock(
-                              label: 'Our mission',
-                              body: 'To make it faster and simpler for someone who urgently needs blood to reach a willing, compatible donor nearby — replacing word-of-mouth and cold calls with one request that reaches the right people.',
-                            ),
-                            const SizedBox(height: 20),
-                            _textBlock(
-                              label: 'Our vision',
-                              body: 'A community where no one waits helplessly for blood because a compatible donor was simply out of reach — every donor and every request connected within minutes, not days.',
-                            ),
-                            const SizedBox(height: 20),
-                            _textBlock(
-                              label: 'How Rakta Bandhan helps',
-                              body: 'Donors register once with their blood group and general location. When someone raises a request, the app finds compatible, available donors nearby and lets them accept directly — no public posting of anyone’s phone number or address.',
-                            ),
-                          ] else
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(color: Colors.white, border: Border.all(color: AppColors.warmBorder), borderRadius: BorderRadius.circular(12)),
-                              child: const Row(
-                                children: [
-                                  Icon(LucideIcons.clock, size: 16, color: AppColors.ink2),
-                                  SizedBox(width: 10),
-                                  Expanded(
-                                    child: Text(
-                                      'Mission, vision and programme details will appear here once approved by the Rakta Bandhan / Rotary Club team.',
-                                      style: TextStyle(fontSize: 13, color: AppColors.ink2, height: 1.5),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          const SizedBox(height: 20),
-                          Row(
-                            children: [
-                              _statTile('donors'),
-                              const SizedBox(width: 10),
-                              _statTile('donations'),
-                              const SizedBox(width: 10),
-                              _statTile('camps'),
-                            ],
+                          _label('Our mission'),
+                          _body(
+                            'To create a real-time, GPS-enabled platform that bridges the gap between urgent blood requirements and willing donors — fostering timely giving, responsible donation and lifesaving action.',
                           ),
-                          const SizedBox(height: 8),
-                          const Text('Figures read from existing records once confirmed — none invented', textAlign: TextAlign.center, style: TextStyle(fontSize: 11, color: AppColors.disabledTint)),
-                          const SizedBox(height: 24),
-                          Row(
-                            children: [
-                              const Text('The team', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.1, color: AppColors.ink2)),
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                                decoration: BoxDecoration(color: AppColors.sand, borderRadius: BorderRadius.circular(999)),
-                                child: const Text('Info pending', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.ink2)),
-                              ),
-                            ],
+                          const SizedBox(height: 14),
+                          for (final (icon, verb, rest) in _missionPoints) _missionRow(icon, verb, rest),
+                          const SizedBox(height: 22),
+                          _label('Our vision'),
+                          _body('A future where finding a blood donor is as quick and seamless as ordering a ride or a meal — powered by technology, humanity and trust.'),
+                          const SizedBox(height: 26),
+                          _label('About Rakta Bandhan'),
+                          _body(
+                            'Rakta Bandhan is a technology-enabled blood donor platform created to bridge the critical gap between people who urgently need blood and willing donors.',
                           ),
-                          const SizedBox(height: 10),
+                          const SizedBox(height: 14),
                           Container(
-                            decoration: BoxDecoration(color: Colors.white, border: Border.all(color: AppColors.warmBorder), borderRadius: BorderRadius.circular(12)),
-                            child: Column(
-                              children: [
-                                _teamRow('Adarsh', isLast: false),
-                                _teamRow('Sathish Kumar', isLast: false),
-                                _teamRow('Radhika', isLast: true),
-                              ],
+                            padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                            decoration: BoxDecoration(
+                              color: AppColors.goldTint,
+                              border: const Border(left: BorderSide(color: AppColors.gold, width: 3)),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              '“When food and groceries can be delivered in minutes, finding a blood donor should not take hours.”',
+                              style: AppTextStyles.display(fontSize: 16, color: AppColors.goldDeepest, height: 1.5).copyWith(fontStyle: FontStyle.italic),
                             ),
                           ),
-                          const SizedBox(height: 8),
-                          const Text('Role, biography and photograph pending confirmation from the team.', style: TextStyle(fontSize: 11.5, color: AppColors.disabledTint)),
+                          const SizedBox(height: 14),
+                          _paragraph(
+                            'Rakta Bandhan uses location-enabled technology to help identify suitable, available blood donors in the vicinity of an urgent requirement. It connects patients, caregivers and hospitals with blood donors, enabling faster communication and helping turn an emergency blood requirement into timely community action.',
+                          ),
+                          const SizedBox(height: 12),
+                          _paragraph(
+                            'The initiative is a collaborative service project of Madras Cosmos Charitable Trust, managed by Rotary Club of Madras Cosmos, and Chennai Capital Trust, managed by Rotary Club of Chennai Capital, with support from Rotary International District 3233.',
+                          ),
+                          const SizedBox(height: 12),
+                          _paragraph(
+                            'The project was conceptualised by PHF Rtn. Radhika Dhruv, Immediate Past President of Rotary Club of Madras Cosmos, with the app’s development majorly sponsored by her.',
+                          ),
+                          const SizedBox(height: 22),
+                          _label('Our belief'),
+                          Text('Every drop counts. Every donor matters. Every minute matters.', style: AppTextStyles.display(fontSize: 18, color: AppColors.brandRed, height: 1.4)),
+                          const SizedBox(height: 28),
+                          _label('Our team'),
+                          const SizedBox(height: 4),
+                          for (final m in _team) _teamCard(m),
+                          const SizedBox(height: 22),
+                          _label('Community & legal'),
+                          const SizedBox(height: 4),
+                          _linkRow(context, LucideIcons.heartHandshake, 'Community guidelines', () => LegalReaderScreen.guidelines()),
+                          _linkRow(context, LucideIcons.shieldCheck, 'Privacy policy', () => LegalReaderScreen.privacy()),
+                          _linkRow(context, LucideIcons.fileText, 'Terms of use', () => LegalReaderScreen.terms()),
                         ],
                       ),
                     ),
@@ -161,56 +176,115 @@ class AboutScreen extends StatelessWidget {
     );
   }
 
-  Widget _textBlock({required String label, required String body}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.1, color: AppColors.ink2)),
-        const SizedBox(height: 10),
-        Text(body, style: AppTextStyles.display(fontSize: 16, color: AppColors.ink, height: 1.6)),
-      ],
-    );
-  }
+  Widget _label(String text) => Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Text(text, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.1, color: AppColors.ink2)),
+      );
 
-  Widget _statTile(String label) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        decoration: BoxDecoration(color: Colors.white, border: Border.all(color: AppColors.warmBorder), borderRadius: BorderRadius.circular(12)),
-        child: Column(
-          children: [
-            Text('—', style: AppTextStyles.display(fontSize: 22, color: AppColors.ink, height: 1)),
-            const SizedBox(height: 4),
-            Text(label, style: const TextStyle(fontSize: 11, color: AppColors.ink2)),
-          ],
-        ),
-      ),
-    );
-  }
+  Widget _body(String text) => Text(text, style: AppTextStyles.display(fontSize: 17, color: AppColors.ink, height: 1.55));
 
-  Widget _teamRow(String name, {required bool isLast}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-      decoration: BoxDecoration(border: isLast ? null : const Border(bottom: BorderSide(color: AppColors.warmDivider))),
+  Widget _paragraph(String text) => Text(text, style: const TextStyle(fontSize: 14, color: AppColors.ink, height: 1.6));
+
+  Widget _missionRow(IconData icon, String verb, String rest) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(color: AppColors.sand, shape: BoxShape.circle, border: Border.all(color: AppColors.warmBorder, style: BorderStyle.solid)),
+            width: 30,
+            height: 30,
+            decoration: BoxDecoration(color: AppColors.primaryLightTint, borderRadius: BorderRadius.circular(9)),
+            alignment: Alignment.center,
+            child: Icon(icon, size: 15, color: AppColors.primary),
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(name, style: AppTextStyles.display(fontSize: 16.5, color: AppColors.ink)),
-                const Text('Role — to be supplied', style: TextStyle(fontSize: 11.5, color: AppColors.disabledTint)),
-              ],
+            child: Padding(
+              padding: const EdgeInsets.only(top: 5),
+              child: Text.rich(
+                TextSpan(
+                  style: const TextStyle(fontSize: 13.5, color: AppColors.ink, height: 1.45),
+                  children: [
+                    TextSpan(text: '$verb ', style: const TextStyle(fontWeight: FontWeight.w700)),
+                    TextSpan(text: rest),
+                  ],
+                ),
+              ),
             ),
           ),
         ],
       ),
     );
   }
+
+  Widget _teamCard(_Member m) {
+    final initials = m.name
+        .replaceAll(RegExp(r'^(PHF\s+)?(Rtn\.\s+)?'), '')
+        .split(RegExp(r'\s+'))
+        .where((w) => w.isNotEmpty)
+        .take(2)
+        .map((w) => w[0].toUpperCase())
+        .join();
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(color: Colors.white, border: Border.all(color: AppColors.warmBorder), borderRadius: BorderRadius.circular(14)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: const BoxDecoration(color: AppColors.primaryLightTint, shape: BoxShape.circle),
+                alignment: Alignment.center,
+                child: Text(initials, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.primary)),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(m.name, style: AppTextStyles.display(fontSize: 16.5, color: AppColors.ink)),
+                    Text(m.role, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primary)),
+                    Text(m.detail, style: const TextStyle(fontSize: 11.5, color: AppColors.ink2)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(m.bio, style: const TextStyle(fontSize: 13, color: AppColors.ink, height: 1.55)),
+        ],
+      ),
+    );
+  }
+
+  Widget _linkRow(BuildContext context, IconData icon, String label, Widget Function() page) {
+    return InkWell(
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => page())),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Row(
+          children: [
+            Icon(icon, size: 17, color: AppColors.ink2),
+            const SizedBox(width: 12),
+            Expanded(child: Text(label, style: const TextStyle(fontSize: 14, color: AppColors.ink))),
+            const Icon(LucideIcons.chevronRight, size: 16, color: AppColors.chevronMuted),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+@immutable
+class _Member {
+  final String name;
+  final String role;
+  final String detail;
+  final String bio;
+  const _Member({required this.name, required this.role, required this.detail, required this.bio});
 }

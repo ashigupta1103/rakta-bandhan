@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../services/backend.dart';
 import '../services/chat_service.dart';
+import '../services/push_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/live_events_host.dart';
 import 'community_screen.dart';
@@ -23,6 +25,16 @@ class MainNavigationScreen extends StatefulWidget {
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // Push token + topics for this signed-in phone (asks for notification
+    // permission the first time). Needs the blood group for its topic.
+    Backend.instance.myDonorDoc().then((snap) {
+      PushService.instance.registerDevice(bloodGroup: snap.data()?['blood_group'] as String?);
+    }).catchError((_) {});
+  }
 
   final List<Widget> _screens = const [
     RequestsScreen(),

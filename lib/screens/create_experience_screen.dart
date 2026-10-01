@@ -1,4 +1,7 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../services/backend.dart';
 import '../theme/app_colors.dart';
@@ -6,10 +9,9 @@ import '../theme/app_text_styles.dart';
 import '../widgets/dashed_border.dart';
 
 /// "Share an experience" — posts a real story to `community_stories`, shown
-/// on the Community → Stories tab. Photo attachment is still not offered:
-/// images would need Cloud Storage (Blaze-only since Sep 2026) and the
-/// base64-in-Firestore trick used for ID proof doesn't scale to a public
-/// feed of images.
+/// on the Community → Stories tab, optionally with one photo. The photo is
+/// downscaled on the phone (1440 px, JPEG ~78%) before upload, so a post
+/// costs ~150–300 KB of storage instead of a 4–6 MB camera original.
 class CreateExperienceScreen extends StatefulWidget {
   const CreateExperienceScreen({super.key});
 
@@ -25,6 +27,52 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
   String _topic = 'My first donation';
   bool _showBloodGroup = true;
   bool _tagLocation = false;
+  XFile? _photo;
+  Uint8List? _photoBytes;
+
+  Future<void> _pickPhoto() async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (sheet) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(LucideIcons.image),
+              title: const Text('Choose from gallery'),
+              onTap: () => Navigator.pop(sheet, ImageSource.gallery),
+            ),
+            ListTile(
+              leading: const Icon(LucideIcons.camera),
+              title: const Text('Take a photo'),
+              onTap: () => Navigator.pop(sheet, ImageSource.camera),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null) return;
+    try {
+      final picked = await ImagePicker().pickImage(source: source, maxWidth: 1440, maxHeight: 1440, imageQuality: 78);
+      if (picked == null) return;
+      final bytes = await picked.readAsBytes();
+      if (bytes.length > 2 * 1024 * 1024) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('That photo is too large. Try a different one.')));
+        return;
+      }
+      if (!mounted) return;
+      setState(() {
+        _photo = picked;
+        _photoBytes = bytes;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Couldn’t open photos. Check the app’s permission in Settings.')));
+    }
+  }
 
   @override
   void initState() {
@@ -37,10 +85,6 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
     _textController.dispose();
     _focusNode.dispose();
     super.dispose();
-  }
-
-  void _comingSoon(String label) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$label — coming soon.')));
   }
 
   bool _submitting = false;
@@ -56,11 +100,14 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
     setState(() => _submitting = true);
     try {
       final donor = (await Backend.instance.myDonorDoc()).data();
+      // Neighbourhood only ("Adyar, Chennai") — never the registered address.
+      final area = _tagLocation ? await Backend.instance.myPublicArea() : null;
       await Backend.instance.submitCommunityStory(
         topic: _topic,
         body: body,
         bloodGroup: _showBloodGroup ? (donor?['blood_group'] as String?) : null,
-        locationLabel: _tagLocation ? (donor?['location_label'] as String?) : null,
+        locationLabel: area,
+        photo: _photo,
       );
       if (!mounted) return;
       Navigator.pop(context);
@@ -137,38 +184,59 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
                       ),
                     ),
                     const SizedBox(height: 14),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: GestureDetector(
-                            onTap: () => _comingSoon('Adding a photo'),
-                            child: CustomPaint(
-                              painter: DashedRRectPainter(color: AppColors.warmBorder, radius: 12),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 14),
-                                alignment: Alignment.center,
-                                child: const Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(LucideIcons.plus, size: 15, color: AppColors.ink2),
-                                    SizedBox(width: 7),
-                                    Text('Add photo', style: TextStyle(fontSize: 13.5, color: AppColors.ink2)),
-                                  ],
-                                ),
+                    if (_photoBytes != null)
+                      // Preview exactly as the feed will show it.
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(14),
+                        child: Stack(
+                          children: [
+                            AspectRatio(aspectRatio: 4 / 5, child: Image.memory(_photoBytes!, fit: BoxFit.cover, width: double.infinity)),
+                            Positioned(
+                              top: 8,
+                              right: 8,
+                              child: IconButton.filled(
+                                tooltip: 'Remove photo',
+                                style: IconButton.styleFrom(backgroundColor: Colors.black54),
+                                icon: const Icon(LucideIcons.x, size: 16, color: Colors.white),
+                                onPressed: () => setState(() {
+                                  _photo = null;
+                                  _photoBytes = null;
+                                }),
                               ),
+                            ),
+                            Positioned(
+                              bottom: 8,
+                              right: 8,
+                              child: TextButton.icon(
+                                style: TextButton.styleFrom(backgroundColor: Colors.black54, foregroundColor: Colors.white),
+                                onPressed: _pickPhoto,
+                                icon: const Icon(LucideIcons.refreshCw, size: 14),
+                                label: const Text('Change'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      GestureDetector(
+                        onTap: _pickPhoto,
+                        child: CustomPaint(
+                          painter: DashedRRectPainter(color: AppColors.warmBorder, radius: 12),
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            alignment: Alignment.center,
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(LucideIcons.imagePlus, size: 16, color: AppColors.ink2),
+                                SizedBox(width: 8),
+                                Text('Add a photo (optional)', style: TextStyle(fontSize: 13.5, color: AppColors.ink2)),
+                              ],
                             ),
                           ),
                         ),
-                        const SizedBox(width: 10),
-                        Container(
-                          width: 74,
-                          height: 50,
-                          decoration: BoxDecoration(color: AppColors.sand, borderRadius: BorderRadius.circular(12)),
-                          alignment: Alignment.center,
-                          child: const Text('4:3\ncrop', textAlign: TextAlign.center, style: TextStyle(fontSize: 11, height: 1.3, color: AppColors.disabledTint)),
-                        ),
-                      ],
-                    ),
+                      ),
                     const SizedBox(height: 22),
                     const Text('Choose a topic', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.1, color: AppColors.ink2)),
                     const SizedBox(height: 10),
@@ -199,7 +267,7 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
                       child: Column(
                         children: [
                           _privacyRow('Show my blood group', 'Adds the droplet to your disc', _showBloodGroup, (v) => setState(() => _showBloodGroup = v)),
-                          _privacyRow('Tag the camp or hospital', 'Location only — never your address', _tagLocation, (v) => setState(() => _tagLocation = v), isLast: true),
+                          _privacyRow('Show my area', 'Neighbourhood only, e.g. “Adyar, Chennai” — never your address', _tagLocation, (v) => setState(() => _tagLocation = v), isLast: true),
                         ],
                       ),
                     ),
@@ -222,7 +290,7 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
                     ),
                   ),
                   const SizedBox(height: 9),
-                  const Text('Your story appears on the Community tab for other donors', textAlign: TextAlign.center, style: TextStyle(fontSize: 11.5, color: AppColors.disabledTint)),
+                  const Text('Visible to everyone signed in to Rakta Bandhan. Follow the community guidelines — no phone numbers, no payment for blood.', textAlign: TextAlign.center, style: TextStyle(fontSize: 11.5, color: AppColors.disabledTint, height: 1.4)),
                 ],
               ),
             ),

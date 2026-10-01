@@ -51,10 +51,12 @@ Deploy Hosting first; see the README. The pages come from the in-app text.
 
 | Field | URL |
 |---|---|
-| Privacy policy (both stores) | `https://<project-id>.web.app/legal/privacy.html` |
-| Terms (optional field / EULA link) | `https://<project-id>.web.app/legal/terms.html` |
-| Play "Delete account URL" | `https://<project-id>.web.app/legal/delete-account.html` |
-| Support URL (App Store, required) | the privacy page, until a support page exists — **fill `kLegalContactEmail` first** |
+| Privacy policy (both stores) | `https://rakta-bandhan2026.web.app/legal/privacy.html` |
+| Terms (optional field / EULA link) | `https://rakta-bandhan2026.web.app/legal/terms.html` |
+| Community guidelines | `https://rakta-bandhan2026.web.app/legal/community-guidelines.html` |
+| Play "Delete account URL" | `https://rakta-bandhan2026.web.app/legal/delete-account.html` |
+| Website / marketing URL (share card) | `https://rakta-bandhan2026.web.app/app/` |
+| Support URL (App Store, required) | the share page above, until a support page exists — **fill `kLegalContactEmail` first** |
 
 ## Google Play — Data safety
 
@@ -63,13 +65,15 @@ Deploy Hosting first; see the README. The pages come from the in-app text.
 | Data type (Play category) | Collected | Shared | Purpose | Optional? |
 |---|---|---|---|---|
 | Name (Personal info) | Yes | No* | App functionality | Required |
+| Email address (Personal info) | Yes | No | Account management | Required |
 | Phone number (Personal info) | Yes | No* | App functionality, account management | Required |
 | Approximate and precise location (Location) | Yes | No | App functionality | Required (area); current location optional |
 | Health info: blood group (Health and fitness) | Yes | No | App functionality | Required |
-| Photos: ID proof (Photos and videos) | Yes | No | App functionality (verification) | Optional |
+| Photos: ID proof, community post photos (Photos and videos) | Yes | No | App functionality | Optional |
 | Other in-app messages (Messages) | Yes | No | App functionality | Optional |
+| Other user-generated content: community posts (App activity) | Yes | No | App functionality | Optional |
 | App interactions (App activity) | Yes | No | Analytics | Required |
-| Device or other IDs | Yes | No | Analytics, app functionality (push) | Required |
+| Device or other IDs (push token, Firebase app-instance ID — **not** the Advertising ID) | Yes | No | Analytics, app functionality (push) | Required |
 
 **Other answers**
 - \*"Shared" in Play's sense means transfer to a third party. Showing a matched user your name and number is a user-initiated disclosure *within* the service, not "sharing". Google treats service providers (Firebase) as not sharing.
@@ -77,7 +81,10 @@ Deploy Hosting first; see the README. The pages come from the in-app text.
 - **Users can request deletion:** Yes, in the app (Settings › Delete my account) and on the web page above.
 - **Audio from calls:** not collected. Calls are peer-to-peer and never recorded or stored.
 - **Health apps declaration:** required. Category: *Blood and organ donation*. The app doesn't use Health Connect.
-- **Permissions declaration:** none needed. No SMS, call-log, background-location or full-screen-intent permissions.
+- **Advertising ID:** not collected. The AD_ID permission is removed from the manifest and Analytics ad-ID collection is off — answer "No" to "Does your app use advertising ID?".
+- **Foreground service declaration (Play Console › App content):** type **Phone call** (`FOREGROUND_SERVICE_PHONE_CALL` + `MICROPHONE`), used only while an in-app voice call is ringing or live between a matched donor and requester. Attach a short screen recording of an incoming call.
+- **Full-screen intent:** not requested (removed from the manifest) — incoming calls ring as a heads-up notification instead.
+- **No** SMS, call-log or background-location permissions.
 - **Target audience:** 18+. Not designed for children.
 - **Ads:** None.
 - **Content rating (IARC):**
@@ -93,23 +100,27 @@ Tracking: **No** (no IDFA, no data brokers, no cross-app tracking).
 | Data type | Linked to user | Used for tracking | Purposes |
 |---|---|---|---|
 | Name | Yes | No | App Functionality |
+| Email Address | Yes | No | App Functionality |
 | Phone Number | Yes | No | App Functionality |
 | Health (blood group) | Yes | No | App Functionality |
 | Precise Location | Yes | No | App Functionality |
-| Photos or Videos (ID proof, optional) | Yes | No | App Functionality |
-| Other User Content (messages) | Yes | No | App Functionality |
+| Photos or Videos (ID proof, community posts — optional) | Yes | No | App Functionality |
+| Other User Content (messages, community posts) | Yes | No | App Functionality |
 | Product Interaction | No | No | Analytics |
 | Device ID | No | No | Analytics, App Functionality |
 
 **Age rating:**
 - Unrestricted web access: no.
-- User-generated content: yes (chat), with moderation: report and block in the chat menu, and admins review reports.
+- User-generated content: yes (chat and community posts), with moderation: report and block in the chat menu, report / hide / delete on every post, community guidelines, and admins review reports.
 - Medical/treatment information: "infrequent/mild". The app gives no medical advice, only a donation-interval note.
 - Result: 12+. Apple usually rates apps with user-to-user chat 12+ or higher.
 
 ## App Review notes (paste into App Store Connect › App Review Information)
 
-> **Sign-in:** enter any 10-digit Indian mobile number and any 6-digit code. This review build uses a test verification flow. *(Replace this before launch once real OTP ships. See README "Blockers".)*
+> **Sign-in:** use the review accounts below (email + password, already verified). New accounts confirm their email with a link Firebase sends.
+> - Account A (requester): `review-a@<your-domain>` / `<password>`
+> - Account B (donor): `review-b@<your-domain>` / `<password>`
+> *(Create both in the app before submitting, verify their emails, and register B as an O+ donor near A's location.)*
 >
 > **To see matching, chat and calling**, use two devices or simulators signed in with two different numbers:
 > 1. On device A, Request tab › "Need blood yourself?" › pick a blood group, urgency and location.
@@ -118,9 +129,9 @@ Tracking: **No** (no IDFA, no data brokers, no cross-app tracking).
 >
 > **Account deletion:** My Page › Settings › Delete my account.
 > **Report and block:** in any chat, tap the header or the ··· menu.
-> **Microphone** is used only for in-app voice calls between matched users. **Location** is used to show nearby requests and donors. The **camera or photo library** is used only for the optional ID-proof photo.
+> **Microphone** is used only for in-app voice calls between matched users. **Location** is used only while the app is open, to show nearby requests and donors. The **camera or photo library** is used only for the optional ID-proof photo and optional community post photos; **photo saving** only when the user taps Save on their donation certificate.
 >
-> Rakta Bandhan is a non-commercial initiative of the Rotary Club of Madras Cosmos, Chennai. It connects blood requesters with volunteer donors and does not provide medical services.
+> Rakta Bandhan is a non-commercial service project of Madras Cosmos Charitable Trust and Chennai Capital Trust (Rotary Club of Madras Cosmos and Rotary Club of Chennai Capital, Chennai). It connects blood requesters with volunteer donors and does not provide medical services.
 
 **Guidelines this build is designed against:**
 - **1.2** User-generated content: report, block, and admin review.

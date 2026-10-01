@@ -575,7 +575,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       for (final entry in abuseReports)
                         _inboxCard(
                           title: entry.reason,
-                          subtitle: 'Reported user ${entry.reportedUid} · request ${entry.requestId}',
+                          subtitle: entry.subject,
                           body: entry.details,
                           meta: entry.time,
                           status: entry.status,
@@ -777,17 +777,22 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 Text(_broadcastError!, style: const TextStyle(fontSize: 12, color: AppColors.primary)),
               ],
               const SizedBox(height: 6),
-              const Text('Rate-limited to one broadcast per area every 30 minutes.', style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
+              const Text('Sent as a push notification to every signed-in phone in this audience.', style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
               const SizedBox(height: 10),
               ElevatedButton.icon(
-                onPressed: () {
+                onPressed: () async {
                   if (_broadcastController.text.trim().isEmpty) {
                     setState(() => _broadcastError = 'Write a message before sending.');
                     return;
                   }
-                  _service.sendBroadcast(_broadcastController.text, _audience);
-                  _broadcastController.clear();
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Broadcast sent and logged to the audit trail.')));
+                  final messenger = ScaffoldMessenger.of(context);
+                  try {
+                    await _service.sendBroadcast(_broadcastController.text, _audience);
+                    _broadcastController.clear();
+                    messenger.showSnackBar(const SnackBar(content: Text('Broadcast queued — phones receive it within a minute.')));
+                  } catch (_) {
+                    messenger.showSnackBar(const SnackBar(content: Text('Could not send the broadcast. Please try again.')));
+                  }
                 },
                 icon: const Icon(LucideIcons.megaphone, size: 14),
                 label: const Text('Send broadcast'),

@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 
 import 'chat_service.dart';
+import 'push_service.dart';
 
 /// ICE servers for in-app calls. Google's public STUN servers are enough
 /// when both phones can reach each other directly; roughly 10–20% of
@@ -141,6 +142,7 @@ class ActiveCall extends ChangeNotifier {
     }
     await _dispose();
     CallService.instance._clearActive(this);
+    await PushService.endNativeCall(callId);
   }
 
   Future<void> _dispose() async {
@@ -240,10 +242,10 @@ class ActiveCall extends ChangeNotifier {
 /// `requests/{id}/calls/{callId}`, readable/writable by the two people on
 /// that matched request (see firestore.rules). Nothing is recorded.
 ///
-/// Spark plan: an incoming call only rings while the callee has the app
-/// open ([incomingCalls] is a live listener). On Blaze, a function on call
-/// creation sends an FCM/VoIP push that reports a CallKit /
-/// ConnectionService call — this class stays the same.
+/// While the app is open, [incomingCalls] (a live listener) rings in-app.
+/// When it's in the background or closed, the onCallCreated Cloud Function
+/// pushes to the callee and PushService shows the native incoming-call
+/// screen — this class stays the same.
 class CallService {
   CallService._();
   static final CallService instance = CallService._();

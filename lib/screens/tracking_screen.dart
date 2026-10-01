@@ -32,6 +32,32 @@ class TrackingScreen extends StatefulWidget {
 
 class _TrackingScreenState extends State<TrackingScreen> {
   bool _cancelling = false;
+  bool _confirming = false;
+
+  /// Requester's half of the two-sided completion ("I received it").
+  Future<void> _confirmReceived(String donorName) async {
+    final confirmed = await ConfirmSheet.show(
+      context,
+      title: 'Did $donorName donate?',
+      message: 'Confirm once the donation has happened at the hospital or blood bank. The request is marked completed when you both confirm.',
+      confirmLabel: 'Yes, donation received',
+      cancelLabel: 'Not yet',
+    );
+    if (!confirmed || !mounted) return;
+    setState(() => _confirming = true);
+    try {
+      final closed = await Backend.instance.requesterConfirmDonation(widget.requestId);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(closed ? 'Donation completed. Thank you for using Rakta Bandhan.' : 'Thanks. We’ve asked $donorName to confirm as well.'),
+      ));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not update this request. Please try again.')));
+    } finally {
+      if (mounted) setState(() => _confirming = false);
+    }
+  }
 
   Future<void> _cancel() async {
     if (_cancelling) return;
@@ -101,6 +127,8 @@ class _TrackingScreenState extends State<TrackingScreen> {
             final location = (data['location_label'] as String?)?.isNotEmpty == true ? data['location_label'] as String : 'Blood request';
             final createdAt = (data['created_at'] as Timestamp?)?.toDate();
             final donorName = data['matched_donor_name'] as String?;
+            final donorConfirmed = data['donor_confirmed_at'] != null;
+            final iConfirmed = data['requester_confirmed_at'] != null;
 
             final isMatched = status == 'matched' || status == 'fulfilled';
             final isFulfilled = status == 'fulfilled';
@@ -123,7 +151,13 @@ class _TrackingScreenState extends State<TrackingScreen> {
               ),
               TrackerStep(
                 label: 'Completed',
-                sub: isFulfilled ? 'Donation completed — thank you' : 'Marked once the donor confirms',
+                sub: isFulfilled
+                    ? 'Donation completed — thank you'
+                    : iConfirmed
+                        ? 'You confirmed · waiting for ${donorName ?? 'the donor'}'
+                        : donorConfirmed
+                            ? '${donorName ?? 'The donor'} says they donated · please confirm'
+                            : 'Completed once you and the donor both confirm',
                 status: isFulfilled ? StepStatus.done : StepStatus.pending,
                 icon: LucideIcons.checkCircle,
               ),
@@ -143,7 +177,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(location, style: AppTextStyles.display(fontSize: 22, color: AppColors.ink, height: 1.2)),
+                            Text(Backend.shortPlace(location, fallback: 'Blood request'), style: AppTextStyles.display(fontSize: 22, color: AppColors.ink, height: 1.2)),
                             const SizedBox(height: 3),
                             Text(
                               '$units unit(s) · $urgency${createdAt == null ? '' : ' · raised ${_timeAgo(createdAt)}'}',
@@ -188,6 +222,16 @@ class _TrackingScreenState extends State<TrackingScreen> {
                             ),
                         ],
                       ),
+                    ),
+                  ],
+                  if (status == 'matched' && donorName != null && !iConfirmed) ...[
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: _confirming ? null : () => _confirmReceived(donorName),
+                      icon: _confirming
+                          ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                          : const Icon(LucideIcons.checkCircle, size: 16),
+                      label: Text(donorConfirmed ? 'Confirm donation received' : 'Mark donation received'),
                     ),
                   ],
                   if (isTerminalBad) ...[

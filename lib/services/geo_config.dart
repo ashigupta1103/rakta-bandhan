@@ -13,7 +13,18 @@ const kLocationIqKey = '';
 /// a match abroad.
 const kGeocodeCountryCodes = 'in';
 
-/// Raster tiles. Default: OpenStreetMap's standard style in full colour
+/// Native Google Maps (Android/iOS) instead of flutter_map raster tiles.
+/// Google's Maps SDK map loads are free and unlimited on mobile — the only
+/// map option that stays free at 1 lakh users (tile APIs bill per tile).
+/// Turn on by building with `--dart-define=GOOGLE_MAPS=true` after adding
+/// the key:
+///   Android: MAPS_API_KEY=... in android/local.properties (or env var)
+///   iOS:     GOOGLE_MAPS_API_KEY=... in ios/Flutter/Release.xcconfig
+/// Restrict the key to the app (package + SHA-1 / bundle ID) and to "Maps
+/// SDK for Android" / "Maps SDK for iOS" only.
+const kUseGoogleMaps = bool.fromEnvironment('GOOGLE_MAPS');
+
+/// Raster tiles (flutter_map fallback). Default: OpenStreetMap's standard style in full colour
 /// (the old build greyscaled it, which is why streets and landmarks were
 /// hard to read). Verified 26 Sep 2026: CARTO's keyless basemaps now return
 /// an "API KEY REQUIRED" tile, so they're not an option without signing up.

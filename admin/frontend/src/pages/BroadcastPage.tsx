@@ -1,11 +1,7 @@
 /**
- * BroadcastPage — Compose a notification blast to donors.
- *
- * Real FCM delivery needs adminBroadcastNotification.js, which needs the
- * Blaze plan (not enabled on this project — see BACKEND_REFERENCE.md).
- * Submitting here still queries the real matching donor count and logs
- * the intent to /broadcasts + the audit log, so the flow demos honestly
- * end-to-end instead of a dead form.
+ * BroadcastPage — Compose a push notification to donors. Submitting writes
+ * /broadcasts/{id}; the onBroadcast Cloud Function delivers it to the
+ * matching FCM topic.
  */
 
 import { useState } from 'react';
@@ -67,8 +63,8 @@ export default function BroadcastPage() {
         <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3">
           <Info className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
           <p className="text-xs text-amber-700">
-            Push delivery requires the Blaze plan. Sending here targets and logs the real matching
-            donor count, but no device notification goes out until Cloud Functions are deployed.
+            Sent as a push notification to every signed-in phone in this audience (all donors, or one
+            blood group). Use it sparingly — frequent broadcasts make people turn notifications off.
           </p>
         </div>
 

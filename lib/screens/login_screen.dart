@@ -1,55 +1,21 @@
-import 'package:country_flags/country_flags.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../preview_mode.dart';
+import '../services/backend.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
-import 'otp_screen.dart';
+import '../widgets/loading_button.dart';
+import 'legal_reader_screen.dart';
+import 'main_navigation_screen.dart';
 import 'preview_gallery_screen.dart';
 import 'preview_ui_screen.dart';
+import 'registration_screen.dart';
+import 'verify_email_screen.dart';
 
-class _Country {
-  final String name;
-  final String short;
-  final String? isoCode; // null = custom/"Other" (shown with a globe icon)
-  final String code;
-  final int? digits; // null = custom/"Other", any length 4-15 accepted
-  const _Country(this.name, this.short, this.isoCode, this.code, this.digits);
-}
-
-const _kCountries = [
-  _Country('India', 'IN', 'IN', '+91', 10),
-  _Country('United States / Canada', 'US', 'US', '+1', 10),
-  _Country('United Kingdom', 'UK', 'GB', '+44', 10),
-  _Country('United Arab Emirates', 'UAE', 'AE', '+971', 9),
-  _Country('Saudi Arabia', 'SA', 'SA', '+966', 9),
-  _Country('Other', '', null, '', null),
-];
-
-/// Real flag artwork (country_flags package), not emoji glyphs.
-class _FlagIcon extends StatelessWidget {
-  final _Country country;
-  final double height;
-  const _FlagIcon(this.country, {this.height = 18});
-
-  @override
-  Widget build(BuildContext context) {
-    if (country.isoCode == null) {
-      return Icon(LucideIcons.globe, size: height, color: AppColors.textSecondary);
-    }
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(3),
-      child: CountryFlag.fromCountryCode(
-        country.isoCode!,
-        height: height,
-        width: height * 4 / 3,
-        shape: const RoundedRectangle(3),
-      ),
-    );
-  }
-}
-
+/// Sign in / create account with email and password. New accounts get a
+/// verification email (Firebase's own, free) and go to VerifyEmailScreen;
+/// nothing else in the app opens until the address is confirmed. The phone
+/// number is collected on the registration screen.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -58,110 +24,112 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final TextEditingController _phoneController = TextEditingController();
-  final TextEditingController _customCodeController = TextEditingController();
-  _Country _country = _kCountries.first;
-  String? _errorMessage;
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmController = TextEditingController();
+  bool _creating = false;
+  bool _busy = false;
+  bool _showPassword = false;
+  String? _error;
+
+  static final _emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+  static const minPasswordLength = 8;
 
   @override
   void dispose() {
-    _phoneController.dispose();
-    _customCodeController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmController.dispose();
     super.dispose();
   }
 
-  String get _effectiveCode =>
-      _country.digits == null ? '+${_customCodeController.text.trim()}' : _country.code;
-
-  void _handleContinue() {
-    final phoneText = _phoneController.text.trim();
-    final customCode = _customCodeController.text.trim();
-
-    if (_country.digits == null && (customCode.isEmpty || !RegExp(r'^[0-9]+$').hasMatch(customCode))) {
-      setState(() => _errorMessage = 'Please enter a valid country code');
-      return;
+  String? _validate() {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    if (!_emailPattern.hasMatch(email)) return 'Enter a valid email address.';
+    if (password.isEmpty) return 'Enter your password.';
+    if (_creating) {
+      if (password.length < minPasswordLength) return 'Use at least $minPasswordLength characters for your password.';
+      if (!RegExp(r'[A-Za-z]').hasMatch(password) || !RegExp(r'\d').hasMatch(password)) {
+        return 'Use a mix of letters and numbers in your password.';
+      }
+      if (_confirmController.text != password) return 'The two passwords don’t match.';
     }
-    if (phoneText.isEmpty) {
-      setState(() => _errorMessage = 'Phone number cannot be empty');
-      return;
-    }
-    if (!RegExp(r'^[0-9]+$').hasMatch(phoneText)) {
-      setState(() => _errorMessage = 'Phone number must contain digits only');
-      return;
-    }
-    final expectedDigits = _country.digits;
-    final validLength = expectedDigits == null
-        ? phoneText.length >= 4 && phoneText.length <= 15
-        : phoneText.length == expectedDigits;
-    if (!validLength) {
-      setState(() {
-        _errorMessage = expectedDigits == null
-            ? 'Please enter a valid phone number'
-            : 'Please enter a valid $expectedDigits-digit phone number';
-      });
-      return;
-    }
-
-    setState(() => _errorMessage = null);
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => OtpScreen(phoneNumber: phoneText, countryCode: _effectiveCode),
-      ),
-    );
+    return null;
   }
 
-  Future<void> _openCountryPicker() async {
-    final picked = await showModalBottomSheet<_Country>(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 10),
-            Container(width: 36, height: 4, decoration: BoxDecoration(color: AppColors.dividerWarm, borderRadius: BorderRadius.circular(2))),
-            const SizedBox(height: 16),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text('Select country', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
-              ),
-            ),
-            const SizedBox(height: 8),
-            for (final c in _kCountries)
-              ListTile(
-                onTap: () => Navigator.pop(context, c),
-                leading: _FlagIcon(c, height: 22),
-                title: Text(
-                  c.digits == null ? c.name : '${c.short}  ${c.code}',
-                  style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm),
-                ),
-                subtitle: c.digits == null ? null : Text(c.name, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                trailing: c == _country ? const Icon(LucideIcons.check, size: 18, color: AppColors.primary) : null,
-              ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
-    );
-    if (picked != null) {
+  Future<void> _submit() async {
+    final problem = _validate();
+    if (problem != null) {
+      setState(() => _error = problem);
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final email = _emailController.text.trim();
+      final password = _passwordController.text;
+      if (_creating) {
+        await Backend.instance.signUpWithEmail(email, password);
+      } else {
+        await Backend.instance.signInWithEmail(email, password);
+      }
+      if (!mounted) return;
+      await _continueSignedIn();
+    } catch (e) {
+      if (!mounted) return;
       setState(() {
-        _country = picked;
-        _errorMessage = null;
-        // Switching to a shorter-numbered country must not leave a
-        // now-too-long number sitting in the field.
-        final limit = picked.digits;
-        if (limit != null && _phoneController.text.length > limit) {
-          _phoneController.text = _phoneController.text.substring(0, limit);
-        }
+        _busy = false;
+        _error = Backend.authErrorMessage(e);
       });
     }
   }
+
+  /// Verified → profile or registration. Unverified → the verify screen.
+  Future<void> _continueSignedIn() async {
+    final verified = await Backend.instance.refreshEmailVerified();
+    Widget next;
+    if (!verified) {
+      next = const VerifyEmailScreen();
+    } else {
+      next = await Backend.instance.hasProfile() ? const MainNavigationScreen() : const RegistrationScreen();
+    }
+    if (!mounted) return;
+    Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => next), (route) => false);
+  }
+
+  Future<void> _forgotPassword() async {
+    final email = _emailController.text.trim();
+    if (!_emailPattern.hasMatch(email)) {
+      setState(() => _error = 'Type your email address above first, then tap “Forgot password”.');
+      return;
+    }
+    try {
+      await Backend.instance.sendPasswordReset(email);
+    } catch (_) {
+      // Deliberately the same message either way — never reveal whether an
+      // account exists for an address.
+    }
+    if (!mounted) return;
+    setState(() => _error = null);
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text('If an account exists for $email, a password reset link is on its way. Check your inbox and spam folder.'),
+    ));
+  }
+
+  void _toggleMode() => setState(() {
+        _creating = !_creating;
+        _error = null;
+        _confirmController.clear();
+      });
+
+  InputDecoration _field(String hint, IconData icon, {Widget? suffix}) => InputDecoration(
+        hintText: hint,
+        prefixIcon: Icon(icon, size: 17, color: AppColors.textSecondary),
+        suffixIcon: suffix,
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -170,250 +138,158 @@ class _LoginScreenState extends State<LoginScreen> {
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Frontend-only entry point for internal testing — gated by
-              // kEnablePreviewUi (see definition above), off in any normal
-              // release build so real users never see it. See
-              // preview_gallery_screen.dart's own header comment for the
-              // "why" of this whole mechanism.
-              if (kEnablePreviewUi) ...[
-                const SizedBox(height: 16),
-                GestureDetector(
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const PreviewGalleryScreen())),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: AppColors.goldTint,
-                      border: Border.all(color: AppColors.gold, width: 1.4),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(LucideIcons.eye, size: 18, color: AppColors.goldDeep),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text('Preview UI — All Screens', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.goldDeepest)),
-                              const Text('No sign-in, no backend — sample data only', style: TextStyle(fontSize: 11.5, color: AppColors.goldDeep)),
-                            ],
-                          ),
-                        ),
-                        const Icon(LucideIcons.chevronRight, size: 18, color: AppColors.goldDeep),
-                      ],
-                    ),
+          child: AutofillGroup(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Frontend-only entry point for internal testing — gated by
+                // kEnablePreviewUi, off in any normal release build.
+                if (kEnablePreviewUi) ...[
+                  const SizedBox(height: 16),
+                  OutlinedButton.icon(
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const PreviewGalleryScreen())),
+                    icon: const Icon(LucideIcons.eye, size: 16),
+                    label: const Text('Preview UI — all screens (no backend)'),
                   ),
+                ],
+                const SizedBox(height: 20),
+                Center(child: Image.asset('assets/branding/final-logo-transparent.png', width: 148, fit: BoxFit.contain)),
+                const SizedBox(height: 12),
+                Text(
+                  _creating ? 'Create your account' : 'Welcome to Rakta Bandhan',
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.display(fontSize: 24, color: AppColors.textPrimaryWarm),
                 ),
-                const SizedBox(height: 4),
-                const Center(
-                  child: Text('PREVIEW MODE — hidden in normal production builds', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, letterSpacing: 0.4, color: AppColors.disabledTint)),
+                const SizedBox(height: 8),
+                Text(
+                  _creating ? 'We’ll email you a link to confirm it’s really you.' : 'Your help can save a life.',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
                 ),
-              ],
-              const SizedBox(height: 20),
-              Center(
-                child: Image.asset(
-                  'assets/branding/final-logo-transparent.png',
-                  width: 148,
-                  fit: BoxFit.contain,
-                ),
-              ),
-              const SizedBox(height: 12),
-              // Header
-              Text(
-                'Welcome to Rakta Bandhan',
-                textAlign: TextAlign.center,
-                style: AppTextStyles.display(fontSize: 24, color: AppColors.textPrimaryWarm),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Your help can save a life.',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
-              ),
-              const SizedBox(height: 40),
-
-              // Country Code & Phone Input — flag + code + divider + plain
-              // field. Radius matches the system's 12px control per the
-              // design doc's own note on this screen: "The current 30px
-              // pill becomes the system's 12px control, so Login stops
-              // being the one screen with its own radius."
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: Border.all(color: AppColors.cardBorderWarm, width: 1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
-                child: Row(
-                  children: [
-                    GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: _openCountryPicker,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            _FlagIcon(_country, height: 18),
-                            const SizedBox(width: 6),
-                            Text(
-                              _country.digits == null ? _country.name : _country.code,
-                              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm),
-                            ),
-                            const SizedBox(width: 4),
-                            const Icon(LucideIcons.chevronDown, size: 15, color: AppColors.textSecondary),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Container(width: 1, height: 26, color: AppColors.cardBorderWarm),
-                    const SizedBox(width: 12),
-
-                    // Phone TextField
-                    Expanded(
-                      child: TextField(
-                        controller: _phoneController,
-                        keyboardType: TextInputType.phone,
-                        // Hard cap at the selected country's length (India = 10)
-                        // so an over-long number can't even be typed.
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                          LengthLimitingTextInputFormatter(_country.digits ?? 15),
-                        ],
-                        onChanged: (val) {
-                          if (_errorMessage != null) {
-                            setState(() {
-                              _errorMessage = null;
-                            });
-                          }
-                        },
-                        style: const TextStyle(fontSize: 15),
-                        decoration: const InputDecoration(
-                          hintText: 'Enter your phone number',
-                          border: InputBorder.none,
-                          enabledBorder: InputBorder.none,
-                          focusedBorder: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(vertical: 16),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (_country.digits == null) ...[
+                const SizedBox(height: 32),
+                const Text('Email', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
                 const SizedBox(height: 8),
                 TextField(
-                  controller: _customCodeController,
-                  keyboardType: TextInputType.phone,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
-                    LengthLimitingTextInputFormatter(4),
-                  ],
-                  onChanged: (val) {
-                    if (_errorMessage != null) setState(() => _errorMessage = null);
-                  },
-                  decoration: const InputDecoration(
-                    hintText: 'Country code, e.g. 33',
-                    prefixText: '+ ',
-                  ),
+                  controller: _emailController,
+                  keyboardType: TextInputType.emailAddress,
+                  textInputAction: TextInputAction.next,
+                  autocorrect: false,
+                  autofillHints: const [AutofillHints.email],
+                  onChanged: (_) => _error == null ? null : setState(() => _error = null),
+                  decoration: _field('you@example.com', LucideIcons.mail),
                 ),
-              ],
-
-              // Inline Error Message
-              if (_errorMessage != null) ...[
+                const SizedBox(height: 16),
+                const Text('Password', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
                 const SizedBox(height: 8),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                  child: Text(
-                    _errorMessage!,
-                    style: const TextStyle(fontSize: 12, color: AppColors.primary),
+                TextField(
+                  controller: _passwordController,
+                  obscureText: !_showPassword,
+                  textInputAction: _creating ? TextInputAction.next : TextInputAction.done,
+                  autofillHints: [_creating ? AutofillHints.newPassword : AutofillHints.password],
+                  onSubmitted: (_) => _creating ? null : _submit(),
+                  onChanged: (_) => _error == null ? null : setState(() => _error = null),
+                  decoration: _field(
+                    _creating ? 'At least $minPasswordLength characters, letters and numbers' : 'Your password',
+                    LucideIcons.lock,
+                    suffix: IconButton(
+                      tooltip: _showPassword ? 'Hide password' : 'Show password',
+                      icon: Icon(_showPassword ? LucideIcons.eyeOff : LucideIcons.eye, size: 17, color: AppColors.textSecondary),
+                      onPressed: () => setState(() => _showPassword = !_showPassword),
+                    ),
                   ),
                 ),
-              ],
-
-              const SizedBox(height: 24),
-
-              // Continue Button
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _handleContinue,
+                if (_creating) ...[
+                  const SizedBox(height: 16),
+                  const Text('Confirm password', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _confirmController,
+                    obscureText: !_showPassword,
+                    textInputAction: TextInputAction.done,
+                    onSubmitted: (_) => _submit(),
+                    onChanged: (_) => _error == null ? null : setState(() => _error = null),
+                    decoration: _field('Type it again', LucideIcons.lock),
+                  ),
+                ],
+                if (!_creating)
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: _busy ? null : _forgotPassword,
+                      child: const Text('Forgot password?', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.primary)),
+                    ),
+                  )
+                else
+                  const SizedBox(height: 12),
+                if (_error != null) ...[
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Text(_error!, style: const TextStyle(fontSize: 12.5, color: AppColors.primary, height: 1.4)),
+                  ),
+                ],
+                LoadingButton(label: _creating ? 'Create account' : 'Sign in', isLoading: _busy, onPressed: _submit),
+                const SizedBox(height: 14),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(_creating ? 'Already have an account?' : 'New to Rakta Bandhan?', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                    TextButton(
+                      onPressed: _busy ? null : _toggleMode,
+                      child: Text(_creating ? 'Sign in' : 'Create account', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primary)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                  decoration: BoxDecoration(
+                    color: AppColors.goldTint,
+                    border: Border.all(color: AppColors.warmBorder),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                   child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Continue'),
-                      SizedBox(width: 8),
-                      Icon(LucideIcons.arrowRight, size: 18),
+                      Icon(LucideIcons.shieldCheck, size: 16, color: AppColors.goldDeep),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Your email is used to sign in and to recover your account. It is never shown to other users.',
+                          style: TextStyle(fontSize: 12.5, color: AppColors.goldDeepest, height: 1.5),
+                        ),
+                      ),
                     ],
                   ),
                 ),
-              ),
-
-              const SizedBox(height: 22),
-
-              // OTP-only reassurance — per the approved design doc
-              // (design_updated/Rakta Bandhan Redesign.dc.html, Login
-              // frame): "The unavailable illustration is not replaced; the
-              // space it occupied becomes the OTP-only reassurance, which
-              // is more useful anyway." Replaces the hands-and-heart image
-              // that used to sit below the consent text and add a full
-              // extra screen of scrolling for no functional reason.
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-                decoration: BoxDecoration(
-                  color: AppColors.goldTint,
-                  border: Border.all(color: AppColors.warmBorder),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                const SizedBox(height: 18),
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    Icon(LucideIcons.shieldCheck, size: 16, color: AppColors.goldDeep),
-                    SizedBox(width: 10),
-                    Expanded(
-                      child: Text.rich(
-                        TextSpan(
-                          style: TextStyle(fontSize: 12.5, color: AppColors.goldDeepest, height: 1.5),
-                          children: [
-                            TextSpan(text: 'We verify your phone with '),
-                            TextSpan(text: 'a one-time code', style: TextStyle(fontWeight: FontWeight.w700)),
-                            TextSpan(text: '. No password is required.'),
-                          ],
-                        ),
-                      ),
+                    const Text('By continuing you agree to our ', style: TextStyle(fontSize: 12, color: AppColors.textMutedWarm)),
+                    GestureDetector(
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => LegalReaderScreen.terms())),
+                      child: const Text('Terms', style: TextStyle(fontSize: 12, color: AppColors.primary, fontWeight: FontWeight.w600)),
                     ),
+                    const Text(' and ', style: TextStyle(fontSize: 12, color: AppColors.textMutedWarm)),
+                    GestureDetector(
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => LegalReaderScreen.privacy())),
+                      child: const Text('Privacy policy', style: TextStyle(fontSize: 12, color: AppColors.primary, fontWeight: FontWeight.w600)),
+                    ),
+                    const Text('.', style: TextStyle(fontSize: 12, color: AppColors.textMutedWarm)),
                   ],
                 ),
-              ),
-
-              const SizedBox(height: 20),
-
-              // Consent Text
-              const Text(
-                'By continuing, you consent to receive an OTP code to verify your phone number.',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12, color: AppColors.textMutedWarm),
-              ),
-
-              // Secondary, lighter preview entry (4 tabs only) — same
-              // kEnablePreviewUi gate as the primary banner above. Remove
-              // this block (and preview_ui_screen.dart) once the preview is
-              // no longer needed.
-              if (kEnablePreviewUi) ...[
-                const SizedBox(height: 20),
-                Center(
-                  child: TextButton(
-                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const PreviewUiScreen())),
-                    child: const Text('Preview UI — 4 main tabs only (no backend)', style: TextStyle(fontSize: 12, color: AppColors.disabledTint)),
+                if (kEnablePreviewUi) ...[
+                  const SizedBox(height: 12),
+                  Center(
+                    child: TextButton(
+                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const PreviewUiScreen())),
+                      child: const Text('Preview UI — 4 main tabs only (no backend)', style: TextStyle(fontSize: 12, color: AppColors.disabledTint)),
+                    ),
                   ),
-                ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),

@@ -38,10 +38,11 @@ class UrgentAlert {
 ///   own, within [radiusKm], raised in the last [freshFor];
 /// - this device hasn't already alerted for that request.
 ///
-/// Spark plan: this is a live Firestore listener, so it rings while the
-/// app is open. On Blaze, an onCreate function applies the same filter
-/// server-side and pushes to the token saved by [requestPushPermission] —
-/// the preference field is already the one it will read.
+/// While the app is open this is a live Firestore listener over nearby
+/// open requests. When the app is in the background or closed, the
+/// `onRequestCreated` Cloud Function (functions/src/index.ts) applies the
+/// same filter server-side and pushes to the token saved by
+/// [requestPushPermission].
 class UrgentAlertService {
   UrgentAlertService._();
   static final UrgentAlertService instance = UrgentAlertService._();
@@ -56,7 +57,8 @@ class UrgentAlertService {
     final seen = <String>{};
     StreamSubscription<dynamic>? donorSub;
     StreamSubscription<dynamic>? requestSub;
-    QuerySnapshot<Map<String, dynamic>>? lastRequests;
+    List<QueryDocumentSnapshot<Map<String, dynamic>>>? lastRequests;
+    String? watchingArea;
 
     Future<void> remember(String id) async {
       seen.add(id);
@@ -70,12 +72,15 @@ class UrgentAlertService {
     // Evaluates the whole open-request set every time (the seen-set makes
     // it idempotent), so requests that arrived before the donor profile
     // loaded aren't lost.
-    void evaluate(QuerySnapshot<Map<String, dynamic>> snap) {
-      lastRequests = snap;
+    void evaluate(List<QueryDocumentSnapshot<Map<String, dynamic>>> docs) {
+      lastRequests = docs;
       final me = donor;
       if (me == null) return;
       final optedIn = me['urgent_alerts'] == true;
-      final eligible = me['is_available'] == true && me['is_banned'] != true && me['active_request_id'] == null;
+      final eligible = me['is_available'] == true &&
+          me['is_banned'] != true &&
+          me['active_request_id'] == null &&
+          !Backend.onCooldown(me);
       if (!optedIn || !eligible || CallService.instance.active != null) return;
 
       final myGroup = me['blood_group'] as String?;
@@ -85,7 +90,7 @@ class UrgentAlertService {
       final canGiveTo = Backend.instance.compatibleRecipientGroups(myGroup);
       final myUid = Backend.instance.currentUser?.uid;
 
-      for (final doc in snap.docs) {
+      for (final doc in docs) {
         final data = doc.data();
         if (seen.contains(doc.id)) continue;
         if (data['requester_uid'] == myUid) continue;
@@ -119,10 +124,21 @@ class UrgentAlertService {
       } catch (_) {}
       donorSub = Backend.instance.myDonorDocStream().listen((s) {
         donor = s.data();
+        // Watch only requests around the donor's registered area; re-aim
+        // the listener if they move it.
+        final lat = (donor?['lat'] as num?)?.toDouble();
+        final lng = (donor?['lng'] as num?)?.toDouble();
+        final area = lat == null || lng == null ? null : '$lat,$lng';
+        if (area != null && area != watchingArea) {
+          watchingArea = area;
+          requestSub?.cancel();
+          requestSub = Backend.instance
+              .openRequestsNearStream(lat!, lng!, radiusKm: radiusKm)
+              .listen(evaluate, onError: (_) {});
+        }
         final last = lastRequests;
         if (last != null) evaluate(last);
       }, onError: (_) {});
-      requestSub = Backend.instance.openRequestsStream().listen(evaluate, onError: (_) {});
     };
     controller.onCancel = () async {
       await donorSub?.cancel();

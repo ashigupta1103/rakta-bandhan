@@ -55,9 +55,17 @@ class _MatchContactScreenState extends State<MatchContactScreen> {
   }
 
   Future<void> _markDonated() async {
+    final confirmed = await ConfirmSheet.show(
+      context,
+      title: 'Did you donate for this request?',
+      message: 'Confirm only after you have donated. Your availability pauses for 90 days, and the requester is asked to confirm too.',
+      confirmLabel: 'Yes, I donated',
+      cancelLabel: 'Not yet',
+    );
+    if (!confirmed || !mounted) return;
     setState(() => _markingDonated = true);
     try {
-      await Backend.instance.markFulfilled(widget.requestId);
+      await Backend.instance.donorConfirmDonation(widget.requestId);
       if (!mounted) return;
       Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const DonationConfirmScreen()));
     } catch (e) {
@@ -98,6 +106,8 @@ class _MatchContactScreenState extends State<MatchContactScreen> {
               final requesterUid = request['requester_uid'] as String? ?? '';
               final status = request['status'] as String? ?? 'matched';
               final isLive = status == 'matched' && request['matched_donor_id'] == Backend.instance.currentUser?.uid;
+              final iConfirmed = request['donor_confirmed_at'] != null;
+              final theyConfirmed = request['requester_confirmed_at'] != null;
               final initials = name.trim().isEmpty ? '?' : name.trim().split(RegExp(r'\s+')).take(2).map((w) => w[0].toUpperCase()).join();
 
               return Column(
@@ -147,7 +157,24 @@ class _MatchContactScreenState extends State<MatchContactScreen> {
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
                               ContactActions(requestId: widget.requestId, peerUid: requesterUid, peerName: name, peerPhone: phone),
+                              if (theyConfirmed && !iConfirmed) ...[
+                                const SizedBox(height: 10),
+                                Text(
+                                  '$name confirmed they received your donation. Tap “Mark as donated” to record it.',
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(fontSize: 12.5, color: AppColors.onEmberSuccess, height: 1.4),
+                                ),
+                              ],
+                              if (iConfirmed) ...[
+                                const SizedBox(height: 10),
+                                Text(
+                                  'You confirmed your donation. Waiting for $name to confirm they received it.',
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(fontSize: 12.5, color: AppColors.onEmberMuted, height: 1.4),
+                                ),
+                              ],
                               const SizedBox(height: 8),
+                              if (!iConfirmed)
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [

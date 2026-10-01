@@ -1,4 +1,6 @@
-# Rakta Bandhan backend (Firebase Spark / free plan)
+# Rakta Bandhan backend
+
+> **Update (Oct 2026):** the project is moving to the **Blaze** plan. Push notifications, call ringing, request expiry and broadcasts now run as Cloud Functions in `../functions/`; photo posts use Cloud Storage (`storage.rules`). Sign-in is email + password with verification. The Spark-era notes below are kept for history — the rules in this folder are current. Run the rules tests with `cd rules-test && npm test`.
 
 No Cloud Functions, no custom server. The whole backend is Firestore +
 Firebase Auth, driven directly from the Flutter client in

@@ -29,6 +29,22 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   Position? _position;
   int _donationCount = 0;
+  Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>>? _nearbyOpen;
+  String? _nearbyKey;
+
+  /// Open requests near the donor's registered area, rebuilt only when that
+  /// area changes — not on every profile update.
+  Stream<List<QueryDocumentSnapshot<Map<String, dynamic>>>> _nearbyFor(double? lat, double? lng) {
+    if (lat == null || lng == null) return Stream.value(const []);
+    final key = '$lat,$lng';
+    if (key != _nearbyKey || _nearbyOpen == null) {
+      _nearbyKey = key;
+      _nearbyOpen = Backend.instance.openRequestsNearStream(lat, lng);
+    }
+    return _nearbyOpen!;
+  }
+
+  static int _urgencyRank(String? u) => switch (u) { 'critical' => 0, 'urgent' => 1, _ => 2 };
 
   @override
   void initState() {
@@ -133,11 +149,25 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 20),
                   const Text('Someone needs you', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.1, color: AppColors.textSecondary)),
                   const SizedBox(height: 12),
-                  StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                    stream: Backend.instance.openRequestsStream(),
+                  StreamBuilder<List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
+                    stream: _nearbyFor((donor['lat'] as num?)?.toDouble(), (donor['lng'] as num?)?.toDouble()),
                     builder: (context, snapshot) {
                       final myUid = Backend.instance.currentUser?.uid;
-                      final docs = (snapshot.data?.docs ?? []).where((d) => d.data()['requester_uid'] != myUid).toList();
+                      final canGiveTo = bloodGroup == null ? const <String>[] : Backend.instance.compatibleRecipientGroups(bloodGroup);
+                      final myLat = _position?.latitude ?? (donor['lat'] as num?)?.toDouble();
+                      final myLng = _position?.longitude ?? (donor['lng'] as num?)?.toDouble();
+                      double kmTo(Map<String, dynamic> r) => myLat == null || myLng == null
+                          ? 0
+                          : distanceKm(myLat, myLng, (r['lat'] as num).toDouble(), (r['lng'] as num).toDouble());
+                      // Only requests this donor can actually give to, most
+                      // urgent first, then nearest.
+                      final docs = (snapshot.data ?? const [])
+                          .where((d) => d.data()['requester_uid'] != myUid && canGiveTo.contains(d.data()['blood_group']))
+                          .toList()
+                        ..sort((a, b) {
+                          final byUrgency = _urgencyRank(a.data()['urgency'] as String?).compareTo(_urgencyRank(b.data()['urgency'] as String?));
+                          return byUrgency != 0 ? byUrgency : kmTo(a.data()).compareTo(kmTo(b.data()));
+                        });
                       // Lazy stand-in for the Blaze-only expireOldRequests
                       // scheduled function — sweep stale docs whenever this
                       // list is rendered (no-op unless genuinely past due).
@@ -154,9 +184,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
                       final doc = docs.first;
                       final request = doc.data();
-                      final distance = _position == null
-                          ? null
-                          : distanceKm(_position!.latitude, _position!.longitude, (request['lat'] as num).toDouble(), (request['lng'] as num).toDouble());
+                      final distance = myLat == null ? null : kmTo(request);
+                      final createdAt = (request['created_at'] as Timestamp?)?.toDate();
                       final urgency = request['urgency'] as String? ?? 'normal';
                       final isUrgent = urgency != 'normal';
                       final group = request['blood_group'] as String? ?? '';
@@ -197,13 +226,13 @@ class _HomeScreenState extends State<HomeScreen> {
                                               ),
                                             const SizedBox(height: 5),
                                             Text(
-                                              (request['location_label'] as String?)?.isNotEmpty == true ? request['location_label'] as String : 'Blood request',
+                                              Backend.shortPlace(request['location_label'] as String?, fallback: 'Blood request'),
                                               style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm),
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
                                             ),
                                             const SizedBox(height: 2),
-                                            Text('${request['units_needed'] ?? 1} units · just now', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                                            Text('${request['units_needed'] ?? 1} ${request['units_needed'] == 1 ? 'unit' : 'units'} · ${_ago(createdAt)}', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                                           ],
                                         ),
                                       ),
@@ -289,6 +318,15 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+  }
+
+  String _ago(DateTime? t) {
+    if (t == null) return 'just now';
+    final d = DateTime.now().difference(t);
+    if (d.inMinutes < 1) return 'just now';
+    if (d.inMinutes < 60) return '${d.inMinutes} min ago';
+    if (d.inHours < 24) return '${d.inHours}h ago';
+    return '${d.inDays}d ago';
   }
 
   int _eligibleInDays(DateTime reactivateAt) {

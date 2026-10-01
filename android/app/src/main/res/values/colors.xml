@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Accent for push notifications (matches COLOR in functions/src/index.ts). -->
+    <color name="notification_accent">#B3261E</color>
+</resources>

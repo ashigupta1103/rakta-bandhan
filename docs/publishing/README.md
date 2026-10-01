@@ -8,61 +8,73 @@ Legend: ✅ done in the repo · ⬜ someone must do it (needs an account, a deci
 
 ## Blockers — the stores will reject, or the app is unsafe, without these
 
-- ⬜ **Real phone verification.** Today any 6-digit code signs in, and every account shares one hardcoded password (`Backend.verifyFakeOtp`). Anyone who knows a phone number can take over that account.
-  - Plan: Truecaller one-tap (Android), then a WhatsApp OTP, then an SMS OTP as the fallback. "Verify on WhatsApp" (the user sends the code; free) can be switched on if the budget gets tight.
-  - Runs as **Cloud Functions** in the same Firebase project, which mint a Firebase custom token. No separate server.
-  - Do **not** use Firebase Phone Auth SMS at this volume (≈ ₹9.9 lakh a year). See `cost-estimate.md`.
-- ⬜ **Firebase for iOS.** `lib/firebase_options.dart` has no iOS config, so the app crashes on launch on iPhone.
-  - Run `flutterfire configure --project=<id> --platforms=android,ios,web`.
-  - This regenerates `firebase_options.dart` and adds `ios/Runner/GoogleService-Info.plist`.
-  - Register the iOS app with bundle ID **`com.raktabandhan.app`**.
 - ⬜ **Legal contact details.** Set `kLegalContactEmail` and `kGrievanceOfficerName` in `lib/legal/legal_config.dart`.
-  - Have counsel review `lib/legal/legal_documents.dart`, then set `kLegalApproved = true`.
-  - Re-run `python tool/export_legal_html.py`.
+  - Have counsel review `lib/legal/legal_documents.dart`, then set `kLegalApproved = true` (removes the "draft" banner).
+  - Re-run `python tool/export_legal_html.py`, then redeploy Hosting.
   - The App Store requires a working support URL and contact.
-- ⬜ **Map tiles and geocoding keys.** Both providers are set in one file, `lib/services/geo_config.dart`.
-  - **Tiles:** create a free MapTiler key and paste the URL shown there. CARTO's keyless tiles were checked on 26 Sep 2026 and now return "API KEY REQUIRED".
-  - **Geocoding:** create a free LocationIQ key and set `kLocationIqKey`. The public OpenStreetMap servers are fine for development only.
+- ⬜ **Delete the old test accounts.** Accounts made with the old any-code test login (`p+91…@phone.raktabandhan.local`) share one password. Delete them in Firebase console › Authentication before launch; they can't create anything any more (rules require a verified email) but can still read.
+- ⬜ **Team copy approval.** The About page bios for CSK and Adarsh Betala are role descriptions written from the roles given — have each person approve their paragraph, and send photographs if wanted.
+- ⬜ **Firebase for iOS** (App Store phase). `lib/firebase_options.dart` has no iOS config yet.
+  - Run `flutterfire configure --project=rakta-bandhan2026 --platforms=android,ios,web`, registering bundle ID **`com.raktabandhan.app`**.
+  - Upload an APNs key in Firebase › Project settings › Cloud Messaging, so iOS gets push.
 - ⬜ **Rotary mark.** The full logo includes the Rotary International wheel, a registered trademark. Confirm the club's use in a public app follows Rotary's brand guidelines (Apple guideline 5.2.1). The app icon deliberately uses only the droplet-and-heart mark.
 
 ## Done in this branch
 
-- ✅ App icons generated from the approved logo mark, not the Flutter default: iOS, Android (legacy + adaptive), and web. Script: `tool/make_app_icons.py`.
-- ✅ iOS bundle ID `com.raktabandhan.app`, matching Android. Display name "Rakta Bandhan" on both.
-- ✅ iOS privacy manifest `ios/Runner/PrivacyInfo.xcprivacy`, registered in the Xcode project.
-- ✅ iOS permission purpose strings: location, camera, photos, microphone. Background modes are audio (live calls) and remote-notification. `ITSAppUsesNonExemptEncryption = false`.
-- ✅ Android permissions trimmed to what's used. No restricted permissions: no SMS, call log, full-screen intent or background location.
-- ✅ Android release signing reads `android/key.properties`, which is git-ignored.
-- ✅ In-app account deletion and data export. Report and block in chat.
-- ✅ Privacy policy, terms and delete-account pages, in the app and as static web pages (`admin/frontend/public/legal/`).
-- ✅ Firestore rules and indexes for chat, calls, reports, read markers, the private ID-proof document and the bounded donor search.
+- ✅ **Real sign-in.** Email + password with Firebase's verification email (free, 100,000/day on Blaze), password reset, and password re-check before account deletion. The old any-code test login is gone. Firestore and Storage rules only let **verified** accounts create anything.
+- ✅ **Push notifications** (Cloud Functions in `functions/`): chat messages, missed calls, request accepted / released / cancelled / expired, two-sided donation confirmation prompts, nearby compatible donors on every new request (urgent alerts on a loud channel), and admin broadcasts to FCM topics.
+- ✅ **Ringing calls when the app is closed** (Android): a high-priority data push opens the native incoming-call screen with ringtone (flutter_callkit_incoming). Answer goes straight into the call; Decline tells the caller at once. iOS gets a time-sensitive "Incoming call" alert until PushKit + CallKit are added.
+- ✅ **Two-sided completion.** Donor taps "I donated" → their 90-day rest starts and history + certificate are written; the request becomes *completed* only when the requester also confirms (or an admin does). Enforced in the rules.
+- ✅ **Cooldown.** Availability switches off for 90 days after a donation and can't be switched back on early — locked in the app and in the rules. It turns itself back on afterwards.
+- ✅ **Certificates** open from Donation history; Save (photo gallery) and Share (WhatsApp, Instagram…).
+- ✅ **Community photo posts** with an Instagram-style card and full-screen viewer; report / hide author / delete own post; photos in Cloud Storage, compressed on the phone, deleted with the post.
+- ✅ **Area names, never coordinates**: neighbourhood ("Adyar, Chennai") on donor cards and posts; donors can re-pin their area.
+- ✅ **Maps**: native Google Maps on phones once the key is added (free, unlimited mobile map loads); flutter_map stays as the fallback.
+- ✅ **Admin**: verification checklist (5 steps) before Verify unlocks; real broadcasts; member testimonial submissions with an approval queue; reported posts in the inbox.
+- ✅ **About** (mission, vision, story, team, belief), **community guidelines**, updated privacy policy and terms; public share page with a social preview card (`/app/`).
+- ✅ **Cost**: the open-requests feeds read only nearby requests (geohash cells), not every open request in India.
+- ✅ Play hygiene: Advertising ID permission removed, full-screen intent removed, camera foreground-service type removed.
+- ✅ App icons, bundle IDs, iOS privacy manifest and purpose strings, Android release signing via `android/key.properties`, in-app account deletion and data export.
+
+## Tests (all passing on this branch)
+
+| Suite | Command | Result |
+|---|---|---|
+| Flutter analyzer | `flutter analyze` | no errors (2 pre-existing infos) |
+| Flutter tests | `flutter test` | 31 / 31 |
+| Security rules (Firestore + Storage, emulator) | `cd backend/rules-test && npm install && npm test` (needs Java 21) | 34 / 34 |
+| Functions unit tests | `cd functions && npm test` | 6 / 6 |
+| Functions smoke test (emulator) | `cd functions && FUNCTIONS_DISCOVERY_TIMEOUT=120 npm run smoke` | all 8 triggers load and fire |
+| Android build | `flutter build apk --debug`, `flutter build appbundle --release` | builds |
+| Admin console | `cd admin/frontend && npm run build` | builds, type-checks |
+
+Not testable here: real push delivery, real calls between two phones, and the Google map (need the live project, two devices and the Maps key) — see the two-phone checklist in step 3.
 
 ## Step by step
 
 ### 1. Firebase (Blaze)
-1. Upgrade to Blaze and **create a budget with alerts immediately** (Cloud Console › Billing › Budgets).
-2. `firebase deploy --only firestore:rules,firestore:indexes`
-   - The index builds take a few minutes.
-   - Chat, calls and the Find map fail until they're done.
-3. Enable **App Check**:
-   - Play Integrity on Android.
-   - App Attest / DeviceCheck on iOS.
-   - reCAPTCHA Enterprise on web.
-4. Authentication › Settings › **SMS region policy: allow India only**.
-5. Build the admin dashboard, then deploy: `cd admin/frontend && npm run build && cd ../.. && firebase deploy --only hosting`
-6. Open `/legal/privacy.html`, `/legal/terms.html` and `/legal/delete-account.html` on the hosted domain. These are the store URLs.
+1. **Billing account in the club's name**, linked to the project; upgrade to Blaze.
+   - Budget: **₹3,000/month**, alerts at 50% / 90% / 100% (Cloud Console › Billing › Budgets & alerts). Blaze has no hard cap; the alerts are the guardrail.
+   - The payment method can be changed any time (Billing › Payment method), and the project can be moved to a different billing account (Billing › Account management › Change billing) — no downtime.
+2. **Authentication** › Sign-in method › enable **Email/Password**. Templates › customise the verification email sender name ("Rakta Bandhan") and, optionally, a custom domain.
+3. **Storage**: Build › Storage › Get started (location same as Firestore).
+4. Check `REGION` in `functions/src/index.ts` equals the Firestore location (Firestore › the location shown at the top). Change it if needed.
+5. Deploy everything:
+   ```
+   cd admin/frontend && npm run build && cd ../..
+   python tool/export_legal_html.py && python tool/make_share_page.py
+   firebase deploy --only firestore:rules,firestore:indexes,storage,functions,hosting
+   ```
+   - Accept the Artifact Registry cleanup policy when asked.
+   - Index builds take a few minutes; the Find map and feeds fail until they show "Enabled".
+6. Open `/legal/privacy.html`, `/legal/terms.html`, `/legal/community-guidelines.html`, `/legal/delete-account.html` and `/app/` on `rakta-bandhan2026.web.app` — these are the store URLs.
 
-### 2. Server-side jobs (Cloud Functions, same project)
-Everything else stays client-side under Firestore rules. The functions use the built-in Admin SDK, so there is no key file to manage; the functions' service account needs the **Service Account Token Creator** role to mint sign-in tokens. All of this fits in the free 2M invocations a month. The jobs to add, in priority order:
-1. **OTP send/verify** → custom token (replaces the fake OTP).
-2. **Push on new message**: a Firestore trigger on `requests/{id}/messages/{mid}` sends FCM to the other participant.
-3. **Push on incoming call**: same pattern, for `requests/{id}/calls/{cid}`.
-   - Android: an FCM high-priority data message, shown as a calling notification (a genuine calling use case).
-   - iOS: PushKit VoIP → CallKit. Add the `voip` background mode **only** together with CallKit.
-4. **Urgent-alert fan-out**: a new request where urgency ∈ {urgent, critical}.
-   - Query nearby opted-in donors (`urgent_alerts == true`, geohash range) and FCM them.
-   - Donors' tokens are already saved at `donors/{uid}.fcm_token`.
-5. Optional: a scheduled expiry of stale requests, which replaces the lazy client-side expiry.
+### 2. Google Maps key (recommended before launch)
+1. Google Cloud console (same project) › APIs › enable **Maps SDK for Android** (and **for iOS** later).
+2. Credentials › Create API key › restrict to *Android apps* with package `com.raktabandhan.app` + your upload and Play signing SHA-1s, and to the Maps SDK only.
+3. Put `MAPS_API_KEY=…` in `android/local.properties` (git-ignored).
+4. Build with `--dart-define=GOOGLE_MAPS=true`. Without the flag the app uses OpenStreetMap tiles (fine for testing, not for production load).
+5. For address search, set a free LocationIQ key in `lib/services/geo_config.dart` (`kLocationIqKey`).
 
 ### 3. Android → Google Play
 1. Create the upload key once:
@@ -77,12 +89,26 @@ Everything else stays client-side under Firestore rules. The functions use the b
    storeFile=/absolute/path/to/rakta-upload.jks
    ```
 3. Bump `version:` in `pubspec.yaml` for each upload. The build number (`+N`) must increase every time.
-4. Build: `flutter build appbundle --release`
+4. Build: `flutter build appbundle --release --dart-define=GOOGLE_MAPS=true`
+   - On the build machine, install **Android SDK Command-line Tools** (Android Studio › SDK Manager › SDK Tools) and run `flutter doctor --android-licenses`. Without them the bundle still builds but keeps native debug symbols (≈ 88 MB instead of ≈ 35 MB).
 5. Play Console:
    1. Create the app.
    2. Fill **Data safety**, **Health apps declaration**, **Content rating**, **Target audience (18+)** and **Ads: none**, using `store-listing.md`.
    3. Upload to **Internal testing** first.
    4. New personal developer accounts must run a closed test with at least 12 testers for 14 days before production access.
+   5. App content › **Foreground service** declaration: *Phone call* (see `store-listing.md`).
+6. **Two-phone checklist** on the internal-testing build (one phone signed in as a requester, one as a donor):
+   - [ ] Create account → verification email arrives → tapping the link moves the app on by itself.
+   - [ ] Forgot password email arrives.
+   - [ ] Donor registers (mobile number, area by GPS and by "Pin on map").
+   - [ ] Requester raises an urgent request → donor's phone gets a notification **with the app closed** (and the loud urgent alert if urgent alerts are on).
+   - [ ] Donor accepts → requester gets "A donor accepted your request".
+   - [ ] Chat both ways; with the app closed, a message arrives as a notification and tapping it opens the chat.
+   - [ ] Call with the receiving app **closed and the screen locked** → it rings; Answer connects audio both ways; Decline stops the caller ringing at once; no answer → "Missed call" notification.
+   - [ ] Donor taps "Mark as donated" → requester is asked to confirm → after both confirm, the request shows *Completed*, the donor's availability switch is locked off for 90 days, and the certificate opens from Donation history (Save and Share both work).
+   - [ ] Community: post with a photo, open it full-screen, report it from the other phone, see it in the admin inbox, delete it.
+   - [ ] Admin: verification checklist → Verify; broadcast to "All donors" arrives on both phones.
+   - [ ] Settings › Delete my account asks for the password and removes the account.
 
 ### 4. iOS → App Store (needs a Mac or Codemagic)
 1. In the Apple Developer account, create the App ID `com.raktabandhan.app` with the Push Notifications capability.

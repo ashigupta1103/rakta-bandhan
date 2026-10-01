@@ -66,6 +66,12 @@ PAGE = """<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{title} — Rakta Bandhan</title>
 <meta name="description" content="{description}">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Rakta Bandhan">
+<meta property="og:title" content="{title} — Rakta Bandhan">
+<meta property="og:description" content="{description}">
+<meta property="og:image" content="https://rakta-bandhan2026.web.app/app/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="/legal/icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -187,7 +193,8 @@ def main():
     src = open(SRC, encoding='utf-8').read()
     os.makedirs(OUT, exist_ok=True)
     for name, fname, desc in [('privacyPolicy', 'privacy.html', 'How Rakta Bandhan collects, uses and protects your data.'),
-                              ('termsOfUse', 'terms.html', 'The terms for using Rakta Bandhan.')]:
+                              ('termsOfUse', 'terms.html', 'The terms for using Rakta Bandhan.'),
+                              ('communityGuidelines', 'community-guidelines.html', 'How to use Rakta Bandhan respectfully and safely.')]:
         doc = parse_doc(src, name, cfg)
         assert doc['sections'], f'no sections parsed for {name}'
         open(os.path.join(OUT, fname), 'w', encoding='utf-8').write(

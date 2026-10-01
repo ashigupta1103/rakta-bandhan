@@ -7,11 +7,15 @@ library;
 
 const kLegalApproved = false;
 
-const kLegalVersion = '1.0';
-const kLegalEffectiveDate = '26 September 2026';
+const kLegalVersion = '1.1';
+const kLegalEffectiveDate = '1 October 2026';
 
-/// The data fiduciary (DPDP Act, 2023) — the organisation responsible.
-const kLegalEntity = 'Rotary Club of Madras Cosmos';
+/// The data fiduciary (DPDP Act, 2023) — the organisations responsible.
+/// Rakta Bandhan is a collaborative service project of these two trusts,
+/// managed by Rotary Club of Madras Cosmos and Rotary Club of Chennai
+/// Capital, with support from Rotary International District 3233.
+const kLegalEntity = 'Madras Cosmos Charitable Trust and Chennai Capital Trust';
+const kLegalOperators = 'Rotary Club of Madras Cosmos and Rotary Club of Chennai Capital';
 const kLegalCity = 'Chennai, Tamil Nadu';
 
 /// Required before launch: a monitored inbox for privacy requests, and the

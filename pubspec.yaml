@@ -43,6 +43,11 @@ dependencies:
   google_fonts: ^8.2.1
   shared_preferences: ^2.3.2
   flutter_map: ^8.3.2
+  # Native Google Maps on Android/iOS — free and unlimited for mobile map
+  # loads. Switched on with --dart-define=GOOGLE_MAPS=true once the Maps API
+  # key is set (see lib/services/geo_config.dart); flutter_map + OSM tiles
+  # remain the fallback (web, and builds without a key).
+  google_maps_flutter: ^2.18.2
   latlong2: ^0.9.1
   country_flags: ^3.1.0
   image_picker: ^1.2.3
@@ -56,6 +61,14 @@ dependencies:
   audioplayers: ^6.8.1
   # "Call from your phone" fallback (tel: — no call permissions needed).
   url_launcher: ^6.3.2
+  # Native incoming-call screen + ringtone when the app is closed (Android
+  # ConnectionService UI; CallKit on iOS once PushKit is added).
+  flutter_callkit_incoming: ^3.1.6
+  # Community post photos. Pinned to the firebase_core 3.x train.
+  firebase_storage: ^12.4.10
+  # Donation certificate: share it, or save it to the photo gallery.
+  share_plus: ^12.0.1
+  gal: ^2.3.3
 
 dev_dependencies:
   flutter_test:

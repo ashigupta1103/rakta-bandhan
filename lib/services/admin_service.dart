@@ -125,17 +125,24 @@ class AdminReportEntry {
   final String reporterUid;
   final String reportedUid;
   final String requestId;
+  /// Set for a reported community post (Backend.reportStory) instead of a
+  /// chat/call.
+  final String storyId;
   final String reason;
   final String details;
   final String time;
   final InboxStatus status;
   final String adminNote;
 
+  /// What the report is about, for the inbox subtitle.
+  String get subject => storyId.isNotEmpty ? 'Community post $storyId' : 'Reported user $reportedUid · request $requestId';
+
   const AdminReportEntry({
     required this.id,
     required this.reporterUid,
     required this.reportedUid,
     required this.requestId,
+    this.storyId = '',
     required this.reason,
     required this.details,
     required this.time,
@@ -440,6 +447,7 @@ class AdminService extends ChangeNotifier {
       reporterUid: d['reporter_uid'] as String? ?? '',
       reportedUid: d['reported_uid'] as String? ?? '',
       requestId: d['request_id'] as String? ?? '',
+      storyId: d['story_id'] as String? ?? '',
       reason: d['reason'] as String? ?? '',
       details: d['details'] as String? ?? '',
       time: _timeAgo((d['created_at'] as Timestamp?)?.toDate()),
@@ -508,8 +516,8 @@ class AdminService extends ChangeNotifier {
   Future<void> updateHospital(String id, String name, String address) => Backend.instance.adminUpdateHospital(id, name, address);
   Future<void> deleteHospital(String id) => Backend.instance.adminDeleteHospital(id);
 
-  /// Not a real broadcast — see Backend.adminSendBroadcast: sending a push
-  /// needs a server, which Spark can't run. Logged to the audit trail only.
+  /// Push notification to every phone or one blood group (see
+  /// Backend.adminSendBroadcast — delivered by the onBroadcast function).
   Future<void> sendBroadcast(String message, String audience) {
     if (message.trim().isEmpty) return Future.value();
     return Backend.instance.adminSendBroadcast(message, audience);

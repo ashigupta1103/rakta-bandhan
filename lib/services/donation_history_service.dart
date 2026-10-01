@@ -50,19 +50,20 @@ class FirestoreDonationHistoryService implements DonationHistoryService {
       final data = doc.data();
       final date = (data['donation_date'] as Timestamp?)?.toDate();
       final requestId = data['request_id'] as String?;
-      var hospital = 'Blood donation';
-      var bloodGroup = '';
-      if (requestId != null) {
-        final reqSnap = await _db.collection('requests').doc(requestId).get();
-        final req = reqSnap.data();
-        if (req != null) {
-          final label = req['location_label'] as String?;
-          if (label != null && label.isNotEmpty) hospital = label;
-          bloodGroup = req['blood_group'] as String? ?? '';
-        }
+      var hospital = data['hospital'] as String? ?? '';
+      var bloodGroup = data['blood_group'] as String? ?? '';
+      // Older records only point at the request — look it up.
+      if ((hospital.isEmpty || bloodGroup.isEmpty) && requestId != null) {
+        try {
+          final req = (await _db.collection('requests').doc(requestId).get()).data();
+          if (req != null) {
+            if (hospital.isEmpty) hospital = req['location_label'] as String? ?? '';
+            if (bloodGroup.isEmpty) bloodGroup = req['blood_group'] as String? ?? '';
+          }
+        } catch (_) {}
       }
       records.add(DonationRecord(
-        hospital: hospital,
+        hospital: Backend.shortPlace(hospital, fallback: 'Blood donation'),
         date: date == null ? '' : '${date.day} ${_months[date.month]} ${date.year}',
         bloodGroup: bloodGroup,
       ));

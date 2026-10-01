@@ -133,6 +133,8 @@ export interface AbuseReport extends DocumentData {
   reporter_uid: string;
   reported_uid: string;
   request_id: string;
+  /** Set when a community post (not a chat) was reported. */
+  story_id?: string;
   reason: string;
   details?: string;
   status?: InboxStatus;
@@ -654,11 +656,12 @@ export function useAdminActions() {
     });
 
   /**
-   * Real FCM delivery needs a Cloud Function (Blaze-only) — there's no
-   * `broadcasts` collection in firestore.rules to write to either, so
-   * this only counts the matching donors and records the intent in
-   * audit_log (same no-op-but-honest pattern as Backend.adminSendBroadcast
-   * in the Flutter app).
+   * Writes `broadcasts/{id}`; the onBroadcast Cloud Function delivers it
+   * to the FCM topic every signed-in phone subscribes to ("all", or the
+   * blood group's topic) and stamps status back onto the doc. The count
+   * shown is how many donors match (count() aggregation, ~1 read per
+   * 1,000 donors). Topics can't filter by availability, so
+   * `availableOnly` narrows the count only.
    */
   const broadcastNotification = (params: {
     title: string;
@@ -674,13 +677,21 @@ export function useAdminActions() {
       // every matching donor document just to count them.
       const targeted = (await getCountFromServer(q)).data().count;
 
-      await logAudit('BROADCAST_NOTIFICATION', { name: params.title }, `${targeted} donor(s) matched`);
+      const ref = await addDoc(collection(db, 'broadcasts'), {
+        title: params.title.trim().slice(0, 80),
+        body: params.body.trim().slice(0, 300),
+        blood_group: params.bloodGroup ?? null,
+        created_by: auth.currentUser?.uid ?? null,
+        created_at: serverTimestamp(),
+        status: 'queued',
+      });
+      await logAudit('BROADCAST_NOTIFICATION', { uid: ref.id, name: params.title }, `${targeted} donor(s) matched`);
 
       return {
         sent: 0,
         failed: 0,
         targeted,
-        message: `Logged for ${targeted} matching donor(s). Live push delivery needs the Blaze plan — not enabled on this project.`,
+        message: `Queued for ${targeted} matching donor(s). Phones receive it within a minute.`,
       };
     });
 

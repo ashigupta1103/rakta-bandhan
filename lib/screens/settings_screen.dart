@@ -1,4 +1,6 @@
+import 'package:firebase_auth/firebase_auth.dart' show FirebaseAuthException;
 import 'package:flutter/material.dart';
+import '../services/backend.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -129,12 +131,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
       cancelLabel: 'Keep my account',
     );
     if (!confirmed || !mounted) return;
+    final password = await _askPassword();
+    if (password == null || !mounted) return;
     setState(() => _deleting = true);
     try {
-      await AccountService.instance.deleteMyAccount();
+      await AccountService.instance.deleteMyAccount(password: password);
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const LoginScreen()), (route) => false);
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Your account has been deleted.')));
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      setState(() => _deleting = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(Backend.authErrorMessage(e))));
     } catch (_) {
       if (!mounted) return;
       setState(() => _deleting = false);
@@ -142,6 +150,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
         const SnackBar(content: Text('Could not finish deleting your account. Check your connection and try again — nothing is lost by retrying.')),
       );
     }
+  }
+
+  /// Firebase needs a fresh sign-in before deleting an account.
+  Future<String?> _askPassword() {
+    final controller = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Confirm with your password'),
+        content: TextField(
+          controller: controller,
+          obscureText: true,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'Password'),
+          onSubmitted: (v) => Navigator.pop(dialogContext, v.isEmpty ? null : v),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, controller.text.isEmpty ? null : controller.text),
+            child: const Text('Delete account', style: TextStyle(color: AppColors.primary)),
+          ),
+        ],
+      ),
+    );
+    // The controller is left to the GC: disposing it here would race the
+    // dialog's closing animation, which still reads it.
   }
 
   Future<void> _confirmLogOut() => confirmAndLogOut(

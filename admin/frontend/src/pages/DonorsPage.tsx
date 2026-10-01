@@ -14,6 +14,18 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@
 
 const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
+/** The same five checks as the app's admin verification checklist. */
+const VERIFY_CHECKLIST = [
+  'Before verifying, confirm you have:',
+  '1. Seen a clear, readable ID photo (Aadhaar, PAN, DL, voter ID or passport)',
+  '2. Matched the name on the ID with the profile',
+  '3. Checked the donor is 18 or older',
+  '4. Called or WhatsApped the number and confirmed they registered',
+  '5. Confirmed the blood group with the donor',
+  '',
+  'Verifying deletes the ID photo; only the date it was checked is kept.',
+].join('\n');
+
 function DonorRow({ donor, onVerify, onToggle, onBan, onDelete, busy }: {
   donor: Donor;
   onVerify: (id: string, v: boolean, name: string) => void;
@@ -58,7 +70,10 @@ function DonorRow({ donor, onVerify, onToggle, onBan, onDelete, busy }: {
       </TableCell>
       <TableCell>
         <div className="flex items-center gap-1.5 flex-wrap">
-          <Button size="sm" variant="secondary" disabled={busy} onClick={() => onVerify(donor.id, !donor.is_verified, donor.name)}>
+          <Button size="sm" variant="secondary" disabled={busy} onClick={() => {
+            if (!donor.is_verified && !window.confirm(VERIFY_CHECKLIST)) return;
+            onVerify(donor.id, !donor.is_verified, donor.name);
+          }}>
             {donor.is_verified ? 'Unverify' : 'Verify'}
           </Button>
           <Button size="sm" variant="secondary" disabled={busy} onClick={() => onToggle(donor.id, !donor.is_available, donor.name)}>
