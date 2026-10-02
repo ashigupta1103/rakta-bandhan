@@ -63,4 +63,19 @@ void main() {
     expect(Demo.phoneOtp, hasLength(6));
     expect(Demo.emailCode, isNot(Demo.phoneOtp));
   });
+
+  test('own stories can be edited and deleted; others are untouched', () {
+    final d = Demo.instance..start(DemoRole.requester);
+    d.addStory('First draft', 'Gratitude');
+    d.addStory('Another story', 'Awareness');
+    final id = d.stories.last['id'] as String;
+    d.updateStory(id, body: 'Edited text', topic: 'My first donation');
+    final edited = d.stories.firstWhere((st) => st['id'] == id);
+    expect(edited['body'], 'Edited text');
+    expect(edited['topic'], 'My first donation');
+    expect(edited['edited_at'], isNotNull);
+    d.deleteStory(id);
+    expect(d.stories.where((st) => st['id'] == id), isEmpty);
+    expect(d.stories, hasLength(1), reason: 'only the chosen story is removed');
+  });
 }

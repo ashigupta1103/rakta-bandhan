@@ -11,6 +11,8 @@ import '../widgets/rb_icon.dart';
 import 'legal_reader_screen.dart';
 import 'login_code_screen.dart';
 import 'main_navigation_screen.dart';
+import 'preview_gallery_screen.dart';
+import 'preview_ui_screen.dart';
 
 /// Human wording for a failed sign-in step. The sign-in functions send
 /// readable messages for expected cases (wrong or expired code); anything
@@ -112,6 +114,16 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  // Frontend-only entry point for internal testing — gated by
+                  // kEnablePreviewUi, off in any normal release build.
+                  if (kEnablePreviewUi) ...[
+                    const SizedBox(height: 16),
+                    OutlinedButton.icon(
+                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const PreviewGalleryScreen())),
+                      icon: const RbIcon(RbGlyph.eye, size: 16),
+                      label: const Text('Preview UI — all screens (no backend)'),
+                    ),
+                  ],
                   const SizedBox(height: 24),
                   Center(child: Image.asset('assets/branding/final-logo-transparent.png', width: 104, fit: BoxFit.contain)),
                   const SizedBox(height: 22),
@@ -199,6 +211,15 @@ class _LoginScreenState extends State<LoginScreen> {
                       'Simulated data on this device only — no sign-in, nothing sent or saved.',
                       textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 11.5, color: AppColors.mutedInk),
+                    ),
+                  ],
+                  if (kEnablePreviewUi) ...[
+                    const SizedBox(height: 12),
+                    Center(
+                      child: TextButton(
+                        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const PreviewUiScreen())),
+                        child: const Text('Preview UI — 4 main tabs only (no backend)', style: TextStyle(fontSize: 12, color: AppColors.disabledTint)),
+                      ),
                     ),
                   ],
                   const SizedBox(height: 24),

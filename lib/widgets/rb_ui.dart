@@ -74,24 +74,21 @@ class RbTabBar extends StatelessWidget {
   final int selected;
   final ValueChanged<int> onChanged;
 
-  const RbTabBar({super.key, required this.tabs, required this.selected, required this.onChanged});
+  /// The full-width hairline under the tabs; the active indicator stays either way.
+  final bool showDivider;
+
+  const RbTabBar({super.key, required this.tabs, required this.selected, required this.onChanged, this.showDivider = true});
 
   @override
   Widget build(BuildContext context) {
+    // One control: equal-width tabs on a shared baseline, the active one
+    // marked by an indicator sitting exactly on the divider.
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      decoration: const BoxDecoration(color: AppColors.warmGround, border: Border(bottom: BorderSide(color: AppColors.warmBorder))),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            for (var i = 0; i < tabs.length; i++) ...[
-              if (i > 0) const SizedBox(width: 24),
-              _tab(i),
-            ],
-          ],
-        ),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(color: AppColors.warmGround, border: showDivider ? const Border(bottom: BorderSide(color: AppColors.warmBorder)) : null),
+      child: Row(
+        children: [for (var i = 0; i < tabs.length; i++) Expanded(child: _tab(i))],
       ),
     );
   }
@@ -105,22 +102,46 @@ class RbTabBar extends StatelessWidget {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () => onChanged(i),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOut,
-          padding: const EdgeInsets.only(top: 13, bottom: 11),
-          decoration: BoxDecoration(border: Border(bottom: BorderSide(color: active ? AppColors.brandRed : Colors.transparent, width: 2.5))),
-          child: Row(
+        child: SizedBox(
+          height: 46,
+          child: Stack(
+            alignment: Alignment.center,
             children: [
-              Text(label, style: TextStyle(fontSize: 15, fontWeight: active ? FontWeight.w600 : FontWeight.w500, color: active ? AppColors.ink : AppColors.ink2)),
-              if (count > 0) ...[
-                const SizedBox(width: 6),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
-                  decoration: BoxDecoration(color: active ? AppColors.red100 : AppColors.warmDivider, borderRadius: BorderRadius.circular(999)),
-                  child: Text('$count', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: active ? AppColors.red700 : AppColors.ink2)),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Flexible(
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 15, height: 1.2, fontWeight: active ? FontWeight.w600 : FontWeight.w500, color: active ? AppColors.ink : AppColors.ink2),
+                    ),
+                  ),
+                  if (count > 0) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
+                      decoration: BoxDecoration(color: active ? AppColors.red100 : AppColors.warmDivider, borderRadius: BorderRadius.circular(999)),
+                      child: Text('$count', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: active ? AppColors.red700 : AppColors.ink2)),
+                    ),
+                  ],
+                ],
+              ),
+              Positioned(
+                left: 14,
+                right: 14,
+                bottom: 0,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  curve: Curves.easeOut,
+                  height: 2.5,
+                  decoration: BoxDecoration(
+                    color: active ? AppColors.brandRed : Colors.transparent,
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
+                  ),
                 ),
-              ],
+              ),
             ],
           ),
         ),

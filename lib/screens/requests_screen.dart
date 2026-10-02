@@ -183,6 +183,7 @@ class _RequestsScreenState extends State<RequestsScreen> {
     return Scaffold(
       backgroundColor: AppColors.warmPageBackground,
       appBar: AppHeader(
+        showDivider: false,
         title: 'Requests',
         primaryAction: const MessagesButton(),
         onNotificationTap: () => _open(const NotificationsScreen()),
@@ -212,6 +213,7 @@ class _RequestsScreenState extends State<RequestsScreen> {
   }
 
   Widget _tabRow(int yoursCount) => RbTabBar(
+        showDivider: false,
         tabs: [('Near you', 0), ('Yours', yoursCount)],
         selected: _tab.index,
         onChanged: (i) => setState(() => _tab = _Tab.values[i]),
@@ -282,9 +284,8 @@ class _RequestsScreenState extends State<RequestsScreen> {
       bloodGroup: r['blood_group'] as String? ?? '',
       request: r,
       meta: [if (distance != null) _km(distance), _ago(r['created_at']), _units(r['units_needed'])],
-      action: ElevatedButton(
-        onPressed: () => _open(RequestDetailScreen(requestId: id)),
-        child: const Text('See request & help'),
+      action: _actions(
+        primary: ElevatedButton(style: _primaryStyle, onPressed: () => _open(RequestDetailScreen(requestId: id)), child: _label('See request & help')),
       ),
     );
   }
@@ -301,24 +302,19 @@ class _RequestsScreenState extends State<RequestsScreen> {
       statusLabel: waitingOnThem ? 'Waiting for the requester to confirm' : 'You accepted',
       subtitle: requester == null || requester.isEmpty ? null : 'For $requester',
       meta: [_ago(r['matched_at'] ?? r['created_at']), _units(r['units_needed'])],
-      action: Row(
-        children: [
-          Expanded(
-            child: ElevatedButton.icon(
-              onPressed: () => _open(MatchContactScreen(requestId: id)),
-              icon: const RbIcon(RbGlyph.phone, size: 16),
-              label: const Text('Contact & confirm'),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: OutlinedButton.icon(
-              onPressed: () => _open(ChatScreen(requestId: id)),
-              icon: const RbIcon(RbGlyph.message, size: 15),
-              label: const Text('Message'),
-            ),
-          ),
-        ],
+      action: _actions(
+        primary: ElevatedButton.icon(
+          style: _primaryStyle,
+          onPressed: () => _open(MatchContactScreen(requestId: id)),
+          icon: const RbIcon(RbGlyph.phone, size: 16),
+          label: _label('Contact & confirm'),
+        ),
+        secondary: OutlinedButton.icon(
+          style: _secondaryStyle,
+          onPressed: () => _open(ChatScreen(requestId: id)),
+          icon: const RbIcon(RbGlyph.message, size: 16),
+          label: _label('Message'),
+        ),
       ),
     );
   }
@@ -369,32 +365,27 @@ class _RequestsScreenState extends State<RequestsScreen> {
       muted: !live,
       meta: [_ago(r['created_at']), _units(r['units_needed'])],
       action: live
-          ? Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () => _open(TrackingScreen(requestId: id)),
-                    icon: const RbIcon(RbGlyph.route, size: 16),
-                    label: const Text('Track request'),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: status == 'open'
-                      ? OutlinedButton(
-                          style: OutlinedButton.styleFrom(foregroundColor: AppColors.red700, side: const BorderSide(color: AppColors.red200)),
-                          onPressed: () => _cancel(id),
-                          child: const Text('Cancel'),
-                        )
-                      : OutlinedButton.icon(
-                          onPressed: () => _open(ChatScreen(requestId: id)),
-                          icon: const RbIcon(RbGlyph.message, size: 15),
-                          label: const Text('Message'),
-                        ),
-                ),
-              ],
+          ? _actions(
+              primary: ElevatedButton.icon(
+                style: _primaryStyle,
+                onPressed: () => _open(TrackingScreen(requestId: id)),
+                icon: const RbIcon(RbGlyph.route, size: 16),
+                label: _label('Track request'),
+              ),
+              secondary: status == 'open'
+                  ? OutlinedButton(
+                      style: _secondaryStyle.merge(OutlinedButton.styleFrom(foregroundColor: AppColors.red700, side: const BorderSide(color: AppColors.red200))),
+                      onPressed: () => _cancel(id),
+                      child: _label('Cancel'),
+                    )
+                  : OutlinedButton.icon(
+                      style: _secondaryStyle,
+                      onPressed: () => _open(ChatScreen(requestId: id)),
+                      icon: const RbIcon(RbGlyph.message, size: 16),
+                      label: _label('Message'),
+                    ),
             )
-          : OutlinedButton(onPressed: () => _open(TrackingScreen(requestId: id)), child: const Text('View details')),
+          : _actions(primary: OutlinedButton(style: _secondaryStyle, onPressed: () => _open(TrackingScreen(requestId: id)), child: _label('View details'))),
     );
   }
 
@@ -434,72 +425,61 @@ class _RequestsScreenState extends State<RequestsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // Blood group and urgency first — what a donor scans for.
                 Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     BloodGroupDroplet(
                       label: bloodGroup,
-                      size: 46,
+                      size: 40,
                       filled: true,
                       color: muted ? AppColors.warmDivider : AppColors.brandRed,
                       textColor: muted ? AppColors.ink2 : AppColors.onEmber,
-                      fontSize: 14,
+                      fontSize: 12.5,
                       serif: true,
                     ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              _urgencyTag(urgency, muted),
-                              if (statusLabel != null) ...[
-                                const SizedBox(width: 8),
-                                Flexible(
-                                  child: Text(statusLabel, maxLines: 1, overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.ink2)),
-                                ),
-                              ],
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          // The place — tap to open it in Google Maps.
-                          Semantics(
-                            button: hasPoint,
-                            label: hasPoint ? 'Open $place in Google Maps' : null,
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(8),
-                              onTap: hasPoint ? () => _openPlace(request) : null,
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Expanded(
-                                    child: Text(place, maxLines: 2, overflow: TextOverflow.ellipsis,
-                                        style: AppTextStyles.display(fontSize: 18, color: AppColors.ink, height: 1.25)),
-                                  ),
-                                  if (hasPoint)
-                                    const Padding(
-                                      padding: EdgeInsets.only(left: 8, top: 3),
-                                      child: RbIcon(RbGlyph.pin, size: 17, color: AppColors.brandRed),
-                                    ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          if (subtitle != null) ...[
-                            const SizedBox(height: 2),
-                            Text(subtitle, style: const TextStyle(fontSize: 13, color: AppColors.ink2)),
-                          ],
-                          if (metaText.isNotEmpty) ...[
-                            const SizedBox(height: 4),
-                            Text(metaText, style: const TextStyle(fontSize: 13, color: AppColors.ink2)),
-                          ],
-                        ],
+                    const SizedBox(width: 12),
+                    _urgencyTag(urgency, muted),
+                    if (statusLabel != null) ...[
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(statusLabel, maxLines: 2, overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.ink2, height: 1.3)),
                       ),
-                    ),
+                    ],
                   ],
                 ),
+                const SizedBox(height: 12),
+                // The place — tap to open it in Google Maps.
+                Semantics(
+                  button: hasPoint,
+                  label: hasPoint ? 'Open $place in Google Maps' : null,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: hasPoint ? () => _openPlace(request) : null,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(place, maxLines: 2, overflow: TextOverflow.ellipsis,
+                              style: AppTextStyles.display(fontSize: 19, color: AppColors.ink, height: 1.25)),
+                        ),
+                        if (hasPoint)
+                          const Padding(
+                            padding: EdgeInsets.only(left: 10, top: 2),
+                            child: RbIcon(RbGlyph.pin, size: 18, color: AppColors.brandRed),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                if (subtitle != null) ...[
+                  const SizedBox(height: 6),
+                  Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w500, color: AppColors.ink)),
+                ],
+                if (metaText.isNotEmpty) ...[
+                  SizedBox(height: subtitle != null ? 2 : 6),
+                  Text(metaText, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, color: AppColors.ink2)),
+                ],
                 const SizedBox(height: 14),
                 action,
               ],
@@ -509,6 +489,29 @@ class _RequestsScreenState extends State<RequestsScreen> {
       ),
     );
   }
+
+  // Card actions: one height, one padding, one type size, so a pair of
+  // buttons always shares a baseline and never wraps.
+  static final _primaryStyle = ElevatedButton.styleFrom(
+    minimumSize: const Size(0, 44),
+    padding: const EdgeInsets.symmetric(horizontal: 12),
+    textStyle: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600),
+  );
+  static final _secondaryStyle = OutlinedButton.styleFrom(
+    minimumSize: const Size(0, 44),
+    padding: const EdgeInsets.symmetric(horizontal: 12),
+    textStyle: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600),
+  );
+
+  static Widget _label(String text) => Text(text, maxLines: 1, overflow: TextOverflow.ellipsis);
+
+  /// A primary action and an optional secondary one, side by side.
+  Widget _actions({required Widget primary, Widget? secondary}) => Row(
+        children: [
+          Expanded(flex: secondary == null ? 1 : 3, child: primary),
+          if (secondary != null) ...[const SizedBox(width: 10), Expanded(flex: 2, child: secondary)],
+        ],
+      );
 
   Widget _urgencyTag(String? urgency, bool muted) {
     final (label, bg, fg) = switch (urgency) {

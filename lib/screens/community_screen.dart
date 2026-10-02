@@ -57,7 +57,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
   // Client demo: only demo content — never mixed into the real feed.
   static Stream<List<_Doc>> _storiesStream() => Demo.on
       ? Demo.instance.watch(() => [
-            for (var i = 0; i < Demo.instance.stories.length; i++) (id: 'demo-story-$i', data: Demo.instance.stories[i]),
+            for (final st in Demo.instance.stories) (id: st['id'] as String, data: st),
             (id: 'demo-story-fixture', data: _demoFixtureStory),
           ])
       : Backend.instance.communityStoriesStream().map(_docs);
@@ -242,11 +242,16 @@ class _CommunityScreenState extends State<CommunityScreen> {
     final topic = data['topic'] as String?;
     final imageUrl = data['image_url'] as String?;
     final aspect = ((data['image_aspect'] as num?)?.toDouble() ?? 4 / 5).clamp(4 / 5, 1.91);
-    final isMine = !demo && data['author_uid'] == Backend.instance.currentUser?.uid;
+    final isMine = demo ? data['author_uid'] == Demo.instance.myUid : data['author_uid'] == Backend.instance.currentUser?.uid;
+    // Own stories only (author_uid matches the signed-in or demo user).
+    final canEdit = isMine;
+    // Report / hide are moderation actions — not simulated in the demo.
+    final showMenu = isMine || !demo;
     final name = data['author_name'] as String? ?? 'A donor';
     final meta = [
       if (location != null && location.isNotEmpty) location,
       if (created != null) _timeAgo(created),
+      if (data['edited_at'] != null) 'edited',
       if (demo) 'demo',
     ].join(' · ');
 
@@ -291,14 +296,16 @@ class _CommunityScreenState extends State<CommunityScreen> {
                     ],
                   ),
                 ),
-                if (!demo)
+                if (showMenu)
                   PopupMenuButton<String>(
-                    tooltip: 'More',
+                    tooltip: isMine ? 'Story options' : 'More',
                     icon: const RbIcon(RbGlyph.more, size: 18, color: AppColors.ink2),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    color: Colors.white,
                     onSelected: (action) => _onStoryAction(action, id, data),
                     itemBuilder: (_) => [
-                      if (isMine) const PopupMenuItem(value: 'delete', child: Text('Delete post')),
+                      if (canEdit) _menuItem('edit', RbGlyph.pen, 'Edit story'),
+                      if (isMine) _menuItem('delete', RbGlyph.trash, 'Delete story', destructive: true),
                       if (!isMine) const PopupMenuItem(value: 'report', child: Text('Report post')),
                       if (!isMine) PopupMenuItem(value: 'hide', child: Text('Hide posts from ${name.split(' ').first}')),
                     ],
@@ -350,15 +357,64 @@ class _CommunityScreenState extends State<CommunityScreen> {
     );
   }
 
+  PopupMenuItem<String> _menuItem(String value, RbGlyph glyph, String label, {bool destructive = false}) => PopupMenuItem(
+        value: value,
+        child: Row(
+          children: [
+            RbIcon(glyph, size: 17, color: destructive ? AppColors.red700 : AppColors.ink2, accent: Colors.transparent),
+            const SizedBox(width: 10),
+            Text(label, style: TextStyle(fontSize: 14.5, color: destructive ? AppColors.red700 : AppColors.ink)),
+          ],
+        ),
+      );
+
+  Future<bool> _confirmDeleteStory() async =>
+      await showDialog<bool>(
+        context: context,
+        builder: (dialog) => AlertDialog(
+          backgroundColor: AppColors.warmGround,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Text('Delete this story?', style: AppTextStyles.display(fontSize: 20, color: AppColors.ink)),
+          content: const Text('This action can’t be undone.', style: TextStyle(fontSize: 14, color: AppColors.ink2, height: 1.45)),
+          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialog, false), child: const Text('Cancel', style: TextStyle(color: AppColors.ink2))),
+            TextButton(
+              onPressed: () => Navigator.pop(dialog, true),
+              style: TextButton.styleFrom(foregroundColor: AppColors.red700),
+              child: const Text('Delete', style: TextStyle(fontWeight: FontWeight.w600)),
+            ),
+          ],
+        ),
+      ) ??
+      false;
+
   Future<void> _onStoryAction(String action, String id, Map<String, dynamic> data) async {
     final messenger = ScaffoldMessenger.of(context);
     switch (action) {
+      case 'edit':
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => CreateExperienceScreen(
+              editStoryId: id,
+              initialBody: data['body'] as String? ?? '',
+              initialTopic: data['topic'] as String?,
+            ),
+          ),
+        );
       case 'delete':
+        if (!await _confirmDeleteStory() || !mounted) return;
+        if (Demo.isDemoId(id)) {
+          Demo.instance.deleteStory(id);
+          messenger.showSnackBar(const SnackBar(content: Text('Story deleted.')));
+          return;
+        }
         try {
           await Backend.instance.deleteMyStory(id);
-          messenger.showSnackBar(const SnackBar(content: Text('Post deleted.')));
+          messenger.showSnackBar(const SnackBar(content: Text('Story deleted.')));
         } catch (_) {
-          messenger.showSnackBar(const SnackBar(content: Text('Could not delete the post. Please try again.')));
+          messenger.showSnackBar(const SnackBar(content: Text('Could not delete the story. Please try again.')));
         }
       case 'report':
         final reason = await showModalBottomSheet<String>(
