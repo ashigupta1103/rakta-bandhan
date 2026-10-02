@@ -21,7 +21,7 @@ Create the TURN key in Cloudflare Realtime. Set `ALLOWED_ORIGINS` to the exact a
 Owner deploys Spark-safe Firebase pieces separately:
 
 ```sh
-firebase deploy --only firestore:rules,firestore:indexes,hosting
+firebase deploy --project rakta-bandhan2026 --only firestore:rules,firestore:indexes,hosting
 ```
 
 Keep `config/features.server_jobs=false` and `phone_required=false`. Do not deploy Cloud Functions on Spark. `backend/storage.rules` remains for legacy tests; new app uploads use R2, and `firebase_storage` is removed.

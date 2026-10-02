@@ -1,6 +1,6 @@
 # Rakta Bandhan backend
 
-> **Update (Oct 2026):** the project is moving to the **Blaze** plan. Push notifications, call ringing, request expiry and broadcasts now run as Cloud Functions in `../functions/`; photo posts use Cloud Storage (`storage.rules`). Sign-in is email + password with verification. The Spark-era notes below are kept for history — the rules in this folder are current. Run the rules tests with `cd rules-test && npm test`.
+> **Current (2026-10-02):** demo sign-in until owner Blaze upgrade. Real sign-in uses emailed codes and Functions custom tokens. Functions lifecycle/jobs/push/support are built and tested locally; owner deployment remains pending. New photos use Cloudflare R2 and calls can use its TURN relay. `storage.rules` is retained for legacy tests. See [build status](../docs/launch/BUILD_STATUS.md), [decisions](../docs/launch/DECISIONS.md) and [deploy runbook](../docs/launch/DEPLOY_RUNBOOK.md). The older architecture notes below are historical; current code/rules and launch docs take precedence.
 
 No Cloud Functions, no custom server. The whole backend is Firestore +
 Firebase Auth, driven directly from the Flutter client in
@@ -33,7 +33,7 @@ worth keeping distinct, since only the first one is a hard wall:
 | MSG91 SMS fallback | Not built — no fallback channel if push/in-app is missed |
 
 **Spark-compatible, built:**
-- Donor ID proof (`Backend.uploadIdProof`) — lives at `donors/{uid}/private/id_proof` (a Firestore *subcollection* doc, base64 inside it), not Cloud Storage — same free-tier trick as before, just moved off the profile doc itself so a bulk admin read of `donors` no longer downloads every photo. The profile only keeps `has_id_proof: true/false`. `AdminDonorDetailScreen`'s `_IdProofView` fetches it on demand, one donor at a time (`Backend.fetchIdProof`), and it's deleted once an admin verifies the donor (`Backend.adminVerifyDonor`) or the donor is rejected — the scan isn't kept longer than review needs. Caller-side resolution/quality caps (`maxWidth: 1280, imageQuality: 70`) keep it well under Firestore's 1MiB document limit.
+- Donor ID proofs now upload as compressed JPEG to authenticated Cloudflare R2 paths. Both consoles fetch with the admin bearer token and delete after review. `donors/{uid}/private/id_proof` is a legacy base64 read fallback; no bulk migration is performed.
 - In-app chat and voice calls (`ChatService`/`ChatScreen`, `CallService`/`CallScreen`) — `requests/{id}/messages` and `requests/{id}/calls/{cid}` (+ ICE-candidate subcollections), open only between the requester and the matched donor while the request is `matched`. Calls are peer-to-peer WebRTC audio; Firestore carries only the signalling handshake, never the audio. Block/report writes to `reports/{id}` (admin-read, admin-can-triage-but-not-delete). See `docs/specs/2026-09-26-chat-calls-alerts-compliance-design.md`.
 - Urgent alerts (`UrgentAlertService`/`UrgentAlertScreen`) — opt-in (`donors/{uid}.urgent_alerts`), full-screen takeover for a compatible nearby critical/urgent request, live only while the app is open (closed-app push needs Blaze — see below).
 - Real in-app account deletion and data export (`AccountService`) — required by App Store 5.1.1(v) and Google Play's account-deletion policy; cancels/releases the user's open matches, scrubs their name/phone off shared request docs, deletes their own chat messages, then the two donor docs and the Auth user itself.
@@ -144,9 +144,4 @@ admin edits, not hardcoded copy. Both consoles cover the same ground:
 Each screen falls back to its existing honest empty state when nothing is
 published — the app never invents a placeholder announcement or testimonial.
 
-**Still Blaze-only here:** there is no reply channel out of any Inbox
-section, `reports` included. An `admin_note` is internal, and telling the
-submitter anything would need outbound email/SMS from a server — see the
-"requires Blaze" table above, which now also covers push for new messages
-and incoming calls (today's `ChatScreen`/`CallScreen` only ring while the
-app is open). Triage state is visible to admins only.
+**Support now:** members see their own safe submission copies/status and admin replies in My reports. Both consoles can reply; internal notes remain private. `support_submissions` and `support_replies` enforce ownership. Email/push delivery uses a disabled-by-default Functions trigger after Blaze.

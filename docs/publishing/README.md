@@ -3,6 +3,7 @@
 For the team shipping v1.0 to the App Store and Google Play. Related documents:
 - `store-listing.md`: listing copy and every policy-form answer.
 - `cost-estimate.md`: the Blaze budget.
+- [Current build and owner choices](../launch/BUILD_STATUS.md), [external connections](../launch/EXTERNAL_CONNECTIONS.md) and [owner deploy runbook](../launch/DEPLOY_RUNBOOK.md). Demo sign-in remains in use until the owner upgrades to Blaze and verifies a sending domain.
 
 Legend: ✅ done in the repo · ⬜ someone must do it (needs an account, a decision, or a Mac).
 
@@ -27,7 +28,7 @@ Legend: ✅ done in the repo · ⬜ someone must do it (needs an account, a deci
 - ✅ **Two-sided completion.** Donor taps "I donated" → their 90-day rest starts and history + certificate are written; the request becomes *completed* only when the requester also confirms (or an admin does). Enforced in the rules.
 - ✅ **Cooldown.** Availability switches off for 90 days after a donation and can't be switched back on early — locked in the app and in the rules. It turns itself back on afterwards.
 - ✅ **Certificates** open from Donation history; Save (photo gallery) and Share (WhatsApp, Instagram…).
-- ✅ **Community photo posts** with an Instagram-style card and full-screen viewer; report / hide author / delete own post; photos in Cloud Storage, compressed on the phone, deleted with the post.
+- ✅ **Community photo posts** with an Instagram-style card and full-screen viewer; report / hide author / delete own post; photos on Cloudflare R2 through the Worker, compressed on the phone, deleted with the post; the existing editor also saves real post edits.
 - ✅ **Area names, never coordinates**: neighbourhood ("Adyar, Chennai") on donor cards and posts; donors can re-pin their area.
 - ✅ **Maps**: native Google Maps on phones once the key is added (free, unlimited mobile map loads); flutter_map stays as the fallback.
 - ✅ **Admin**: verification checklist (5 steps) before Verify unlocks; real broadcasts; member testimonial submissions with an approval queue; reported posts in the inbox.
@@ -40,12 +41,12 @@ Legend: ✅ done in the repo · ⬜ someone must do it (needs an account, a deci
 
 | Suite | Command | Result |
 |---|---|---|
-| Flutter analyzer | `flutter analyze` | no errors (2 pre-existing infos) |
-| Flutter tests | `flutter test` | 31 / 31 |
-| Security rules (Firestore + Storage, emulator) | `cd backend/rules-test && npm install && npm test` (needs Java 21) | 34 / 34 |
-| Functions unit tests | `cd functions && npm test` | 6 / 6 |
-| Functions smoke test (emulator) | `cd functions && FUNCTIONS_DISCOVERY_TIMEOUT=120 npm run smoke` | all 8 triggers load and fire |
-| Android build | `flutter build apk --debug`, `flutter build appbundle --release` | builds |
+| Flutter analyzer | `flutter analyze` | no issues |
+| Flutter tests | `flutter test` | 65 pass; 1 demo-only skip, separately verified with its define |
+| Security rules (Firestore + Storage, emulator) | `cd backend/rules-test && npm install && npm test` (needs Java 21) | 73 / 73 |
+| Functions unit tests | `cd functions && npm test` | 27 / 27 |
+| Functions smoke test (emulator) | `cd functions && FUNCTIONS_DISCOVERY_TIMEOUT=120 npm run smoke` | login, review seed, lifecycle/jobs, support and 410-record migration checks pass |
+| Android build | `flutter build apk --release --dart-define=DEMO_SIGNIN=true` | demo APK builds; real-device acceptance is owner-run |
 | Admin console | `cd admin/frontend && npm run build` | builds, type-checks |
 
 Not testable here: real push delivery, real calls between two phones, and the Google map (need the live project, two devices and the Maps key) — see the two-phone checklist in step 3.
@@ -57,13 +58,13 @@ Not testable here: real push delivery, real calls between two phones, and the Go
    - Budget: **₹3,000/month**, alerts at 50% / 90% / 100% (Cloud Console › Billing › Budgets & alerts). Blaze has no hard cap; the alerts are the guardrail.
    - The payment method can be changed any time (Billing › Payment method), and the project can be moved to a different billing account (Billing › Account management › Change billing) — no downtime.
 2. **Authentication** › Sign-in method › enable **Email/Password**. Only the two admin consoles use it; users sign in with an emailed code, which needs the `SMTP_URL` secret (see `docs/launch/AFTER_BLAZE_UPGRADE.md`).
-3. **Storage**: Build › Storage › Get started (location same as Firestore).
+3. **Photos and call relay**: provision Cloudflare R2/TURN and deploy the Worker following `docs/launch/SPARK_NOW.md`. New app photos do not use Firebase Storage.
 4. Check `REGION` in `functions/src/app.ts` equals the Firestore location (Firestore › the location shown at the top). Change it if needed.
 5. Deploy everything:
    ```
    cd admin/frontend && npm run build && cd ../..
    python tool/export_legal_html.py && python tool/make_share_page.py
-   firebase deploy --only firestore:rules,firestore:indexes,storage,functions,hosting
+   firebase deploy --project rakta-bandhan2026 --only firestore:rules,firestore:indexes,functions,hosting
    ```
    - Accept the Artifact Registry cleanup policy when asked.
    - Index builds take a few minutes; the Find map and feeds fail until they show "Enabled".
@@ -74,7 +75,7 @@ Not testable here: real push delivery, real calls between two phones, and the Go
 2. Credentials › Create API key › restrict to *Android apps* with package `com.raktabandhan.app` + your upload and Play signing SHA-1s, and to the Maps SDK only.
 3. Put `MAPS_API_KEY=…` in `android/local.properties` (git-ignored).
 4. Build with `--dart-define=GOOGLE_MAPS=true`. Without the flag the app uses OpenStreetMap tiles (fine for testing, not for production load).
-5. For address search, set a free LocationIQ key in `lib/services/geo_config.dart` (`kLocationIqKey`).
+5. For address search, build with `--dart-define=LOCATIONIQ_KEY=<owner-key>` (`kLocationIqKey` reads this define).
 
 ### 3. Android → Google Play
 1. Create the upload key once:
