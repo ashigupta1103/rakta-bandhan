@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
+import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb, kReleaseMode;
 import 'package:flutter/material.dart';
 import 'firebase_options.dart';
 import 'services/backend.dart';
@@ -13,6 +13,7 @@ import 'screens/splash_screen.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  _softErrorWidget();
   if (!(kDebugMode && const bool.fromEnvironment('USE_EMULATORS'))) {
     unawaited(_activateAppCheck());
   }
@@ -25,6 +26,27 @@ Future<void> main() async {
   // incoming-call screen's accept/decline events.
   await PushService.instance.init();
   runApp(const MyApp());
+}
+
+/// A widget that throws must not paint the framework's full-screen grey box
+/// in release builds. `--dart-define=SHOW_ERRORS=true` adds the exception
+/// text, for test builds only.
+void _softErrorWidget() {
+  if (!kReleaseMode) return;
+  const showDetails = bool.fromEnvironment('SHOW_ERRORS');
+  ErrorWidget.builder = (details) => Directionality(
+        textDirection: TextDirection.ltr,
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Text(
+              showDetails ? 'Something went wrong here:\n${details.exceptionAsString()}' : 'Something went wrong on this screen. Please go back and try again.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 12.5, color: AppColors.ink2, height: 1.4),
+            ),
+          ),
+        ),
+      );
 }
 
 Future<void> _activateAppCheck() async {

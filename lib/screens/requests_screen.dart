@@ -193,6 +193,15 @@ class _RequestsScreenState extends State<RequestsScreen> {
 
   // ------------------------------------------------------------- Near you
 
+  /// One malformed request document must never blank a whole list.
+  static Widget _safe(Widget Function() build) {
+    try {
+      return build();
+    } catch (_) {
+      return const SizedBox.shrink();
+    }
+  }
+
   Widget _nearbyList() {
     if (!_profileLoaded) return const Center(child: CircularProgressIndicator(strokeWidth: 2));
     final compatible = _myBloodGroup == null ? const <String>[] : Backend.instance.compatibleRecipientGroups(_myBloodGroup!);
@@ -206,17 +215,22 @@ class _RequestsScreenState extends State<RequestsScreen> {
           builder: (context, acceptedSnap) {
             if (openSnap.hasError || acceptedSnap.hasError) return _error(_resubscribe);
             if (!openSnap.hasData || !acceptedSnap.hasData) return const Center(child: CircularProgressIndicator(strokeWidth: 2));
-            final open = openSnap.data!.where((d) => d.data['requester_uid'] != myUid && compatible.contains(d.data['blood_group'])).toList();
-            for (final d in open) {
-              // Lazy stand-in for expiry — a no-op unless genuinely past due.
-              Backend.instance.expireIfStale(d.id, d.data);
+            final List<_Doc> open;
+            try {
+              open = openSnap.data!.where((d) => d.data['requester_uid'] != myUid && compatible.contains(d.data['blood_group'])).toList();
+              for (final d in open) {
+                // Lazy stand-in for expiry — a no-op unless genuinely past due.
+                Backend.instance.expireIfStale(d.id, d.data);
+              }
+              open.sort((a, b) {
+                final ua = _urgencyRank[a.data['urgency']] ?? 2;
+                final ub = _urgencyRank[b.data['urgency']] ?? 2;
+                if (ua != ub) return ua.compareTo(ub);
+                return (_distanceTo(a.data) ?? double.infinity).compareTo(_distanceTo(b.data) ?? double.infinity);
+              });
+            } catch (_) {
+              return _error(_resubscribe);
             }
-            open.sort((a, b) {
-              final ua = _urgencyRank[a.data['urgency']] ?? 2;
-              final ub = _urgencyRank[b.data['urgency']] ?? 2;
-              if (ua != ub) return ua.compareTo(ub);
-              return (_distanceTo(a.data) ?? double.infinity).compareTo(_distanceTo(b.data) ?? double.infinity);
-            });
             final accepted = acceptedSnap.data!;
 
             return ListView(
@@ -224,7 +238,7 @@ class _RequestsScreenState extends State<RequestsScreen> {
               children: [
                 if (accepted.isNotEmpty) ...[
                   _sectionLabel('You’ve accepted'),
-                  for (final doc in accepted) ...[_acceptedCard(doc.id, doc.data), const SizedBox(height: 12)],
+                  for (final doc in accepted) ...[_safe(() => _acceptedCard(doc.id, doc.data)), const SizedBox(height: 12)],
                   const SizedBox(height: 8),
                 ],
                 if (open.isEmpty && accepted.isEmpty)
@@ -238,7 +252,7 @@ class _RequestsScreenState extends State<RequestsScreen> {
                     ),
                   ),
                 if (open.isNotEmpty) _sectionLabel('${open.length} ${open.length == 1 ? 'request' : 'requests'} you can help with'),
-                for (final doc in open) ...[_nearbyCard(doc.id, doc.data), const SizedBox(height: 12)],
+                for (final doc in open) ...[_safe(() => _nearbyCard(doc.id, doc.data)), const SizedBox(height: 12)],
                 const SizedBox(height: 8),
                 _createRequestCta(),
               ],
@@ -310,7 +324,7 @@ class _RequestsScreenState extends State<RequestsScreen> {
             message: 'Requests you raise appear here, with their status and who accepted them.',
           )
         else
-          for (final doc in docs) ...[_yoursCard(doc.id, doc.data), const SizedBox(height: 12)],
+          for (final doc in docs) ...[_safe(() => _yoursCard(doc.id, doc.data)), const SizedBox(height: 12)],
       ],
     );
   }
