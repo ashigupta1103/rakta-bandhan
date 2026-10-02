@@ -644,7 +644,7 @@ class Backend {
   }) {
     late final StreamController<List<QueryDocumentSnapshot<Map<String, dynamic>>>> controller;
     final latest = <String, List<QueryDocumentSnapshot<Map<String, dynamic>>>>{};
-    final subs = <StreamSubscription>[];
+    var subs = <StreamSubscription>[];
 
     void emit() {
       final seen = <String>{};
@@ -657,7 +657,10 @@ class Backend {
       controller.add(merged);
     }
 
-    controller = StreamController<List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
+    // Broadcast: a screen that leaves and comes back (switching tabs) listens
+    // again. A single-subscription stream throws "Stream has already been
+    // listened to" the second time, which blanked the Requests tab.
+    controller = StreamController<List<QueryDocumentSnapshot<Map<String, dynamic>>>>.broadcast(
       onListen: () {
         for (final cell in cells) {
           Query<Map<String, dynamic>> q = _db
@@ -672,7 +675,10 @@ class Backend {
         }
       },
       onCancel: () async {
-        for (final sub in subs) {
+        final old = subs;
+        subs = [];
+        latest.clear();
+        for (final sub in old) {
           await sub.cancel();
         }
       },
