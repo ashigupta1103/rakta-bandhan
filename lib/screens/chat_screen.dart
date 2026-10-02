@@ -5,7 +5,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../demo/demo.dart';
 import '../services/backend.dart';
 import '../services/call_service.dart';
 import '../services/chat_service.dart';
@@ -52,18 +51,9 @@ class _ChatScreenState extends State<ChatScreen> {
   /// marker is written once per new message, not on every rebuild.
   String? _markedReadUpTo;
 
-  bool get _demo => Demo.isDemoId(widget.requestId);
-  String get _myUid => _demo ? Demo.instance.myUid : Backend.instance.currentUser?.uid ?? '';
-  Stream<Map<String, dynamic>?> get _doc => Demo.requestDoc(widget.requestId);
-  Stream<List<ChatMessage>> get _messages =>
-      _demo ? Demo.instance.watch(() => Demo.instance.messages) : ChatService.instance.watchMessages(widget.requestId);
-
-  /// Actions that would write moderation records — not simulated.
-  bool _notInDemo() {
-    if (!_demo) return false;
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reporting and blocking aren’t part of the demo.')));
-    return true;
-  }
+  String get _myUid => Backend.instance.currentUser?.uid ?? '';
+  Stream<Map<String, dynamic>?> get _doc => Backend.instance.requestStream(widget.requestId);
+  Stream<List<ChatMessage>> get _messages => ChatService.instance.watchMessages(widget.requestId);
 
   @override
   void initState() {
@@ -87,11 +77,7 @@ class _ChatScreenState extends State<ChatScreen> {
     try {
       if (preset == null) _controller.clear();
       HapticFeedback.selectionClick();
-      if (_demo) {
-        Demo.instance.send(text);
-      } else {
-        await ChatService.instance.sendText(widget.requestId, text, amRequester: _amRequester);
-      }
+      await ChatService.instance.sendText(widget.requestId, text, amRequester: _amRequester);
     } catch (_) {
       if (!mounted) return;
       // Put the text back so nothing typed is lost.
@@ -103,7 +89,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _callInApp(_Peer peer) async {
-    final me = _demo ? {'name': Demo.instance.myName} : (await Backend.instance.myDonorDoc()).data();
+    final me = (await Backend.instance.myDonorDoc()).data();
     if (!mounted) return;
     await startCallFlow(
       context,
@@ -140,11 +126,6 @@ class _ChatScreenState extends State<ChatScreen> {
     );
     if (choice == null || !mounted) return;
     final messenger = ScaffoldMessenger.of(context);
-    if (_demo) {
-      // The demo always shares the fixed demo hospital — never real GPS.
-      Demo.instance.sendLocation(choice == 'hospital' ? hospitalLabel : 'My current location (demo)', Demo.lat, Demo.lng);
-      return;
-    }
     try {
       if (choice == 'hospital') {
         await ChatService.instance.sendLocation(widget.requestId, lat: hospitalLat!, lng: hospitalLng!, label: hospitalLabel, amRequester: _amRequester);
@@ -278,7 +259,7 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
       ),
     );
-    if (reason == null || !mounted || _notInDemo()) return;
+    if (reason == null || !mounted) return;
     try {
       await ChatService.instance.report(requestId: widget.requestId, reportedUid: peer.uid, reason: reason);
       if (!mounted) return;
@@ -297,7 +278,7 @@ class _ChatScreenState extends State<ChatScreen> {
       confirmLabel: 'Block and close',
       cancelLabel: 'Not now',
     );
-    if (!confirmed || !mounted || _notInDemo()) return;
+    if (!confirmed || !mounted) return;
     try {
       await ChatService.instance.closeChat(widget.requestId);
     } catch (_) {
@@ -332,6 +313,7 @@ class _ChatScreenState extends State<ChatScreen> {
             final peer = _Peer(
               uid: (amRequester ? request['matched_donor_id'] : request['requester_uid']) as String? ?? '',
               name: (amRequester ? request['matched_donor_name'] : request['requester_name']) as String? ?? 'Donor',
+              username: (amRequester ? request['matched_donor_username'] : request['requester_username']) as String?,
             );
             final closure = _closure(request);
 
@@ -394,7 +376,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(peer.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppTextStyles.display(fontSize: 17, color: AppColors.ink, height: 1.15)),
+                          Text(peer.username == null ? peer.name : '${peer.firstName} @${peer.username}', maxLines: 1, overflow: TextOverflow.ellipsis, style: AppTextStyles.display(fontSize: 17, color: AppColors.ink, height: 1.15)),
                           const SizedBox(height: 1),
                           Text(
                             '$bloodGroup · $units unit${units == 1 ? '' : 's'}${open ? ' · tap for details' : ' · closed'}',
@@ -469,7 +451,7 @@ class _ChatScreenState extends State<ChatScreen> {
             newestFromPeer.id != _markedReadUpTo &&
             (myReadAt == null || newestFromPeer.sentAt!.isAfter(myReadAt))) {
           _markedReadUpTo = newestFromPeer.id;
-          if (!_demo) ChatService.instance.markRead(widget.requestId, amRequester: amRequester).catchError((_) {});
+          ChatService.instance.markRead(widget.requestId, amRequester: amRequester).catchError((_) {});
         }
 
         // "Seen" sits under my newest message once the other person's read
@@ -635,7 +617,8 @@ class _ChatScreenState extends State<ChatScreen> {
 class _Peer {
   final String uid;
   final String name;
-  const _Peer({required this.uid, required this.name});
+  final String? username;
+  const _Peer({required this.uid, required this.name, this.username});
 
   String get firstName => name.trim().isEmpty ? 'them' : name.trim().split(RegExp(r'\s+')).first;
   String get initials {

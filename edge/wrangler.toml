@@ -1,0 +1,21 @@
+# Rakta Bandhan edge Worker. Deploy with `npm run deploy` (see docs/launch/SPARK_NOW.md).
+name = "rakta-bandhan-edge"
+main = "src/index.ts"
+compatibility_date = "2025-09-01"
+account_id = "361246d2529c9324af1bacc33d2adfb8"
+
+# Photos live in the owner's existing private Standard bucket.
+[[r2_buckets]]
+binding = "MEDIA"
+bucket_name = "bloodbank"
+
+[vars]
+FIREBASE_PROJECT_ID = "rakta-bandhan2026"
+# Browser origins allowed to call the private routes (admin console, web build).
+# The phone app is not a browser and needs no entry.
+ALLOWED_ORIGINS = "https://rakta-bandhan2026.web.app,https://rakta-bandhan2026.firebaseapp.com"
+
+# Secrets (never in this file):
+#   npx wrangler secret put TURN_KEY_ID      # Cloudflare dashboard > Realtime > TURN
+#   npx wrangler secret put TURN_API_TOKEN
+# Unset, the /ice route answers with STUN servers only.

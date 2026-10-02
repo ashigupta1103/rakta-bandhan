@@ -1,24 +1,21 @@
 #!/usr/bin/env bash
-# Runs integration_test/app_flow_test.dart on a connected Android emulator
+# Runs an integration test (default: integration_test/app_flow_test.dart) on a connected Android emulator
 # and saves a screenshot at every `SNAP:<name>` the test prints.
 #
 # Prerequisites:
 #   - an Android emulator running (adb devices shows emulator-5554)
 #   - Firebase emulators running for the app's project:
-#       firebase emulators:start --project rakta-bandhan2026 --only auth,firestore,functions,storage
+#       firebase emulators:start --project rakta-bandhan2026 --only auth,firestore
 #
-# Usage: bash tool/e2e_screenshots.sh [output-dir]
+# Usage: bash tool/e2e_screenshots.sh [output-dir] [test-file]
 set -u
 OUT="${1:-build/e2e_screenshots}"
+TEST="${2:-integration_test/app_flow_test.dart}"
 ADB="${ADB:-adb}"
 PKG=com.raktabandhan.app
 LOG="$OUT/run.log"
 mkdir -p "$OUT"
 : > "$LOG"
-
-# Warm up the sign-in function: the emulator's first call stalls while it
-# looks up the SMTP secret, which would time out the app's first request.
-curl -s --max-time 120 -X POST -H "Content-Type: application/json"   -d '{"data":{"email":"warmup@example.com"}}'   http://127.0.0.1:5001/rakta-bandhan2026/asia-south1/requestLoginCode >/dev/null 2>&1
 
 # Start from a clean install (no signed-in session left from a previous run).
 "$ADB" uninstall "$PKG" >/dev/null 2>&1
@@ -72,7 +69,7 @@ DISMISSER=$!
 ) &
 SHOOTER=$!
 
-flutter test integration_test/app_flow_test.dart -d emulator-5554 --dart-define=USE_EMULATORS=true 2>&1 | tee -a "$LOG"
+flutter test "$TEST" -d emulator-5554 --dart-define=USE_EMULATORS=true --dart-define=EDGE_URL= 2>&1 | tee -a "$LOG"
 STATUS=${PIPESTATUS[0]}
 sleep 4
 kill "$GRANTER" "$SHOOTER" "$DISMISSER" 2>/dev/null

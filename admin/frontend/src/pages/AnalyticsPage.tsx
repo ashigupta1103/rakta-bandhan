@@ -41,7 +41,7 @@ export default function AnalyticsPage() {
         <div>
           <h1 className="text-xl font-semibold">Analytics</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {loading ? 'Loading…' : `Computed ${new Date(data.generatedAt).toLocaleTimeString()}`}
+            {loading ? 'Loading…' : `Computed ${new Date(data.generatedAt).toLocaleTimeString()} from the newest 50 donors and requests; period filters apply to that sample`}
           </p>
         </div>
         <div className="flex gap-1.5">

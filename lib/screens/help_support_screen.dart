@@ -1,21 +1,13 @@
 import 'package:flutter/material.dart';
 import '../services/backend.dart';
-import '../demo/demo.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/filter_chip_row.dart';
 import '../widgets/rb_icon.dart';
+import 'my_reports_screen.dart';
 
-/// Help & support — an accordion FAQ using the same grouped-row component
-/// used everywhere else in the app. Every answer below is verified against
-/// backend.dart, not guessed: OTP sign-in vs. the admin-reviewed "Verified"
-/// badge are genuinely separate mechanisms (see registerDonor/OTP sign-in
-/// vs. adminVerifyDonor); phone visibility follows donors_public (never has
-/// a phone field) vs. the one-time reveal onto a matched request doc; the
-/// cooldown numbers come straight from markFulfilled/maybeReactivate; and
-/// community-name editing is honestly reported as not implemented — there
-/// is no such field anywhere in the data model. Support contact route and
-/// hours are undecided and not invented here.
+/// Help & support: FAQs, issue submission and the author's private replies.
+/// Official contact details and hours remain owner-provided.
 class HelpSupportScreen extends StatefulWidget {
   const HelpSupportScreen({super.key});
 
@@ -42,8 +34,8 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
       'Marking a donation as fulfilled automatically pauses your availability for 90 days from that date. It turns back on by itself once the 90 days pass — there is nothing to request or wait on manually.',
     ),
     (
-      'How do I change my community name?',
-      "This isn't available yet — there is no community-name field in the app today. Your profile only stores the name, phone number and blood group you registered with, and you can change your name and mobile number in My Page › Personal information.",
+      'How do I change my username?',
+      'Open My Page and tap your @username. It must start with a letter and use 3–20 lowercase letters, numbers or underscores. You can change it once every 30 days. Your registered name and mobile number can be edited under Personal information.',
     ),
     (
       'How do I create a blood request?',
@@ -63,7 +55,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
     ),
     (
       'How do I contact support?',
-      'In-app support contact is not wired up yet — an official support email, phone number and hours are pending confirmation from the Rakta Bandhan team. This FAQ page is the current source of truth on how the app behaves.',
+      'Use Report an issue below, then open My reports to read the status and replies from the team. Email and push delivery are pending setup. Official support contact details and hours are pending confirmation.',
     ),
     (
       'What do I do if something looks incorrect?',
@@ -219,6 +211,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
+                    TextButton(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MyReportsScreen())), child: const Text('My reports & replies')),
                     InkWell(
                       borderRadius: BorderRadius.circular(12),
                       onTap: () => _openReportSheet(context),
@@ -274,10 +267,6 @@ class _ReportIssueSheetState extends State<_ReportIssueSheet> {
 
   Future<void> _submit() async {
     if (_reason == null || _submitting) return;
-    if (Demo.on) {
-      setState(() => _error = 'Demo · reports aren’t sent from the demo.');
-      return;
-    }
     setState(() {
       _submitting = true;
       _error = null;

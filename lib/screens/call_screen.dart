@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import '../demo/demo.dart';
 import '../services/backend.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
@@ -79,7 +78,6 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
   Timer? _hintTimer;
   bool _showHint = false;
   bool _closing = false;
-  bool _demoLogged = false;
 
   ActiveCall? _call;
   _Stage _stage = _Stage.starting;
@@ -90,9 +88,7 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
   String get _requestId => _call?.requestId ?? widget.requestId!;
   String get _peerName => _call?.peerName ?? widget.peerName ?? '';
 
-  late final Future<Map<String, dynamic>?> _request = Demo.isDemoId(_requestId)
-      ? Future.value(Demo.instance.request)
-      : FirebaseFirestore.instance.collection('requests').doc(_requestId).get().then((s) => s.data());
+  late final Future<Map<String, dynamic>?> _request = FirebaseFirestore.instance.collection('requests').doc(_requestId).get().then((s) => s.data());
 
   @override
   void initState() {
@@ -113,10 +109,6 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
       _failure = null;
       _showHint = false;
     });
-    if (Demo.isDemoId(widget.requestId)) {
-      _attach(ActiveCall.simulated(requestId: widget.requestId!, peerName: widget.peerName!, isCaller: true));
-      return;
-    }
     try {
       final call = await CallService.instance.startCall(requestId: widget.requestId!, peerUid: widget.peerUid!, peerName: widget.peerName!, myName: widget.myName);
       if (!mounted) {
@@ -174,11 +166,6 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
     }
     _lastPhase = call.phase;
 
-    if (call.phase == CallPhase.ended && call.simulated && !_demoLogged && call.isCaller) {
-      // A demo call shows up in the demo chat like a real call row.
-      _demoLogged = true;
-      Demo.instance.logCall(call.connectedAt == null ? null : DateTime.now().difference(call.connectedAt!).inSeconds);
-    }
     if (call.phase == CallPhase.ended && !_closing && _stage == _Stage.live) {
       final unanswered = call.isCaller && call.connectedAt == null && call.endReason != 'Call cancelled';
       if (unanswered) {
@@ -290,7 +277,7 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
                 // Invisible, but required: on web this element is what
                 // actually plays the other person's voice. Unmounted as soon
                 // as the call ends — the renderer is disposed right after.
-                SizedBox(width: 1, height: 1, child: live && !call.simulated ? RTCVideoView(call.remoteRenderer) : null),
+                SizedBox(width: 1, height: 1, child: live ? RTCVideoView(call.remoteRenderer) : null),
                 Expanded(
                   // Scrolls instead of overflowing on short phones or with
                   // large system text.
@@ -505,7 +492,6 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> with SingleTick
   void initState() {
     super.initState();
     AlertSound.incomingCall.start();
-    if (Demo.isDemoId(incoming.requestId)) return;
     _sub = FirebaseFirestore.instance.collection('requests').doc(incoming.requestId).collection('calls').doc(incoming.callId).snapshots().listen((snap) {
       final status = snap.data()?['status'];
       if (status != 'ringing' && !_busy && mounted) {
@@ -537,13 +523,6 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> with SingleTick
     final navigator = Navigator.of(context);
     final messenger = ScaffoldMessenger.of(context);
     await AlertSound.incomingCall.stop();
-    if (Demo.isDemoId(incoming.requestId)) {
-      navigator.pushReplacement(MaterialPageRoute(
-        fullscreenDialog: true,
-        builder: (_) => CallScreen(call: ActiveCall.simulated(requestId: incoming.requestId, peerName: incoming.callerName, isCaller: false)),
-      ));
-      return;
-    }
     try {
       final call = await CallService.instance.answer(incoming);
       navigator.pushReplacement(MaterialPageRoute(fullscreenDialog: true, builder: (_) => CallScreen(call: call)));
@@ -561,7 +540,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> with SingleTick
     if (_busy) return;
     setState(() => _busy = true);
     await AlertSound.incomingCall.stop();
-    if (!Demo.isDemoId(incoming.requestId)) await CallService.instance.decline(incoming);
+    await CallService.instance.decline(incoming);
     if (!mounted) return;
     if (thenMessage) {
       Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => ChatScreen(requestId: incoming.requestId)));

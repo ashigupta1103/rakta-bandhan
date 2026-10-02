@@ -1,0 +1,58 @@
+# Local build status, 2026-10-02
+
+Branch: `feat/prelaunch`. Upstream `origin/master` at `0e19c5d` was merged, preserving the updated UI. The owner approved connecting missing actions while retaining that design.
+
+Live project (`rakta-bandhan2026`), 2026-10-02: the Cloudflare Worker was deployed (below); the owner deployed `firestore:rules` and `firestore:indexes`; people's data was cleared from Firestore (pre-launch test data; the admin collections were kept) and the Auth test accounts other than the admin are removed in the console. No Cloud Functions are deployed (Spark).
+
+## Implemented
+
+- All demo/preview code is removed (2026-10-02): no demo sign-in, sample content, preview gallery or simulated calls. The app only talks to the real backend. The one labelled simulation is the phone-number check after registration (no SMS provider yet).
+- Free-plan sign-in: email + password, "Forgot password", and a password re-check before account deletion. The email check after sign-up is a labelled simulation (code `123456`, skippable); rules and the photo Worker accept unproven emails until `config/features.email_verified_required` is set. `--dart-define=EMAIL_CODE_LIVE=true` switches to the emailed code once Blaze and a sender exist.
+- A real request lifecycle on the free plan: the donor's thank-you screen and 90-day rest now start as soon as the requester's confirmation completes the donation while the donor's screen is open; new requests carry no phone number.
+- Functions account ban/unban/removal, bounded reactivation, request expiry, two-person completion and switchable server impact counting.
+- Cloudflare R2 client uploads/downloads/deletions, JPEG compression, private ID-proof access and legacy read fallback; TURN credentials with caching and STUN fallback. Both admin clients use authenticated ID-photo access.
+- Atomic username claims, signup/existing-account prompt, 30-day changes, profile/post/chat display, release on deletion and protection against late cleanup deleting a reused name.
+- Community story editing saves text/topic/replacement photos through the real backend without replacing the upstream editor design. Edits keep existing visibility. Uploaded JPEGs strip EXIF metadata after orientation is baked.
+- New request documents contain no phone numbers. The optional phone gate is enforced by rules, and clients cannot grant themselves verification.
+- Both admin consoles use server search and 50-record cursor pages for donors/requests, pending verification queries and aggregate totals. Web hospital/history lists also have cursor pages. Charts based on loaded samples are labelled.
+- Private support submissions/replies, My reports, reply actions in both consoles, status mirrors, export/deletion, and a disabled-by-default Functions email/push trigger.
+- Nonblocking App Check activation; configurable web site keys. Server enforcement remains off until owner registration and verification.
+- Owner-run, paged search backfill and optional historical request-phone cleanup; dry run by default and an explicit live-project guard.
+- Local preflight and CI cover analysis, tests, emulator smoke, Worker bundle and admin checks. Hosted legal pages and privacy/store disclosures match these data changes.
+
+## Deferred by owner choice
+
+Worker service-account helper, D1 email sign-in, privileged Worker admin routes/cron, and Worker push delivery are deferred. Real email sign-in waits for Blaze and a verified sender; no Firebase service-account private key belongs on Cloudflare. Truecaller/SMS/WhatsApp phone ownership verification remains pending. `phone_required=false` and `server_jobs=false` until the relevant owner rollout.
+
+The real production acceptance in the original handoff remains pending owner provisioning/deployment and device testing. Code compilation and emulator results do not verify a live third-party connection.
+
+## Local validation
+
+- Flutter: analyzer clean; 63 tests pass, and the login tests also pass in emailed-code mode (`EMAIL_CODE_LIVE=true`). The demo-only tests were removed with the demo layer.
+- On an Android emulator, against the Firebase emulators and this repo's rules: the donor journey (sign up → simulated email check → register → phone-check simulation → accept a request → in-app call → both confirm → rest period → certificate → Find → Community) passes. The requester, account (log out/in, export, delete) and community/support journeys are written in `integration_test/` but were **not** completed, so they are unverified.
+- Functions: 27 unit tests. Emulator smoke covers login/review accounts, lifecycle, jobs, username release/reuse, support delivery off and migration/search/cursor behaviour across 410 records.
+- Edge: 26 tests and dry-run Worker bundle.
+- Rules: 77 tests, including username atomicity/cooldown, phone protection, contact privacy, private support access and the email-proof switch.
+- Admin: TypeScript, production build and lint pass. Seven pre-existing lint warnings remain in shared UI components; the build also reports its existing chunk-size warning.
+
+Final check logs and APKs are local, ignored artifacts in `build/checks/` and `build/`. Re-run `bash tool/preflight.sh` for reproducible checks. In Windows use Git Bash, not an unconfigured WSL installation.
+
+## Cloudflare Worker deployment, 2026-10-02
+
+Deployed by the coding agent after the owner told it to finish the Cloudflare setup itself. Worker `rakta-bandhan-edge` is live at `https://rakta-bandhan-edge.rakta-bandhan-edge.workers.dev`. It was deployed as version `5c81c77b-c465-4f0e-afab-9e42532a34f5`; each of the two `secret put` commands then published a newer version. Account `361246d2…`; `MEDIA` is bound to the private `bloodbank` bucket; `TURN_KEY_ID` and `TURN_API_TOKEN` are stored as Worker secrets (names confirmed with `wrangler secret list`; the values were never written to a file or committed). Wrangler registered the account's `workers.dev` subdomain as `rakta-bandhan-edge` automatically. It can be renamed in the Cloudflare dashboard, but every build that embeds the URL would then need updating.
+
+Checked live from outside, without signing in: `/health` returns `{"ok":true}`; `/ice`, ID-photo reads and uploads without a valid token return 401; a missing public photo returns 404 (the R2 binding works); an unsigned "emulator" token is refused with 401, so emulator mode is off in production; a token with an unknown signing key returns 401 and not 503 (the Worker can fetch Google's signing keys); CORS allows the Hosting origin and no other. The TURN key was also validated directly against Cloudflare (HTTP 201 with relay credentials).
+
+Not verified: uploads, private-photo access and relay credentials for a real signed-in user and matched request. They need a real sign-in on a phone.
+
+The deployed Worker predates the `email_verified_required` switch (accounts with an unproven email can upload only after `edge/` is redeployed: `npx wrangler login`, then `npx wrangler deploy` in `edge/`).
+
+## Owner next steps
+
+1. Pick how real sign-in will work (Blaze + verified email sender is the plan of record), then install the real APK built with `EDGE_URL` and test on devices. The old `build/RaktaBandhan-demo.apk` is obsolete.
+2. Purchase a domain and create the Resend account. Follow [external connections](EXTERNAL_CONNECTIONS.md).
+3. R2 and TURN are deployed (see above).
+4. When ready, upgrade Firebase to Blaze and follow [after Blaze](AFTER_BLAZE_UPGRADE.md) and [the deploy runbook](DEPLOY_RUNBOOK.md).
+5. Configure signing, App Check, legal contacts and store accounts. Enable real delivery only after owner verification.
+
+Publishing edits for owner review: Cloudflare photo/call transport, phone privacy, username/User ID disclosure, support submissions/replies, App Check, configured address provider and EXIF removal; updated test/build evidence. `kLegalApproved` remains false. Existing local stash/backup safety copies were retained.

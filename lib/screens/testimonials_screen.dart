@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import '../demo/demo.dart';
 import '../services/backend.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
@@ -13,9 +12,7 @@ import '../widgets/rb_icon.dart';
 /// admin from the console's Content tab into `testimonials`, a collection
 /// only an admin can write (see firestore.rules) — that admin-only write
 /// path is what makes "curated and verified" structural rather than a
-/// claim. Until one is published the page shows an honest empty state; in
-/// preview builds, clearly-fictional samples stand in for the layout, with
-/// one subtle "Preview data" tag for the whole section.
+/// claim. Until one is published the page shows an honest empty state.
 class TestimonialsScreen extends StatelessWidget {
   const TestimonialsScreen({super.key});
 
@@ -49,7 +46,7 @@ class TestimonialsScreen extends StatelessWidget {
                     Text('Stories we\'ve been given permission to tell', style: AppTextStyles.display(fontSize: 25, color: AppColors.ink, height: 1.25)),
                     const SizedBox(height: 8),
                     const Text('Curated and verified by Rakta Bandhan. Member stories live in Community.', style: TextStyle(fontSize: 13, color: AppColors.ink2)),
-                    if (Firebase.apps.isNotEmpty || Demo.on) ...[
+                    if (Firebase.apps.isNotEmpty) ...[
                       const SizedBox(height: 14),
                       const _ShareTestimonialButton(),
                       const SizedBox(height: 6),
@@ -62,8 +59,8 @@ class TestimonialsScreen extends StatelessWidget {
                     // No Firebase app (widget tests, or an init failure) means
                     // no stream to build — fall back rather than throw on
                     // FirebaseFirestore.instance.
-                    if (Firebase.apps.isEmpty || Demo.on)
-                      _fallbackContent()
+                    if (Firebase.apps.isEmpty)
+                      _productionEmptyState()
                     else
                       StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                         stream: Backend.instance.testimonialsStream(),
@@ -72,10 +69,7 @@ class TestimonialsScreen extends StatelessWidget {
                             return const SizedBox(height: 160, child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary)));
                           }
                           final docs = snapshot.data?.docs ?? const [];
-                          // Samples only stand in while nothing real is
-                          // published — a preview build with real
-                          // testimonials shows the real ones.
-                          if (docs.isEmpty) return _fallbackContent();
+                          if (docs.isEmpty) return _productionEmptyState();
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -96,37 +90,6 @@ class TestimonialsScreen extends StatelessWidget {
       ),
     );
   }
-
-  /// Client demo only: fictional sample testimonials, labelled as such.
-  List<Widget> _previewContent() {
-    return [
-      const Text('Demo · sample testimonials from fictional people', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.goldDeep)),
-      const SizedBox(height: 12),
-      _quoteCard(
-        quote: '"A donor accepted my father’s request within the hour. We messaged in the app, met at the blood bank, and I never had to hand out my number to a stranger."',
-        name: 'Meera I.',
-        subtitle: 'Requester · demo',
-        timeAgo: '2 weeks ago',
-        avatarIcon: RbGlyph.community,
-      ),
-      const SizedBox(height: 12),
-      _quoteCard(
-        quote: '"I keep “Available to donate” on. When a request near me matches my group I get an alert, read the details, and decide. It takes the guesswork out of helping."',
-        name: 'Aarav M.',
-        subtitle: 'Donor · demo',
-        timeAgo: '1 month ago',
-        avatarIcon: RbGlyph.droplet,
-      ),
-    ];
-  }
-
-
-  /// Shown when nothing is published yet (or there is no backend to ask).
-  Widget _fallbackContent() => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        // Sample testimonials exist only inside a client demo session.
-        children: Demo.on ? _previewContent() : [_productionEmptyState()],
-      );
 
   Widget _publishedCard(Map<String, dynamic> data) {
     final created = (data['created_at'] as Timestamp?)?.toDate();
@@ -206,7 +169,7 @@ class _ShareTestimonialButton extends StatelessWidget {
         constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.92),
         backgroundColor: Colors.white,
         shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-        builder: (_) => const _TestimonialSheet(),
+        builder: (_) => const TestimonialSheet(),
       ),
       icon: const RbIcon(RbGlyph.quote, size: 15),
       label: const Text('Add a testimonial'),
@@ -214,14 +177,15 @@ class _ShareTestimonialButton extends StatelessWidget {
   }
 }
 
-class _TestimonialSheet extends StatefulWidget {
-  const _TestimonialSheet();
+@visibleForTesting
+class TestimonialSheet extends StatefulWidget {
+  const TestimonialSheet({super.key});
 
   @override
-  State<_TestimonialSheet> createState() => _TestimonialSheetState();
+  State<TestimonialSheet> createState() => _TestimonialSheetState();
 }
 
-class _TestimonialSheetState extends State<_TestimonialSheet> {
+class _TestimonialSheetState extends State<TestimonialSheet> {
   final _quote = TextEditingController();
   final _role = TextEditingController();
   bool _consent = false;
@@ -237,11 +201,6 @@ class _TestimonialSheetState extends State<_TestimonialSheet> {
   Future<void> _send() async {
     final navigator = Navigator.of(context);
     final messenger = ScaffoldMessenger.of(context);
-    if (Demo.on) {
-      navigator.pop();
-      messenger.showSnackBar(const SnackBar(content: Text('Demo · nothing was sent. In the app, our team reviews it before it appears.')));
-      return;
-    }
     setState(() => _sending = true);
     try {
       await Backend.instance.submitTestimonial(quote: _quote.text, role: _role.text);

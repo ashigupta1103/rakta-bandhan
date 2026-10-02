@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../screens/call_screen.dart';
 import '../screens/chat_screen.dart';
+import '../screens/my_reports_screen.dart';
 import '../screens/match_contact_screen.dart';
 import '../screens/request_detail_screen.dart';
 import '../screens/tracking_screen.dart';
@@ -172,6 +173,11 @@ class _LiveEventsHostState extends State<LiveEventsHost> with WidgetsBindingObse
 
   /// Opens the screen a notification is about.
   Future<void> _openTarget(PushTarget target) async {
+    if (!mounted) return;
+    if (target.type == PushType.supportReply) {
+      Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MyReportsScreen()));
+      return;
+    }
     final requestId = target.requestId;
     if (!mounted || requestId == null) return;
     final navigator = Navigator.of(context);

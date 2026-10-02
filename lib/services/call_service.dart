@@ -7,18 +7,46 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 
 import 'chat_service.dart';
 import 'push_service.dart';
+import 'edge.dart';
 
-/// ICE servers for in-app calls. Google's public STUN servers are enough
-/// when both phones can reach each other directly; roughly 10–20% of
-/// mobile-carrier NAT pairs (common with Indian CGNAT) also need a TURN
-/// relay, which is a paid service (Twilio, Metered, Cloudflare Calls…).
-/// Add it here before launch — nothing else changes.
+/// Direct-call fallback. The Worker supplies short-lived Cloudflare TURN
+/// credentials when configured; these STUN servers also stay in that list.
 const callIceServers = <Map<String, dynamic>>[
   {
     'urls': ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'],
   },
-  // {'urls': 'turn:turn.example.com:3478', 'username': '…', 'credential': '…'},
 ];
+
+/// Relay entries first; malformed entries never reach WebRTC. STUN always stays.
+List<Map<String, dynamic>> mergeIceServers(Object? remote) {
+  final relay = <Map<String, dynamic>>[];
+  if (remote is List) {
+    for (final entry in remote) {
+      if (entry is! Map) continue;
+      final urls = entry['urls'];
+      final candidates = urls is String
+          ? [urls]
+          : urls is List
+          ? urls
+          : const [];
+      final valid = candidates
+          .whereType<String>()
+          .where((u) => RegExp(r'^turns?:[^\s]+$').hasMatch(u))
+          .toList();
+      final user = entry['username'];
+      final credential = entry['credential'];
+      if (valid.isEmpty ||
+          user is! String ||
+          user.isEmpty ||
+          credential is! String ||
+          credential.isEmpty) {
+        continue;
+      }
+      relay.add({'urls': valid, 'username': user, 'credential': credential});
+    }
+  }
+  return [...relay, ...callIceServers];
+}
 
 /// How long an unanswered call rings before it's logged as missed.
 const callRingTimeout = Duration(seconds: 45);
@@ -52,24 +80,6 @@ class ActiveCall extends ChangeNotifier {
   final bool isCaller;
 
   ActiveCall._({required this.requestId, required this.callId, required this.peerUid, required this.peerName, required this.isCaller});
-
-  /// Client demo only (lib/demo/demo.dart): a call that never opens the
-  /// microphone, WebRTC or Firestore. An outgoing one rings for a few
-  /// seconds and then "connects"; an answered one is live at once. It is
-  /// never registered as [CallService.active] and logs nothing.
-  factory ActiveCall.simulated({required String requestId, required String peerName, required bool isCaller}) {
-    final call = ActiveCall._(requestId: requestId, callId: 'demo-call', peerUid: 'demo', peerName: peerName, isCaller: isCaller).._simulated = true;
-    if (isCaller) {
-      call._phase = CallPhase.ringing;
-      call._ringTimer = Timer(const Duration(seconds: 3), () => call._setPhase(CallPhase.active));
-    } else {
-      call._setPhase(CallPhase.active);
-    }
-    return call;
-  }
-
-  bool _simulated = false;
-  bool get simulated => _simulated;
 
   CallPhase _phase = CallPhase.connecting;
   CallPhase get phase => _phase;
@@ -121,7 +131,7 @@ class ActiveCall extends ChangeNotifier {
 
   Future<void> toggleSpeaker() async {
     _speakerOn = !_speakerOn;
-    if (!kIsWeb && !_simulated) {
+    if (!kIsWeb) {
       try {
         await Helper.setSpeakerphoneOn(_speakerOn);
       } catch (_) {
@@ -135,13 +145,6 @@ class ActiveCall extends ChangeNotifier {
   Future<void> hangUp() async {
     if (_phase == CallPhase.ended) return;
     final wasAnswered = _connectedAt != null;
-    if (_simulated) {
-      _ringTimer?.cancel();
-      _endReason = wasAnswered ? 'Call ended' : 'Call cancelled';
-      _phase = CallPhase.ended;
-      notifyListeners();
-      return;
-    }
     try {
       await _ref.update({
         'status': (!wasAnswered && isCaller) ? 'missed' : 'ended',
@@ -196,7 +199,8 @@ class ActiveCall extends ChangeNotifier {
       throw const CallMicrophoneException();
     }
 
-    final pc = await createPeerConnection({'iceServers': callIceServers, 'sdpSemantics': 'unified-plan'});
+    final servers = await CallService.instance.iceServers(requestId);
+    final pc = await createPeerConnection({'iceServers': servers, 'sdpSemantics': 'unified-plan'});
     _pc = pc;
     for (final track in _localStream!.getTracks()) {
       await pc.addTrack(track, _localStream!);
@@ -274,6 +278,46 @@ class ActiveCall extends ChangeNotifier {
 class CallService {
   CallService._();
   static final CallService instance = CallService._();
+
+  final _edge = EdgeClient();
+  String? _iceUid;
+  DateTime? _iceExpires;
+  List<Map<String, dynamic>>? _cachedIce;
+
+  Future<List<Map<String, dynamic>>> iceServers(String requestId) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null || kEdgeUrl.isEmpty) return callIceServers;
+    if (_iceUid == uid &&
+        _iceExpires != null &&
+        DateTime.now().isBefore(_iceExpires!)) {
+      return _cachedIce!;
+    }
+    _cachedIce = null;
+    _iceExpires = null;
+    _iceUid = uid;
+    try {
+      final remote = await _edge.json(
+        'POST',
+        '/ice',
+        body: {'requestId': requestId},
+        timeout: const Duration(seconds: 3),
+      );
+      final servers = mergeIceServers(remote['iceServers']);
+      final ttl = remote['ttlS'];
+      if (servers.length > callIceServers.length &&
+          ttl is num &&
+          ttl.isFinite &&
+          ttl > 300) {
+        _cachedIce = servers;
+        _iceExpires = DateTime.now().add(
+          Duration(seconds: ttl.toInt().clamp(301, 3600) - 300),
+        );
+      }
+      return servers;
+    } catch (_) {
+      return callIceServers;
+    }
+  }
 
   final _db = FirebaseFirestore.instance;
   String get _uid => FirebaseAuth.instance.currentUser!.uid;

@@ -1,0 +1,128 @@
+name: CI
+
+# The same checks as tool/preflight.sh, on every pull request into master or a
+# release branch. No secrets are used: the rules tests run on the local
+# Firebase emulators and never touch a real project.
+
+on:
+  pull_request:
+    branches: [master, 'release/**']
+  push:
+    branches: [master]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  flutter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.47.0'
+          cache: true
+      - run: flutter pub get
+      # No --no-fatal-infos: an info is a failure here, as it is locally.
+      - run: flutter analyze
+      - run: flutter test
+      # The login form differs once the emailed-code sign-in is switched on.
+      - run: flutter test --dart-define=EMAIL_CODE_LIVE=true test/release_features_test.dart
+
+  functions:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: functions
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+      - run: npm ci
+      - run: npm test
+
+  functions-smoke:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: functions
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm install --global firebase-tools@15
+      - run: npm ci
+      - run: npm run build
+      # Dummy emulator values; outbound email/push is disabled by the code.
+      - run: printf 'SMTP_URL=emulator-no-mail\nREVIEW_CODE=246810\n' > .secret.local
+      - run: npm run smoke
+        env:
+          FUNCTIONS_DISCOVERY_TIMEOUT: '120'
+
+  rules:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend/rules-test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/rules-test/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm install --global firebase-tools@15
+      - run: npm ci
+      - run: npm test
+
+  edge:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: edge
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: edge/package-lock.json
+      - run: npm ci
+      - run: npm test
+      # Bundles the Worker exactly as a deploy would, without logging in.
+      - run: npm run check
+        env:
+          WRANGLER_SEND_METRICS: 'false'
+
+  admin:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: admin/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: admin/frontend/package-lock.json
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm run build
+      - run: npm run lint

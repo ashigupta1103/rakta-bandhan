@@ -1,5 +1,11 @@
 # Rakta Bandhan — Blaze upgrade build plan
 
+> **Superseded (2026-10-01).** This file is kept for history. The plan actually being followed is
+> `docs/launch/BUILD_STATUS.md` and `docs/launch/DECISIONS.md`; owner upgrade steps are in `docs/launch/AFTER_BLAZE_UPGRADE.md`.
+> The server-side lifecycle callables, phone-OTP-first order and Spark workarounds described below
+> were **not** adopted: the rules enforce every invariant, and functions only notify, expire, mint
+> sign-in tokens and clean up.
+
 > **For the Claude Code session that receives this file.**
 > The Firebase project has just been moved from the free Spark plan to the
 > pay-as-you-go **Blaze** plan. Your job is to replace every Spark-era

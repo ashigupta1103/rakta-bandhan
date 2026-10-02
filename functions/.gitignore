@@ -3,3 +3,6 @@ lib/
 *.log
 .secret.local
 .env.local
+.env*
+!.env
+!.env.demo-rakta-bandhan

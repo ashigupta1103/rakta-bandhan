@@ -1,9 +1,7 @@
-import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../demo/demo.dart';
 import '../services/backend.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
@@ -54,32 +52,9 @@ class _CommunityScreenState extends State<CommunityScreen> {
 
   static List<_Doc> _docs(QuerySnapshot<Map<String, dynamic>> q) => [for (final d in q.docs) (id: d.id, data: d.data())];
 
-  // Client demo: only demo content — never mixed into the real feed.
-  static Stream<List<_Doc>> _storiesStream() => Demo.on
-      ? Demo.instance.watch(() => [
-            for (final st in Demo.instance.stories) (id: st['id'] as String, data: st),
-            (id: 'demo-story-fixture', data: _demoFixtureStory),
-          ])
-      : Backend.instance.communityStoriesStream().map(_docs);
+  static Stream<List<_Doc>> _storiesStream() => Backend.instance.communityStoriesStream().map(_docs);
 
-  static Stream<List<_Doc>> _announcementsStream() => Demo.on
-      ? Stream.value([(id: 'demo-announcement', data: _demoAnnouncement)])
-      : Backend.instance.announcementsStream().map(_docs);
-
-  static final Map<String, dynamic> _demoFixtureStory = {
-    'author_name': 'Priya (demo)',
-    'topic': 'My first donation',
-    'location_label': Demo.area,
-    'blood_group': 'B+',
-    'body': 'I was nervous before my first donation, but the staff were kind and it was over in fifteen minutes. A demo story — shown only in the client demo.',
-    'created_at': Timestamp.fromDate(DateTime.now().subtract(const Duration(days: 2))),
-  };
-
-  static final Map<String, dynamic> _demoAnnouncement = {
-    'title': 'Blood donation camp (demo)',
-    'body': 'A sample announcement, shown only in the client demo. Real camps and drives appear here once the team posts them.',
-    'created_at': Timestamp.fromDate(DateTime.now().subtract(const Duration(days: 1))),
-  };
+  static Stream<List<_Doc>> _announcementsStream() => Backend.instance.announcementsStream().map(_docs);
 
   /// Authors this person chose to hide ("Hide posts from …") — kept on the
   /// device, so blocking someone never needs to tell them.
@@ -125,11 +100,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
     );
   }
 
-  // In the demo the community figure counts only the demo's own completed
-  // donation — no invented totals.
-  static Stream<int> _impact() => Demo.on
-      ? Demo.instance.watch(() => Demo.instance.request?['status'] == 'fulfilled' ? 1 : 0)
-      : Backend.instance.impactThisMonthStream();
+  static Stream<int> _impact() => Backend.instance.impactThisMonthStream();
 
   void _openComposer() => Navigator.push(context, MaterialPageRoute(builder: (context) => const CreateExperienceScreen()));
 
@@ -182,7 +153,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
             return Column(
               children: [
                 for (final doc in docs) ...[
-                  _storyCard(doc.id, doc.data, demo: Demo.on),
+                  _storyCard(doc.id, doc.data),
                   const SizedBox(height: 14),
                 ],
               ],
@@ -235,24 +206,23 @@ class _CommunityScreenState extends State<CommunityScreen> {
   /// A post: author row, the photo edge to edge (4:5 to 1.91:1, like
   /// Instagram's crop limits), then the text. Tap the photo for a
   /// full-screen, pinch-to-zoom view.
-  Widget _storyCard(String id, Map<String, dynamic> data, {bool demo = false}) {
+  Widget _storyCard(String id, Map<String, dynamic> data) {
     final created = (data['created_at'] as Timestamp?)?.toDate();
     final bloodGroup = data['blood_group'] as String?;
     final location = data['location_label'] as String?;
     final topic = data['topic'] as String?;
     final imageUrl = data['image_url'] as String?;
     final aspect = ((data['image_aspect'] as num?)?.toDouble() ?? 4 / 5).clamp(4 / 5, 1.91);
-    final isMine = demo ? data['author_uid'] == Demo.instance.myUid : data['author_uid'] == Backend.instance.currentUser?.uid;
-    // Own stories only (author_uid matches the signed-in or demo user).
+    final isMine = data['author_uid'] == Backend.instance.currentUser?.uid;
+    // Own stories only (author_uid matches the signed-in user).
     final canEdit = isMine;
-    // Report / hide are moderation actions — not simulated in the demo.
-    final showMenu = isMine || !demo;
-    final name = data['author_name'] as String? ?? 'A donor';
+    final author = data['author_name'] as String? ?? 'A donor';
+    final username = data['author_username'] as String?;
+    final name = username == null ? author : '${author.split(' ').first} @$username';
     final meta = [
       if (location != null && location.isNotEmpty) location,
       if (created != null) _timeAgo(created),
       if (data['edited_at'] != null) 'edited',
-      if (demo) 'demo',
     ].join(' · ');
 
     return RbCard(
@@ -296,28 +266,22 @@ class _CommunityScreenState extends State<CommunityScreen> {
                     ],
                   ),
                 ),
-                if (showMenu)
-                  PopupMenuButton<String>(
-                    tooltip: isMine ? 'Story options' : 'More',
-                    icon: const RbIcon(RbGlyph.more, size: 18, color: AppColors.ink2),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    color: Colors.white,
-                    onSelected: (action) => _onStoryAction(action, id, data),
-                    itemBuilder: (_) => [
-                      if (canEdit) _menuItem('edit', RbGlyph.pen, 'Edit story'),
-                      if (isMine) _menuItem('delete', RbGlyph.trash, 'Delete story', destructive: true),
-                      if (!isMine) const PopupMenuItem(value: 'report', child: Text('Report post')),
-                      if (!isMine) PopupMenuItem(value: 'hide', child: Text('Hide posts from ${name.split(' ').first}')),
-                    ],
-                  )
-                else
-                  const SizedBox(width: 12),
+                PopupMenuButton<String>(
+                  tooltip: isMine ? 'Story options' : 'More',
+                  icon: const RbIcon(RbGlyph.more, size: 18, color: AppColors.ink2),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  color: Colors.white,
+                  onSelected: (action) => _onStoryAction(action, id, data),
+                  itemBuilder: (_) => [
+                    if (canEdit) _menuItem('edit', RbGlyph.pen, 'Edit story'),
+                    if (isMine) _menuItem('delete', RbGlyph.trash, 'Delete story', destructive: true),
+                    if (!isMine) const PopupMenuItem(value: 'report', child: Text('Report post')),
+                    if (!isMine) PopupMenuItem(value: 'hide', child: Text('Hide posts from ${name.split(' ').first}')),
+                  ],
+                ),
               ],
             ),
           ),
-          // Client demo: a photo picked on this device, never uploaded.
-          if (data['image_bytes'] is Uint8List)
-            AspectRatio(aspectRatio: 4 / 5, child: Image.memory(data['image_bytes'] as Uint8List, fit: BoxFit.cover, width: double.infinity)),
           if (imageUrl != null)
             GestureDetector(
               onTap: () => Navigator.push(context, MaterialPageRoute(fullscreenDialog: true, builder: (_) => _PhotoViewer(url: imageUrl))),
@@ -405,11 +369,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
         );
       case 'delete':
         if (!await _confirmDeleteStory() || !mounted) return;
-        if (Demo.isDemoId(id)) {
-          Demo.instance.deleteStory(id);
-          messenger.showSnackBar(const SnackBar(content: Text('Story deleted.')));
-          return;
-        }
         try {
           await Backend.instance.deleteMyStory(id);
           messenger.showSnackBar(const SnackBar(content: Text('Story deleted.')));
@@ -509,7 +468,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
             return Column(
               children: [
                 for (final doc in docs) ...[
-                  _announcementCard(doc.data, demo: Demo.on),
+                  _announcementCard(doc.data),
                   const SizedBox(height: 12),
                 ],
               ],
@@ -521,7 +480,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
   }
 
   /// A real announcement written by an admin from the console's Content tab.
-  Widget _announcementCard(Map<String, dynamic> data, {bool demo = false}) {
+  Widget _announcementCard(Map<String, dynamic> data) {
     final created = (data['created_at'] as Timestamp?)?.toDate();
     return RbCard(
       child: Row(
@@ -536,7 +495,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                 Text(data['title'] as String? ?? '', style: AppTextStyles.display(fontSize: 17, color: AppColors.ink, height: 1.25)),
                 const SizedBox(height: 2),
                 Text(
-                  demo ? 'Preview sample' : (created != null ? _timeAgo(created) : 'Rakta Bandhan'),
+                  created != null ? _timeAgo(created) : 'Rakta Bandhan',
                   style: const TextStyle(fontSize: 12, color: AppColors.mutedInk),
                 ),
                 const SizedBox(height: 8),
@@ -616,7 +575,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    Demo.on ? 'Demo · counts only the donation completed in this demo.' : 'Counted when both the donor and the requester confirm a donation.',
+                    'Counted when both the donor and the requester confirm a donation.',
                     style: const TextStyle(fontSize: 12, color: AppColors.onEmberMuted),
                   ),
                 ],
@@ -653,7 +612,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
   }
 }
 
-/// A document id and its fields — from Firestore, or from the client demo.
+/// A document id and its fields from Firestore.
 typedef _Doc = ({String id, Map<String, dynamic> data});
 
 class _StorySkeleton extends StatelessWidget {

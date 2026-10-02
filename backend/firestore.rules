@@ -27,15 +27,31 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == uid;
     }
 
-    // Accounts must have proved they own their email or phone before they
-    // can create anything: signed in with an emailed code (custom-token
-    // claim `login`, minted by functions/src/login.ts), a verified email,
-    // or a phone number. Stops throwaway sign-ups.
+    // Proof that the person owns their email or phone: signed in with an
+    // emailed code (custom-token claim `login`, minted by
+    // functions/src/login.ts), a verified email, or a phone number.
+    function emailProven() {
+      return request.auth.token.get('login', '') == 'email_otp'
+        || request.auth.token.get('email_verified', false) == true
+        || request.auth.token.get('phone_number', null) != null;
+    }
+
+    // Until a real email sender exists (the Blaze plan), sign-up can only
+    // simulate that proof, so it is not demanded. The owner switches it on
+    // with config/features.email_verified_required = true once the emailed
+    // code is live; the edge Worker reads the same switch.
+    function emailProofRequired() {
+      let features = /databases/$(database)/documents/config/features;
+      return exists(features) && get(features).data.get('email_verified_required', false) == true;
+    }
+
+    // Who may create anything: anyone proven, or - while proof is not
+    // required - any signed-in account that is not anonymous.
     function isVerifiedUser() {
       return isSignedIn()
-        && (request.auth.token.get('login', '') == 'email_otp'
-            || request.auth.token.get('email_verified', false) == true
-            || request.auth.token.get('phone_number', null) != null);
+        && (emailProven()
+            || (request.auth.token.get('firebase', {}).get('sign_in_provider', '') != 'anonymous'
+                && !emailProofRequired()));
     }
 
     // The post-donation rest period can't be shortened, removed, or ignored
@@ -61,6 +77,82 @@ service cloud.firestore {
       return isSignedIn() && exists(profile) && get(profile).data.get('is_banned', false) == true;
     }
 
+    // A donation record a donor may write for themselves: for a request that
+    // is, after this same write, fulfilled with them as its matched donor,
+    // copying that request's hospital and blood group. getAfter() sees the
+    // request as the transaction leaves it, so the donor's own confirmation
+    // can be the one that completes the request.
+    function completedByDonor(requestId) {
+      let r = getAfter(/databases/$(database)/documents/requests/$(requestId)).data;
+      return r.status == 'fulfilled'
+        && r.get('matched_donor_id', null) == request.auth.uid
+        && request.resource.data.hospital == r.get('location_label', '')
+        && request.resource.data.blood_group == r.blood_group;
+    }
+
+    // The owner sets config/features.server_jobs = true once the Cloud
+    // Functions are deployed. From then on the functions keep the Community
+    // Impact counter and the app may no longer touch it; until then (the free
+    // Spark plan has no functions) the app keeps it, one donation at a time.
+    function serverJobs() {
+      let features = /databases/$(database)/documents/config/features;
+      return exists(features) && get(features).data.get('server_jobs', false) == true;
+    }
+
+    function validUsername(name) {
+      return name is string && name.matches('^[a-z][a-z0-9_]{2,19}$')
+        && !(name in ['admin', 'administrator', 'support', 'help', 'rakta', 'bandhan',
+          'raktabandhan', 'rotary', 'official', 'team', 'moderator', 'system', 'root', 'null', 'undefined']);
+    }
+
+    // Reserved for a real provider.
+    function phoneAllowed() {
+      let features = /databases/$(database)/documents/config/features;
+      let profile = /databases/$(database)/documents/donors/$(request.auth.uid);
+      return !exists(features) || get(features).data.get('phone_required', false) != true
+        || (exists(profile) && get(profile).data.get('phone_verified_for', null) != null
+          && get(profile).data.phone_verified_for == get(profile).data.phone);
+    }
+
+    function usernameBound(uid) {
+      let name = request.resource.data.get('username', null);
+      return validUsername(name)
+        && request.resource.data.username_changed_at == request.time
+        && getAfter(/databases/$(database)/documents/usernames/$(name)).data.uid == uid
+        && getAfter(/databases/$(database)/documents/donors_public/$(uid)).data.username == name;
+    }
+
+    function usernameUpdate(uid) {
+      let before = resource.data.get('username', null);
+      let after = request.resource.data.get('username', null);
+      return (before == after
+          && resource.data.get('username_changed_at', null) == request.resource.data.get('username_changed_at', null))
+        || (usernameBound(uid)
+          && (before == null || (resource.data.username_changed_at + duration.value(30, 'd') <= request.time
+            && !existsAfter(/databases/$(database)/documents/usernames/$(before)))));
+    }
+
+    function publicUsernameMatches(uid) {
+      let name = request.resource.data.get('username', null);
+      let profile = /databases/$(database)/documents/donors/$(uid);
+      return (name == null && (!existsAfter(profile) || getAfter(profile).data.get('username', null) == null))
+        || (validUsername(name) && getAfter(profile).data.username == name);
+    }
+
+    match /usernames/{name} {
+      allow get: if isSignedIn();
+      allow list: if false;
+      allow create: if isVerifiedUser() && !isBanned() && validUsername(name)
+        && request.resource.data.keys().hasOnly(['uid', 'created_at'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.created_at == request.time
+        && getAfter(/databases/$(database)/documents/donors/$(request.auth.uid)).data.username == name;
+      allow update: if false;
+      allow delete: if isAdmin() || (isOwner(resource.data.uid)
+        && (!existsAfter(/databases/$(database)/documents/donors/$(request.auth.uid))
+          || getAfter(/databases/$(database)/documents/donors/$(request.auth.uid)).data.get('username', null) != name));
+    }
+
     // ---------------------------------------------------------------
     // donors/{uid} — private profile: name, phone, exact location.
     // Owner or admin only, ever. is_verified / is_banned are admin-set
@@ -71,14 +163,18 @@ service cloud.firestore {
       allow create: if isOwner(uid)
         && isVerifiedUser()
         && request.resource.data.is_verified == false
-        && request.resource.data.is_banned == false;
+        && request.resource.data.is_banned == false
+        && request.resource.data.get('phone_verified_for', null) == null
+        && usernameBound(uid);
 
       allow update: if isAdmin()
         || (isOwner(uid)
             && resource.data.is_banned == false
             && request.resource.data.is_verified == resource.data.is_verified
             && request.resource.data.is_banned == resource.data.is_banned
-            && cooldownRespected());
+            && request.resource.data.get('phone_verified_for', null) == resource.data.get('phone_verified_for', null)
+            && cooldownRespected()
+            && usernameUpdate(uid));
 
       // Owner delete = in-app account deletion (App Store 5.1.1(v) /
       // Google Play account-deletion policy). See AccountService.
@@ -104,22 +200,24 @@ service cloud.firestore {
     // together in one transaction, so a rule here that called
     // get(donors/{uid}) would read a doc that doesn't exist yet (brand-new
     // donor) or a stale pre-write value (verify/ban/availability) — always
-    // denying. Every check below reads only this document's own fields
-    // instead, so it can't depend on write order within the transaction.
+    // denying. Username coherence uses getAfter(), which sees both sibling
+    // writes. Verification checks below still use this document's own fields.
     match /donors_public/{uid} {
       allow read: if isSignedIn();
 
       // A fresh donor always starts unverified (see registerDonor).
       allow create: if ((isOwner(uid) && isVerifiedUser()) || isAdmin())
         && !('phone' in request.resource.data)
-        && request.resource.data.is_verified == false;
+        && request.resource.data.is_verified == false
+        && (isAdmin() || publicUsernameMatches(uid));
 
       // is_verified can only change via an admin write — an owner's own
       // update must leave it exactly as it already was.
       allow update: if (isOwner(uid) || isAdmin())
         && !('phone' in request.resource.data)
         && (isAdmin() || (!isBanned()
-              && request.resource.data.is_verified == resource.data.is_verified));
+              && request.resource.data.is_verified == resource.data.is_verified
+              && publicUsernameMatches(uid)));
 
       allow delete: if isOwner(uid) || isAdmin();
     }
@@ -155,6 +253,28 @@ service cloud.firestore {
         return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys);
       }
 
+      // One active match per donor, enforced where it can't be skipped.
+      // The accepting write must also set the donor's own lock to this
+      // request (getAfter sees the donor as the write leaves them), the donor
+      // must not be resting, and an existing lock may only be replaced when it
+      // points at nothing live: a request that is gone, belongs to someone
+      // else, or is neither matched nor fulfilled. A fulfilled request still
+      // owes this donor its cooldown and record, so it blocks a new match.
+      function canTakeMatch() {
+        let donorPath = /databases/$(database)/documents/donors/$(request.auth.uid);
+        let donor = get(donorPath).data;
+        let lock = donor.get('active_request_id', null);
+        let lockPath = /databases/$(database)/documents/requests/$(lock);
+        return getAfter(donorPath).data.active_request_id == id
+          && (donor.get('reactivation_scheduled_at', null) == null
+              || donor.reactivation_scheduled_at <= request.time)
+          && (lock == null
+              || lock == id
+              || !exists(lockPath)
+              || get(lockPath).data.get('matched_donor_id', null) != request.auth.uid
+              || !(get(lockPath).data.status in ['matched', 'fulfilled']));
+      }
+
       function previewUnchangedOrMine() {
         return request.resource.data.get('last_message', null) == resource.data.get('last_message', null)
           || request.resource.data.last_message.sender_uid == request.auth.uid;
@@ -175,10 +295,18 @@ service cloud.firestore {
 
       allow create: if isVerifiedUser()
         && !isBanned()
+        && phoneAllowed()
+        && !('requester_phone' in request.resource.data)
+        && !('matched_donor_phone' in request.resource.data)
         && request.resource.data.requester_uid == request.auth.uid
         && request.resource.data.status == 'open';
 
-      allow update: if isAdmin() || (isSignedIn() && coreUnchanged() && (
+      allow update: if isAdmin() || (isSignedIn()
+        && (request.resource.data.get('requester_phone', null) == null
+            || request.resource.data.get('requester_phone', null) == resource.data.get('requester_phone', null))
+        && (request.resource.data.get('matched_donor_phone', null) == null
+            || request.resource.data.get('matched_donor_phone', null) == resource.data.get('matched_donor_phone', null))
+        && coreUnchanged() && (
           // requester cancels their own open or matched request
           (resource.data.requester_uid == request.auth.uid
             && resource.data.status in ['open', 'matched']
@@ -189,7 +317,9 @@ service cloud.firestore {
             && request.resource.data.status == 'matched'
             && request.resource.data.matched_donor_id == request.auth.uid
             && isVerifiedUser()
-            && !isBanned())
+            && !isBanned()
+            && phoneAllowed()
+            && canTakeMatch())
           ||
           // two-sided completion: each side stamps only its own
           // confirmation; the request may become `fulfilled` only when the
@@ -238,10 +368,10 @@ service cloud.firestore {
           // account deletion scrubs the leaving user's own name/phone
           // (and the inbox preview, which may quote them)
           (resource.data.requester_uid == request.auth.uid
-            && onlyChanges(['requester_name', 'requester_phone', 'requester_deleted', 'last_message']))
+            && onlyChanges(['requester_name', 'requester_username', 'requester_phone', 'requester_deleted', 'last_message']))
           ||
           (resource.data.get('matched_donor_id', null) == request.auth.uid
-            && onlyChanges(['matched_donor_name', 'matched_donor_phone', 'matched_donor_deleted', 'last_message']))
+            && onlyChanges(['matched_donor_name', 'matched_donor_username', 'matched_donor_phone', 'matched_donor_deleted', 'last_message']))
           ||
           // chat bookkeeping: each side moves only its own read marker, and
           // only the sender may write the inbox preview (always batched
@@ -314,13 +444,24 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // donation_history/{id} — immutable once written. Self-reported by
-    // the donor (the only real path today) or written by an admin.
+    // donation_history/{id} — immutable once written. The doc id IS the
+    // request id, so there is exactly one record per request: a second write
+    // would be an update, which only an admin may do. A donor can write their
+    // own record only for a request that is really fulfilled with them as the
+    // matched donor (completedByDonor), stamped with the server time, with
+    // nothing but the known fields. Admins, and the onRequestUpdated function
+    // (Admin SDK), can write any record.
     match /donation_history/{id} {
       allow read: if isAdmin() ||
         (isSignedIn() && resource.data.donor_id == request.auth.uid);
-      allow create: if isAdmin() ||
-        (isSignedIn() && request.resource.data.donor_id == request.auth.uid);
+      allow create: if isAdmin() || (isSignedIn()
+        && request.resource.data.keys().hasOnly(
+             ['donor_id', 'request_id', 'donation_date', 'confirmed_by', 'hospital', 'blood_group'])
+        && request.resource.data.donor_id == request.auth.uid
+        && request.resource.data.request_id == id
+        && request.resource.data.confirmed_by == 'self'
+        && request.resource.data.donation_date == request.time
+        && completedByDonor(id));
       allow update, delete: if isAdmin();
     }
 
@@ -366,13 +507,46 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
+    function supportOwner(source, id) {
+      let data = getAfter(/databases/$(database)/documents/$(source)/$(id)).data;
+      return data.get('reporter_uid', data.get('requester_uid', null));
+    }
+
+    // Safe author copy: no internal note or moderation details from the inbox.
+    match /support_submissions/{id} {
+      allow read: if isSignedIn() && (resource.data.reporter_uid == request.auth.uid || isAdmin());
+      allow create: if isAdmin() || (isVerifiedUser()
+        && request.resource.data.keys().hasOnly(['source_collection', 'source_id', 'reporter_uid', 'title', 'body', 'status', 'created_at'])
+        && request.resource.data.source_collection in ['reports', 'issue_reports', 'partnership_inquiries']
+        && request.resource.data.source_id == id && request.resource.data.reporter_uid == request.auth.uid
+        && supportOwner(request.resource.data.source_collection, id) == request.auth.uid
+        && request.resource.data.title is string && request.resource.data.title.size() <= 120
+        && request.resource.data.body is string && request.resource.data.body.size() <= 2000
+        && request.resource.data.status == 'new' && request.resource.data.created_at == request.time);
+      allow update: if isAdmin();
+      allow delete: if isAdmin() || isOwner(resource.data.reporter_uid);
+    }
+
+    match /support_replies/{id} {
+      allow read: if isSignedIn() && (resource.data.to_uid == request.auth.uid || isAdmin());
+      allow create: if isAdmin()
+        && request.resource.data.keys().hasOnly(['source_collection', 'source_id', 'to_uid', 'body', 'created_by', 'created_at'])
+        && request.resource.data.source_collection in ['reports', 'issue_reports', 'partnership_inquiries']
+        && request.resource.data.source_id is string
+        && supportOwner(request.resource.data.source_collection, request.resource.data.source_id) == request.resource.data.to_uid
+        && request.resource.data.body is string && request.resource.data.body.size() > 0 && request.resource.data.body.size() <= 2000
+        && request.resource.data.created_by == request.auth.uid && request.resource.data.created_at == request.time;
+      allow update: if false;
+      allow delete: if isAdmin() || isOwner(resource.data.to_uid);
+    }
+
     // community_stories/{id} — "Share an experience". Readable by any
     // signed-in user (that's the point), written only under the author's
-    // own uid, and never edited by the author afterwards. Admins moderate:
+    // own uid; authors can edit text, topic and their own photo. Admins moderate:
     // `is_hidden` (reversible — the feed filters it out client-side) or an
     // outright delete.
     // Photo posts: `image_path` must point into the author's own folder in
-    // this project's Storage bucket (see storage.rules), never an arbitrary
+    // the R2 community folder, never an arbitrary
     // external link. Authors may delete their own post.
     match /community_stories/{id} {
       allow read: if isSignedIn();
@@ -382,7 +556,14 @@ service cloud.firestore {
         && request.resource.data.body.size() <= 2000
         && (request.resource.data.get('image_path', null) == null
             || request.resource.data.image_path.matches('community/' + request.auth.uid + '/[^/]+'));
-      allow update: if isAdmin();
+      allow update: if isAdmin() || (isVerifiedUser() && !isBanned()
+        && resource.data.author_uid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['body', 'topic', 'image_path', 'image_url', 'image_aspect', 'edited_at'])
+        && request.resource.data.body is string && request.resource.data.body.size() > 0 && request.resource.data.body.size() <= 2000
+        && request.resource.data.topic is string && request.resource.data.topic.size() <= 80
+        && request.resource.data.edited_at == request.time
+        && (request.resource.data.get('image_path', null) == null
+          || request.resource.data.image_path.matches('community/' + request.auth.uid + '/[^/]+')));
       allow delete: if isAdmin() || (isSignedIn() && resource.data.author_uid == request.auth.uid);
     }
 
@@ -439,10 +620,10 @@ service cloud.firestore {
     match /public_stats/{id} {
       allow read: if isSignedIn();
 
-      allow create: if isAdmin() || (isSignedIn()
+      allow create: if isAdmin() || (isSignedIn() && !serverJobs()
         && request.resource.data.donations_this_month == 1);
 
-      allow update: if isAdmin() || (isSignedIn() && (
+      allow update: if isAdmin() || (isSignedIn() && !serverJobs() && (
           (request.resource.data.month_key == resource.data.month_key
             && request.resource.data.donations_this_month == resource.data.donations_this_month + 1)
           ||
@@ -451,6 +632,14 @@ service cloud.firestore {
       ));
 
       allow delete: if isAdmin();
+    }
+
+    // config/features — switches the owner flips from the Firebase console
+    // (server_jobs: functions are deployed). Any signed-in user may read it,
+    // only an admin may write it.
+    match /config/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
     }
 
     match /{document=**} {

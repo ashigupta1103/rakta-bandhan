@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../demo/demo.dart';
-import '../screens/chat_screen.dart';
 import '../screens/conversations_screen.dart';
 import '../services/chat_service.dart';
 import '../theme/app_colors.dart';
@@ -16,21 +14,12 @@ class MessagesButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<int>(
-      stream: Demo.on ? Stream.value(0) : ChatService.instance.watchUnreadCount(),
+      stream: ChatService.instance.watchUnreadCount(),
       builder: (context, snap) {
         final unread = snap.data ?? 0;
         return IconButton(
           tooltip: unread == 0 ? 'Messages' : 'Messages, $unread unread',
           onPressed: () {
-            if (Demo.on) {
-              // The demo has at most one conversation: the matched request.
-              if (Demo.instance.request?['status'] == 'matched') {
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const ChatScreen(requestId: Demo.requestId)));
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No conversations yet — they start when a donor accepts.')));
-              }
-              return;
-            }
             Navigator.push(context, MaterialPageRoute(builder: (_) => const ConversationsScreen()));
           },
           icon: Stack(

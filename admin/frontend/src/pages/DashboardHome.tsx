@@ -25,7 +25,8 @@ const STATUS_VARIANT: Record<string, 'info' | 'warning' | 'success' | 'secondary
 };
 
 export default function DashboardHome() {
-  const { stats, loading } = useDashboardStats();
+  const { stats, loading, error } = useDashboardStats();
+  if (error) return <div className="p-6 text-destructive">{error}</div>;
 
   return (
     <div className="p-6 space-y-6">
@@ -49,7 +50,7 @@ export default function DashboardHome() {
         <StatCard loading={loading} label="Fulfillment Rate" value={`${stats.fulfillmentRate}%`}
           sub="Requests fulfilled" icon={TrendingUp} />
         <StatCard loading={loading} label="Avg Response Time" value={`${stats.avgResponseTimeMinutes}m`}
-          sub="Request → match" icon={Clock} tone="warning" />
+          sub="Newest 50 requests · request → match" icon={Clock} tone="warning" />
         <StatCard loading={loading} label="Banned Users" value={stats.bannedUsers}
           sub="Total bans" icon={XCircle} tone="destructive" />
       </div>

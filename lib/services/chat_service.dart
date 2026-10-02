@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'support_service.dart';
 
 enum ChatMessageKind { text, system, call, location }
 
@@ -259,7 +260,7 @@ class ChatService {
     required String reason,
     String details = '',
   }) =>
-      _db.collection('reports').add({
+      SupportService.submit('reports', {
         'reporter_uid': _uid,
         'reported_uid': reportedUid,
         'request_id': requestId,

@@ -26,7 +26,7 @@ const EMPTY_FORM: HospitalFormData = {
 };
 
 export default function HospitalsPage() {
-  const { hospitals, loading } = useHospitals();
+  const { hospitals, loading, total, error, hasMore, loadingMore, loadMore } = useHospitals();
   const { actionLoading, actionError, createHospital, toggleHospitalVerified, deleteHospital } = useAdminActions();
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<HospitalFormData>(EMPTY_FORM);
@@ -59,7 +59,7 @@ export default function HospitalsPage() {
         <div>
           <h1 className="text-xl font-semibold">Hospitals</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {loading ? '…' : `${hospitals.length} hospitals · ${hospitals.filter(h => h.verified).length} verified`}
+            {loading ? '…' : `${total ?? '…'} hospitals · ${hospitals.length} loaded · ${hospitals.filter(h => h.verified).length} verified in this page`}
           </p>
         </div>
         <Button onClick={() => setShowForm(!showForm)}>
@@ -107,6 +107,7 @@ export default function HospitalsPage() {
         </Card>
       )}
 
+      {error && <p className="text-destructive text-sm">{error}</p>}
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[...Array(6)].map((_, i) => (
@@ -157,6 +158,7 @@ export default function HospitalsPage() {
           ))}
         </div>
       )}
+      {hasMore && <Button variant="secondary" disabled={loadingMore} onClick={loadMore}>{loadingMore ? 'Loading…' : 'Load more'}</Button>}
     </div>
   );
 }

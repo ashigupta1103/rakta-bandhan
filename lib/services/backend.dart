@@ -6,14 +6,18 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/painting.dart' show decodeImageFromList;
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart' show XFile;
 
+import 'features.dart';
 import 'geo_config.dart';
+import 'edge.dart';
+import 'photos.dart';
+import 'usernames.dart';
+import 'support_service.dart';
 
 /// Recipient blood group -> donor groups that can give to it.
 const bloodCompatibility = <String, List<String>>{
@@ -214,6 +218,7 @@ class Backend {
   final _auth = FirebaseAuth.instance;
   final _db = FirebaseFirestore.instance;
   final _analytics = FirebaseAnalytics.instance;
+  final _edge = EdgeClient();
 
   /// Best-effort — a broken/offline Analytics call must never break the
   /// funnel step it's reporting on.
@@ -227,12 +232,14 @@ class Backend {
 
   // ------------------------------------------------------------ Sign-in
   //
-  // Passwordless: a 6-digit code goes to the user's email
-  // (requestLoginCode), and verifyLoginCode trades it for a Firebase custom
-  // token — see functions/src/login.ts. The same email always lands on the
-  // same account. Codes by SMS plug into the same two functions later
-  // (channel: 'sms'). Firestore rules treat a code-login token as verified
-  // (isVerifiedUser in firestore.rules).
+  // Two ways in, chosen at build time (features.dart):
+  //  - kEmailCodeLive: passwordless. A 6-digit code goes to the user's email
+  //    (requestLoginCode) and verifyLoginCode trades it for a Firebase custom
+  //    token — functions/src/login.ts, needs the Blaze plan.
+  //  - otherwise (free plan): email + password; the "check your email" step
+  //    after sign-up is a labelled simulation (EmailVerifyScreen).
+  // Firestore rules and the edge Worker accept both until the owner sets
+  // config/features.email_verified_required (isVerifiedUser in firestore.rules).
 
   FirebaseFunctions get _functions => FirebaseFunctions.instanceFor(region: kFunctionsRegion);
 
@@ -259,12 +266,45 @@ class Backend {
     return cred.user!;
   }
 
+  /// Creates the account. No verification email is sent: until an email
+  /// sender exists the "check your email" step is a simulation
+  /// (EmailVerifyScreen) and the rules accept unproven addresses.
+  Future<User> signUpWithEmail(String email, String password) async {
+    final cred = await _auth.createUserWithEmailAndPassword(email: email.trim(), password: password);
+    _logEvent('sign_up', {'method': 'email'});
+    return cred.user!;
+  }
+
+  Future<User> signInWithEmail(String email, String password) async {
+    final cred = await _auth.signInWithEmailAndPassword(email: email.trim(), password: password);
+    _logEvent('login', {'method': 'email'});
+    return cred.user!;
+  }
+
+  Future<void> sendPasswordReset(String email) => _auth.sendPasswordResetEmail(email: email.trim());
+
+  /// Firebase wants a recent sign-in before deleting an account, so the
+  /// password is asked for again (free-plan sign-in only).
+  Future<void> reauthenticateWithPassword(String password) async {
+    final user = _auth.currentUser;
+    final email = user?.email;
+    if (user == null || email == null) return;
+    await user.reauthenticateWithCredential(EmailAuthProvider.credential(email: email, password: password));
+  }
+
   Future<void> signOut() => _auth.signOut();
 
-  /// Last step of account deletion: the sign-in account itself, removed by
-  /// a function (a passwordless account can't re-enter a password to
-  /// satisfy Firebase's recent-login rule on the device).
-  Future<void> deleteMyAuthAccount() => _functions.httpsCallable('deleteMyAuthAccount').call<Map<String, dynamic>>();
+  /// Last step of account deletion: the sign-in account itself. With code
+  /// sign-in a function removes it (the user has no password to re-enter
+  /// for Firebase's recent-login rule); with password sign-in the app does
+  /// it after [reauthenticateWithPassword].
+  Future<void> deleteMyAuthAccount() async {
+    if (kEmailCodeLive) {
+      await _functions.httpsCallable('deleteMyAuthAccount').call<Map<String, dynamic>>();
+    } else {
+      await _auth.currentUser?.delete();
+    }
+  }
 
   /// Human wording for sign-in errors. The sign-in functions already send
   /// a readable message; anything else gets a generic one. Never echoes a
@@ -282,9 +322,15 @@ class Backend {
     }
     final code = e is FirebaseAuthException ? e.code : '';
     return switch (code) {
+      'invalid-email' => 'That email address doesn’t look right.',
+      'email-already-in-use' => 'An account already exists for this email. Sign in instead.',
+      'weak-password' => 'Choose a stronger password — at least 8 characters.',
+      'user-not-found' || 'wrong-password' || 'invalid-credential' => 'Incorrect email or password.',
       'user-disabled' => 'This account has been disabled. Contact support.',
       'too-many-requests' => 'Too many attempts. Wait a few minutes and try again.',
       'network-request-failed' => 'No internet connection. Check your network and try again.',
+      'requires-recent-login' => 'Please sign in again to continue.',
+      'operation-not-allowed' => 'Email sign-in isn’t switched on for this project yet. Contact support.',
       _ => 'Something went wrong. Please try again.',
     };
   }
@@ -296,7 +342,6 @@ class Backend {
     await FirebaseAuth.instance.useAuthEmulator(host, 9099);
     FirebaseFirestore.instance.useFirestoreEmulator(host, 8080);
     FirebaseFunctions.instanceFor(region: kFunctionsRegion).useFunctionsEmulator(host, 5001);
-    await FirebaseStorage.instance.useStorageEmulator(host, 9199);
   }
 
   /// ~1.1 km precision. donors_public is readable by every signed-in user,
@@ -310,6 +355,10 @@ class Backend {
   Stream<DocumentSnapshot<Map<String, dynamic>>> myDonorDocStream() =>
       _db.collection('donors').doc(_uid).snapshots();
 
+  /// Live data of one request (null once it no longer exists).
+  Stream<Map<String, dynamic>?> requestStream(String id) =>
+      _db.collection('requests').doc(id).snapshots().map((s) => s.data());
+
   Future<bool> hasProfile() async => (await myDonorDoc()).exists;
 
   /// New donors start unverified and unbanned — `is_verified` is
@@ -319,12 +368,15 @@ class Backend {
   /// admins in the console (donor docs otherwise only have raw lat/lng).
   Future<void> registerDonor({
     required String name,
+    required String username,
     required String phone,
     required String bloodGroup,
     required double lat,
     required double lng,
     String? locationLabel,
   }) async {
+    final invalid = validateUsername(username);
+    if (invalid != null) throw FirebaseFunctionsException(code: 'invalid-argument', message: invalid);
     final geohash = encodeGeohash(lat, lng);
     final now = FieldValue.serverTimestamp();
     // Neighbourhood-level name ("Adyar, Chennai") for the public listing —
@@ -332,14 +384,19 @@ class Backend {
     // precise than the ~1 km the listing promises.
     final area = await reverseGeocodeArea(_coarse(lat), _coarse(lng)) ?? '';
 
-    // A real transaction, not a batch: donors_public's create rule reads
-    // donors/{uid} (get()) to confirm is_verified/is_available match —
-    // that read is only guaranteed to see this write's own donors/{uid}
-    // value within the same transaction, not necessarily within a plain
-    // batch. See backend/firestore.rules.
+    // Availability and the claim are checked atomically. Rules bind both
+    // profile mirrors to this claim through getAfter().
     await _db.runTransaction((tx) async {
+      final claim = _db.collection('usernames').doc(username);
+      final profile = _db.collection('donors').doc(_uid);
+      if ((await tx.get(profile)).exists) throw FirebaseFunctionsException(code: 'already-exists', message: 'Your profile already exists.');
+      if ((await tx.get(claim)).exists) throw FirebaseFunctionsException(code: 'already-exists', message: 'That username is taken. Choose another.');
+      tx.set(claim, {'uid': _uid, 'created_at': now});
       tx.set(_db.collection('donors').doc(_uid), {
         'name': name,
+        'name_lower': name.trim().toLowerCase(),
+        'username': username,
+        'username_changed_at': now,
         'phone': phone,
         'email': _auth.currentUser?.email ?? '',
         'blood_group': bloodGroup,
@@ -355,6 +412,7 @@ class Backend {
       });
       tx.set(_db.collection('donors_public').doc(_uid), {
         'name': name,
+        'username': username,
         'blood_group': bloodGroup,
         'geohash': encodeGeohash(_coarse(lat), _coarse(lng), precision: 6),
         'lat': _coarse(lat),
@@ -366,6 +424,31 @@ class Backend {
       });
     });
     _logEvent('donor_registered', {'blood_group': bloodGroup});
+  }
+
+  Future<bool> usernameAvailable(String username) async =>
+      validateUsername(username) == null && !(await _db.collection('usernames').doc(username).get()).exists;
+
+  Future<void> changeUsername(String username) async {
+    final invalid = validateUsername(username);
+    if (invalid != null) throw FirebaseFunctionsException(code: 'invalid-argument', message: invalid);
+    await _db.runTransaction((tx) async {
+      final profile = _db.collection('donors').doc(_uid);
+      final data = (await tx.get(profile)).data();
+      if (data == null) throw FirebaseFunctionsException(code: 'failed-precondition', message: 'Register your profile first.');
+      final old = data['username'] as String?;
+      if (old == username) return;
+      final allowed = usernameChangeAllowedAt((data['username_changed_at'] as Timestamp?)?.toDate());
+      if (old != null && allowed != null && allowed.isAfter(DateTime.now())) {
+        throw FirebaseFunctionsException(code: 'failed-precondition', message: 'You can change your username once every 30 days.');
+      }
+      final claim = _db.collection('usernames').doc(username);
+      if ((await tx.get(claim)).exists) throw FirebaseFunctionsException(code: 'already-exists', message: 'That username is taken. Choose another.');
+      tx.set(claim, {'uid': _uid, 'created_at': FieldValue.serverTimestamp()});
+      tx.update(profile, {'username': username, 'username_changed_at': FieldValue.serverTimestamp()});
+      tx.set(_db.collection('donors_public').doc(_uid), {'username': username}, SetOptions(merge: true));
+      if (old != null) tx.delete(_db.collection('usernames').doc(old));
+    });
   }
 
   /// The donor moved: new exact point on the private profile, and the
@@ -395,27 +478,18 @@ class Backend {
     return until != null && until.isAfter(DateTime.now());
   }
 
-  /// Base64-encodes the donor's picked ID proof photo directly onto their
-  /// private `donors/{uid}` doc (never `donors_public` — same visibility
-  /// tier as phone). Cloud Storage now requires a Blaze billing account
-  /// (Google policy change, no more free Spark bucket) — this stays on the
-  /// free Firestore-only path instead. Caller (personal_information_
-  /// screen.dart) constrains the picked image's resolution/quality so the
-  /// encoded string comfortably fits Firestore's 1MiB document limit.
-  /// Admins view it from AdminDonorDetailScreen before verifying.
-  ///
-  /// The image lives in its own document (`donors/{uid}/private/id_proof`),
-  /// not inline on the profile: the profile is read on nearly every screen,
-  /// and an inline ~200 KB image made every one of those reads download it.
-  /// The profile keeps only a `has_id_proof` flag.
+  /// ID photos go to R2. Every read requires the owner's or admin's token;
+  /// legacy Firestore ID photos remain a read fallback until removed.
   Future<void> uploadIdProof(XFile file) async {
-    final bytes = await file.readAsBytes();
+    final bytes = await photoForUpload(await file.readAsBytes());
+    await _edge.request(
+      'PUT',
+      '/media/id_proofs/$_uid/proof.jpg',
+      bytes: bytes,
+      contentType: 'image/jpeg',
+    );
     final batch = _db.batch();
-    batch.set(_idProofRef(_uid), {
-      'base64': base64Encode(bytes),
-      'content_type': file.mimeType ?? 'image/jpeg',
-      'uploaded_at': FieldValue.serverTimestamp(),
-    });
+    batch.delete(_idProofRef(_uid));
     batch.update(_db.collection('donors').doc(_uid), {
       'has_id_proof': true,
       'id_proof_base64': FieldValue.delete(),
@@ -430,41 +504,63 @@ class Backend {
   /// Owner/admin only (rules). Falls back to the legacy inline field for
   /// donors who uploaded before the image moved to its own document.
   Future<String?> fetchIdProof(String uid) async {
+    if (kEdgeUrl.isNotEmpty) {
+      try {
+        final response = await _edge.request(
+          'GET',
+          '/media/id_proofs/$uid/proof.jpg',
+        );
+        return base64Encode(response.bodyBytes);
+      } on FirebaseFunctionsException catch (e) {
+        if (e.code != 'not-found') rethrow;
+      }
+    }
     final own = (await _idProofRef(uid).get()).data()?['base64'] as String?;
     if (own != null) return own;
-    return (await _db.collection('donors').doc(uid).get()).data()?['id_proof_base64'] as String?;
+    return (await _db.collection('donors').doc(uid).get())
+            .data()?['id_proof_base64']
+        as String?;
   }
 
   /// Account deletion: the ID image document goes with the profile.
-  Future<void> deleteMyIdProof() => _idProofRef(_uid).delete();
+  Future<void> deleteMyIdProof() async {
+    if (kEdgeUrl.isNotEmpty) {
+      await _edge.deleteMedia('id_proofs/$_uid/proof.jpg');
+    }
+    await _idProofRef(_uid).delete();
+  }
 
-  /// Profile photo, shown only on the owner's own My Page. Stored privately
-  /// at `avatars/{uid}/profile` (storage.rules: owner-only read/write, image,
-  /// < 2 MB; the caller passes an image_picker-downscaled file). The
-  /// download URL lives on the private `donors/{uid}` doc, never public.
+  /// Profile photo on R2 under a random name. Its link is stored only on
+  /// the private profile; anyone who receives that link can read the photo.
   Future<String> uploadProfilePhoto(XFile photo) async {
-    final bytes = await photo.readAsBytes();
-    final contentType = switch (photo.mimeType) {
-      'image/png' => 'image/png',
-      'image/webp' => 'image/webp',
-      _ => 'image/jpeg',
-    };
-    final ref = FirebaseStorage.instance.ref('avatars/$_uid/profile');
-    await ref.putData(bytes, SettableMetadata(contentType: contentType));
-    final url = await ref.getDownloadURL();
-    await _db.collection('donors').doc(_uid).update({'photo_url': url, 'photo_updated_at': FieldValue.serverTimestamp()});
+    final bytes = await photoForUpload(await photo.readAsBytes());
+    final path = 'avatars/$_uid/${newMediaName()}';
+    final response = await _edge.request(
+      'PUT',
+      '/media/$path',
+      bytes: bytes,
+      contentType: 'image/jpeg',
+    );
+    final uploaded = jsonDecode(response.body) as Map<String, dynamic>;
+    final url = uploaded['url'] as String;
+    await _db.collection('donors').doc(_uid).update({
+      'photo_url': url,
+      'photo_path': path,
+      'photo_updated_at': FieldValue.serverTimestamp(),
+    });
     return url;
   }
 
   /// Removes the profile photo (file and link). Also used by account deletion.
   Future<void> removeProfilePhoto({bool keepProfileField = false}) async {
-    try {
-      await FirebaseStorage.instance.ref('avatars/$_uid/profile').delete();
-    } on FirebaseException catch (e) {
-      if (e.code != 'object-not-found') rethrow;
-    }
+    final path = (await myDonorDoc()).data()?['photo_path'] as String?;
+    if (path != null) await _edge.deleteMedia(path);
     if (!keepProfileField) {
-      await _db.collection('donors').doc(_uid).update({'photo_url': FieldValue.delete(), 'photo_updated_at': FieldValue.delete()});
+      await _db.collection('donors').doc(_uid).update({
+        'photo_url': FieldValue.delete(),
+        'photo_path': FieldValue.delete(),
+        'photo_updated_at': FieldValue.delete(),
+      });
     }
   }
 
@@ -636,10 +732,8 @@ class Backend {
       .map((e) => e.key)
       .toList();
 
-  /// Denormalizes the requester's own name/phone onto the request at
-  /// creation time — the matched donor then reads contact info straight
-  /// off this doc (see MatchContactScreen) instead of needing a second,
-  /// separately-authorized read of `donors/{requester_uid}`.
+  /// Names identify the people on a request. Phone numbers remain private;
+  /// matched users communicate through in-app messages and calls.
   Future<String> createRequest({
     required String bloodGroup,
     required int unitsNeeded,
@@ -653,7 +747,7 @@ class Backend {
     final ref = await _db.collection('requests').add({
       'requester_uid': _uid,
       'requester_name': requester?['name'] ?? 'Requester',
-      'requester_phone': requester?['phone'] ?? '',
+      'requester_username': requester?['username'],
       'blood_group': bloodGroup,
       'units_needed': unitsNeeded,
       'urgency': urgency,
@@ -703,7 +797,9 @@ class Backend {
   /// points at a request that's no longer actually active (matched
   /// elsewhere finished/cancelled without this donor's client seeing it).
   Future<void> acceptRequest(String requestId) async {
-    if (await completeMyDonationIfConfirmed()) throw const DonorOnCooldownException();
+    if (await completeMyDonationIfConfirmed()) {
+      throw const DonorOnCooldownException();
+    }
     await _db.runTransaction((tx) async {
       final donorRef = _db.collection('donors').doc(_uid);
       final donorSnap = await tx.get(donorRef);
@@ -713,12 +809,16 @@ class Backend {
 
       final activeId = donor['active_request_id'] as String?;
       if (activeId != null && activeId != requestId) {
-        final activeSnap = await tx.get(_db.collection('requests').doc(activeId));
-        final stillActive = activeSnap.exists && activeSnap.data()?['status'] == 'matched';
+        final activeSnap = await tx.get(
+          _db.collection('requests').doc(activeId),
+        );
+        final stillActive =
+            activeSnap.exists && activeSnap.data()?['status'] == 'matched';
         if (stillActive) throw const DonorAlreadyMatchedException();
         // Completed while this app wasn't looking: its cooldown applies
         // first (completeMyDonationIfConfirmed, run before this transaction).
-        if (activeSnap.data()?['status'] == 'fulfilled' && activeSnap.data()?['matched_donor_id'] == _uid) {
+        if (activeSnap.data()?['status'] == 'fulfilled' &&
+            activeSnap.data()?['matched_donor_id'] == _uid) {
           throw const DonorOnCooldownException();
         }
       }
@@ -733,7 +833,9 @@ class Backend {
         'status': 'matched',
         'matched_donor_id': _uid,
         'matched_donor_name': donor['name'],
-        'matched_donor_phone': donor['phone'],
+        'matched_donor_username': donor['username'],
+        'requester_phone': FieldValue.delete(), // Remove legacy values without copying contact details.
+        'matched_donor_phone': FieldValue.delete(),
         'matched_at': FieldValue.serverTimestamp(),
       });
       tx.update(donorRef, {'active_request_id': requestId});
@@ -749,17 +851,27 @@ class Backend {
       final reqRef = _db.collection('requests').doc(requestId);
       final reqSnap = await tx.get(reqRef);
       final data = reqSnap.data();
-      if (data == null || data['status'] != 'matched' || data['matched_donor_id'] != _uid) return;
+      if (data == null ||
+          data['status'] != 'matched' ||
+          data['matched_donor_id'] != _uid) {
+        return;
+      }
       tx.update(reqRef, {
         'status': 'open',
         'matched_donor_id': null,
         'matched_donor_name': null,
-        'matched_donor_phone': null,
+        'matched_donor_username': FieldValue.delete(),
+        'requester_phone': FieldValue.delete(),
+        'matched_donor_phone': FieldValue.delete(),
         'matched_at': null,
         'released_at': FieldValue.serverTimestamp(),
-        'expires_at': Timestamp.fromDate(DateTime.now().add(const Duration(hours: requestExpiryHours))),
+        'expires_at': Timestamp.fromDate(
+          DateTime.now().add(const Duration(hours: requestExpiryHours)),
+        ),
       });
-      tx.update(_db.collection('donors').doc(_uid), {'active_request_id': null});
+      tx.update(_db.collection('donors').doc(_uid), {
+        'active_request_id': null,
+      });
     });
     _logEvent('request_released', {'request_id': requestId});
   }
@@ -967,6 +1079,9 @@ class Backend {
   /// it, keeping a copy of someone's ID only adds risk (and storage). The
   /// profile records that it was checked, and when.
   Future<void> adminVerifyDonor(String donorId) async {
+    if (kEdgeUrl.isNotEmpty) {
+      await _edge.deleteMedia('id_proofs/$donorId/proof.jpg');
+    }
     await _db.runTransaction((tx) async {
       tx.delete(_idProofRef(donorId));
       tx.update(_db.collection('donors').doc(donorId), {
@@ -1189,6 +1304,7 @@ class Backend {
       'handled_at': FieldValue.serverTimestamp(),
     });
     await _logAdminAction('issue_$status', id);
+    await SupportService.mirrorStatus(id, status);
   }
 
   Future<void> adminDeleteIssueReport(String id) async {
@@ -1204,6 +1320,7 @@ class Backend {
       'handled_at': FieldValue.serverTimestamp(),
     });
     await _logAdminAction('inquiry_$status', id);
+    await SupportService.mirrorStatus(id, status);
   }
 
   Future<void> adminDeletePartnershipInquiry(String id) async {
@@ -1222,6 +1339,7 @@ class Backend {
       'handled_at': FieldValue.serverTimestamp(),
     });
     await _logAdminAction('report_$status', id);
+    await SupportService.mirrorStatus(id, status);
   }
 
   /// Reversible moderation: the Community feed filters hidden stories out
@@ -1258,8 +1376,20 @@ class Backend {
   /// is the Spark-compatible way to actually lock someone out; use delete
   /// only when the record itself, not just access, needs to go.
   Future<void> adminDeleteDonor(String donorId) async {
-    await _db.collection('donors_public').doc(donorId).delete();
-    await _db.collection('donors').doc(donorId).delete();
+    if (kEdgeUrl.isNotEmpty) {
+      await _edge.deleteMedia('id_proofs/$donorId/proof.jpg');
+    }
+    await _db.runTransaction((tx) async {
+      final profile = _db.collection('donors').doc(donorId);
+      final username = (await tx.get(profile)).data()?['username'] as String?;
+      if (username != null) {
+        final claim = _db.collection('usernames').doc(username);
+        if ((await tx.get(claim)).data()?['uid'] == donorId) tx.delete(claim);
+      }
+      tx.delete(_idProofRef(donorId));
+      tx.delete(_db.collection('donors_public').doc(donorId));
+      tx.delete(profile);
+    });
     await _logAdminAction('delete_donor', donorId);
   }
 
@@ -1292,7 +1422,7 @@ class Backend {
   /// untouched here — the rules reject an owner write that changes either.
   Future<void> updateProfile({required String name, required String phone}) async {
     await _db.runTransaction((tx) async {
-      tx.update(_db.collection('donors').doc(_uid), {'name': name.trim(), 'phone': phone.trim()});
+      tx.update(_db.collection('donors').doc(_uid), {'name': name.trim(), 'name_lower': name.trim().toLowerCase(), 'phone': phone.trim()});
       tx.update(_db.collection('donors_public').doc(_uid), {
         'name': name.trim(),
         'updated_at': FieldValue.serverTimestamp(),
@@ -1303,10 +1433,8 @@ class Backend {
   /// Community stories ("Share an experience"). Public to signed-in users,
   /// authored under the poster's own uid; admins can moderate/remove.
   ///
-  /// An optional photo goes to Cloud Storage at `community/{uid}/{postId}`
-  /// (storage.rules: own folder, images only, < 2 MB). The caller passes an
-  /// already-downscaled image (image_picker maxWidth/imageQuality), ~150–300
-  /// KB. Deleting the post deletes the photo (onStoryDeleted function).
+  /// The shared photo helper prepares a JPEG for R2. Deleting a post
+  /// removes its photo through the Worker before removing the Firestore doc.
   Future<void> submitCommunityStory({
     required String topic,
     required String body,
@@ -1320,17 +1448,11 @@ class Backend {
     String? imagePath;
     double? imageAspect;
     if (photo != null) {
-      final bytes = await photo.readAsBytes();
-      final contentType = switch (photo.mimeType) {
-        'image/png' => 'image/png',
-        'image/webp' => 'image/webp',
-        _ => 'image/jpeg',
-      };
-      final ext = contentType.split('/').last.replaceAll('jpeg', 'jpg');
-      imagePath = 'community/$_uid/${ref.id}.$ext';
-      final storageRef = FirebaseStorage.instance.ref(imagePath);
-      await storageRef.putData(bytes, SettableMetadata(contentType: contentType, cacheControl: 'public, max-age=604800'));
-      imageUrl = await storageRef.getDownloadURL();
+      final bytes = await photoForUpload(await photo.readAsBytes());
+      imagePath = 'community/$_uid/${newMediaName()}';
+      final response = await _edge.request('PUT', '/media/$imagePath', bytes: bytes, contentType: 'image/jpeg');
+      imageUrl = (jsonDecode(response.body) as Map<String, dynamic>)['url'] as String?;
+      if (imageUrl == null) throw FirebaseFunctionsException(code: 'unavailable', message: 'Photo upload failed.');
       try {
         final image = await decodeImageFromList(bytes);
         if (image.height > 0) imageAspect = image.width / image.height;
@@ -1340,6 +1462,7 @@ class Backend {
     await ref.set({
       'author_uid': _uid,
       'author_name': donor?['name'] ?? 'A donor',
+      'author_username': donor?['username'],
       'topic': topic,
       'body': body.trim(),
       'blood_group': bloodGroup,
@@ -1352,12 +1475,44 @@ class Backend {
     _logEvent('story_posted', {'has_photo': photo != null ? 1 : 0});
   }
 
+  /// Saves an author's content; existing visibility choices and photo are kept unless the photo is replaced.
+  Future<void> updateCommunityStory(String storyId, {required String topic, required String body, XFile? photo}) async {
+    final ref = _db.collection('community_stories').doc(storyId);
+    final existing = (await ref.get()).data();
+    if (existing?['author_uid'] != _uid) throw FirebaseFunctionsException(code: 'permission-denied', message: 'You can only edit your own story.');
+    final data = <String, dynamic>{'topic': topic, 'body': body.trim(), 'edited_at': FieldValue.serverTimestamp()};
+    String? uploadedPath;
+    if (photo != null) {
+      final bytes = await photoForUpload(await photo.readAsBytes());
+      uploadedPath = 'community/$_uid/${newMediaName()}';
+      final response = await _edge.request('PUT', '/media/$uploadedPath', bytes: bytes, contentType: 'image/jpeg');
+      data['image_path'] = uploadedPath;
+      data['image_url'] = (jsonDecode(response.body) as Map<String, dynamic>)['url'] as String;
+      final image = await decodeImageFromList(bytes);
+      data['image_aspect'] = image.width / image.height;
+      image.dispose();
+    }
+    try {
+      await ref.update(data);
+    } catch (_) {
+      if (uploadedPath != null) await _edge.deleteMedia(uploadedPath).catchError((_) {});
+      rethrow;
+    }
+    final oldPath = existing?['image_path'] as String?;
+    if (uploadedPath != null && oldPath != null) await _edge.deleteMedia(oldPath).catchError((_) {});
+  }
+
   /// The author removes their own post (the photo goes with it).
-  Future<void> deleteMyStory(String storyId) => _db.collection('community_stories').doc(storyId).delete();
+  Future<void> deleteMyStory(String storyId) async {
+    final ref = _db.collection('community_stories').doc(storyId);
+    final path = (await ref.get()).data()?['image_path'] as String?;
+    if (path != null && kEdgeUrl.isNotEmpty) await _edge.deleteMedia(path);
+    await ref.delete();
+  }
 
   /// Report a community post for review (Apple guideline 1.2 — user
   /// content must be reportable). Admins see it in the reports inbox.
-  Future<void> reportStory(String storyId, {required String reason}) => _db.collection('reports').add({
+  Future<void> reportStory(String storyId, {required String reason}) => SupportService.submit('reports', {
         'reporter_uid': _uid,
         'reason': reason,
         'kind': 'story',
@@ -1382,7 +1537,7 @@ class Backend {
   /// "Report an issue" (Help & support). One-way — admins read it in the
   /// console, nothing writes back to the reporter.
   Future<void> submitIssueReport({required String reason, String? details}) =>
-      _db.collection('issue_reports').add({
+      SupportService.submit('issue_reports', {
         'reporter_uid': _uid,
         'reason': reason,
         'details': details?.trim() ?? '',
@@ -1398,7 +1553,7 @@ class Backend {
     required String interest,
     String? message,
   }) =>
-      _db.collection('partnership_inquiries').add({
+      SupportService.submit('partnership_inquiries', {
         'requester_uid': _uid,
         'org_name': orgName.trim(),
         'contact_name': contactName.trim(),

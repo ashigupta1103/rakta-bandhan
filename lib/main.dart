@@ -1,9 +1,9 @@
+import 'dart:async';
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
+import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb, kReleaseMode;
 import 'package:flutter/material.dart';
-import 'demo/demo_overlay.dart';
 import 'firebase_options.dart';
-import 'preview_mode.dart';
 import 'services/backend.dart';
 import 'services/push_service.dart';
 import 'theme/app_colors.dart';
@@ -13,6 +13,10 @@ import 'screens/splash_screen.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  _softErrorWidget();
+  if (!(kDebugMode && const bool.fromEnvironment('USE_EMULATORS'))) {
+    unawaited(_activateAppCheck());
+  }
   // Local end-to-end testing against the Firebase emulators (debug only):
   //   flutter run --dart-define=USE_EMULATORS=true
   if (kDebugMode && const bool.fromEnvironment('USE_EMULATORS')) {
@@ -24,17 +28,47 @@ Future<void> main() async {
   runApp(const MyApp());
 }
 
+/// A widget that throws must not paint the framework's full-screen grey box
+/// in release builds. `--dart-define=SHOW_ERRORS=true` adds the exception
+/// text, for test builds only.
+void _softErrorWidget() {
+  if (!kReleaseMode) return;
+  const showDetails = bool.fromEnvironment('SHOW_ERRORS');
+  ErrorWidget.builder = (details) => Directionality(
+        textDirection: TextDirection.ltr,
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Text(
+              showDetails ? 'Something went wrong here:\n${details.exceptionAsString()}' : 'Something went wrong on this screen. Please go back and try again.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 12.5, color: AppColors.ink2, height: 1.4),
+            ),
+          ),
+        ),
+      );
+}
+
+Future<void> _activateAppCheck() async {
+  const siteKey = String.fromEnvironment('RECAPTCHA_SITE_KEY');
+  if (kIsWeb && siteKey.isEmpty) return;
+  try {
+    await FirebaseAppCheck.instance.activate(
+      androidProvider: kDebugMode ? AndroidProvider.debug : AndroidProvider.playIntegrity,
+      appleProvider: kDebugMode ? AppleProvider.debug : AppleProvider.deviceCheck,
+      webProvider: kIsWeb ? ReCaptchaV3Provider(siteKey) : null,
+    );
+  } catch (_) { debugPrint('App Check activation unavailable; startup continues.'); }
+}
+
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
-
-  static final _navigatorKey = GlobalKey<NavigatorState>();
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Rakta Bandhan',
       debugShowCheckedModeBanner: false,
-      navigatorKey: _navigatorKey,
       theme: AppTheme.lightTheme,
       // The final artifact's shell is a fixed ~430px mobile composition,
       // centred on wide viewports rather than stretched full-width. This
@@ -44,8 +78,6 @@ class MyApp extends StatelessWidget {
       // as its own top-level route and would bypass a wrap placed anywhere
       // lower in the tree.
       builder: (context, child) {
-        // Client-demo controls exist only in preview builds.
-        if (kEnablePreviewUi && child != null) child = DemoOverlay(navigatorKey: _navigatorKey, child: child);
         if (!kIsWeb || child == null) return child ?? const SizedBox.shrink();
         return ColoredBox(
           color: AppColors.warmPageBackground,

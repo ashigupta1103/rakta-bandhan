@@ -2,14 +2,12 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../demo/demo.dart';
 import '../services/backend.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/loading_button.dart';
+import 'entry_route.dart';
 import 'login_screen.dart';
-import 'main_navigation_screen.dart';
-import 'registration_screen.dart';
 import '../widgets/rb_icon.dart';
 
 /// "Enter the code we emailed you." Six boxes over one real text field, so
@@ -71,34 +69,11 @@ class _LoginCodeScreenState extends State<LoginCodeScreen> {
       _verifying = true;
       _error = null;
     });
-    if (Demo.on) {
-      // Simulated check against the fixed demo code — production sign-in
-      // never accepts it (this branch can't run outside a demo session).
-      if (code != Demo.emailCode) {
-        HapticFeedback.mediumImpact();
-        setState(() {
-          _verifying = false;
-          _error = 'That code isn’t right. In the demo the code is ${Demo.emailCode}.';
-          _code.clear();
-        });
-        return;
-      }
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (_) => Demo.instance.registered ? const MainNavigationScreen() : const RegistrationScreen()),
-        (route) => false,
-      );
-      return;
-    }
     try {
       await Backend.instance.verifyLoginCode(widget.email, code);
-      final hasProfile = await Backend.instance.hasProfile();
+      final next = await signedInDestination();
       if (!mounted) return;
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (_) => hasProfile ? const MainNavigationScreen() : const RegistrationScreen()),
-        (route) => false,
-      );
+      Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => next), (route) => false);
     } catch (e) {
       if (!mounted) return;
       HapticFeedback.mediumImpact();
@@ -112,10 +87,6 @@ class _LoginCodeScreenState extends State<LoginCodeScreen> {
   }
 
   Future<void> _resend() async {
-    if (Demo.on) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Demo: nothing is sent. The code is ${Demo.emailCode}.')));
-      return;
-    }
     setState(() {
       _resending = true;
       _error = null;
@@ -203,9 +174,7 @@ class _LoginCodeScreenState extends State<LoginCodeScreen> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        Demo.on
-                            ? 'Demo · nothing was emailed. Enter ${Demo.emailCode} to continue.'
-                            : 'The code shows in the email’s subject line. Not there after a minute? Check Spam or Promotions. It works for 10 minutes.',
+                        'The code shows in the email’s subject line. Not there after a minute? Check Spam or Promotions. It works for 10 minutes.',
                         style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary, height: 1.45),
                       ),
                     ),
@@ -220,8 +189,8 @@ class _LoginCodeScreenState extends State<LoginCodeScreen> {
   }
 }
 
-/// Six digit boxes drawn over a single hidden TextField (sign-in code and
-/// the demo phone check share it).
+/// Six digit boxes drawn over a single hidden TextField (the sign-in code
+/// and the phone check share it).
 class CodeBoxes extends StatelessWidget {
   final TextEditingController controller;
   final FocusNode focusNode;

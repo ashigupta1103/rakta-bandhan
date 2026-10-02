@@ -4,13 +4,14 @@
  * see hooks/useFirebaseData.ts for why (no admin* Cloud Functions on Spark).
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useDonors, useAdminActions, type Donor } from '../hooks/useFirebaseData';
 import { CheckCircle, AlertTriangle, Search, Filter, Trash2 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
+import { fetchIdProof } from '../lib/edge';
 
 const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
@@ -34,6 +35,9 @@ function DonorRow({ donor, onVerify, onToggle, onBan, onDelete, busy }: {
   onDelete: (id: string, name: string) => void;
   busy: boolean;
 }) {
+  const [proof, setProof] = useState<string | null>(null);
+  const [proofError, setProofError] = useState('');
+  const [proofLoading, setProofLoading] = useState(false);
   return (
     <TableRow>
       <TableCell>
@@ -43,6 +47,7 @@ function DonorRow({ donor, onVerify, onToggle, onBan, onDelete, busy }: {
           </div>
           <div>
             <p className="text-sm font-medium">{donor.name}</p>
+            {donor.username && <p className="text-xs text-muted-foreground">@{donor.username}</p>}
             <p className="text-xs text-muted-foreground">{donor.phone}</p>
           </div>
         </div>
@@ -70,6 +75,20 @@ function DonorRow({ donor, onVerify, onToggle, onBan, onDelete, busy }: {
       </TableCell>
       <TableCell>
         <div className="flex items-center gap-1.5 flex-wrap">
+          {(donor.has_id_proof || donor.id_proof_base64) && <Button size="sm" variant="secondary" disabled={proofLoading} onClick={async () => {
+            if (proof) { setProof(null); return; }
+            setProofLoading(true);
+            setProofError('');
+            try {
+              const image = await fetchIdProof(donor.id);
+              setProof(image);
+              if (!image) setProofError('No ID photo on file.');
+            } catch (error) {
+              setProofError(error instanceof Error ? error.message : 'Could not load the ID photo.');
+            } finally { setProofLoading(false); }
+          }}>{proof ? 'Hide ID photo' : 'View ID photo'}</Button>}
+          {proof && <img src={proof} alt="Submitted ID document" className="max-w-64 max-h-64 object-contain" />}
+          {proofError && <span className="text-xs text-destructive">{proofError}</span>}
           <Button size="sm" variant="secondary" disabled={busy} onClick={() => {
             if (!donor.is_verified && !window.confirm(VERIFY_CHECKLIST)) return;
             onVerify(donor.id, !donor.is_verified, donor.name);
@@ -92,9 +111,9 @@ function DonorRow({ donor, onVerify, onToggle, onBan, onDelete, busy }: {
             variant="ghost"
             className="text-red-600"
             disabled={busy}
-            title="Delete profile — sign-in stays active, use Ban to lock them out"
+            title="Delete donor profile (sign-in removal requires the deployed backend)"
             onClick={() => {
-              if (confirm(`Delete ${donor.name}'s profile? Their sign-in stays active — this only removes the Firestore record. Use Ban to actually lock them out.`)) {
+              if (confirm(`Delete ${donor.name}'s profile? Once the backend is deployed, this also removes their sign-in account and ID proof.`)) {
                 onDelete(donor.id, donor.name);
               }
             }}
@@ -110,14 +129,13 @@ function DonorRow({ donor, onVerify, onToggle, onBan, onDelete, busy }: {
 export default function DonorsPage() {
   const [bloodGroupFilter, setBloodGroupFilter] = useState('');
   const [search, setSearch] = useState('');
-  const { donors, loading } = useDonors(bloodGroupFilter || undefined);
+  const [queryText, setQueryText] = useState('');
+  const [pending, setPending] = useState(false);
+  useEffect(() => { const timer = setTimeout(() => setQueryText(search), 400); return () => clearTimeout(timer); }, [search]);
+  const { donors, loading, loadingMore, hasMore, loadMore, total, error } = useDonors(bloodGroupFilter || undefined, undefined, queryText, pending);
   const { actionLoading, actionError, verifyDonor, toggleAvailability, banUser, deleteDonor } = useAdminActions();
 
-  const filtered = donors.filter((d) =>
-    !search ||
-    d.name?.toLowerCase().includes(search.toLowerCase()) ||
-    d.phone?.includes(search)
-  );
+  const filtered = donors;
 
   return (
     <div className="p-6 space-y-5">
@@ -125,7 +143,7 @@ export default function DonorsPage() {
         <div>
           <h1 className="text-xl font-semibold">Donors</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {loading ? '…' : `${donors.length} donors registered`}
+            {total === null ? '…' : `${total} matching donors`}
           </p>
         </div>
       </div>
@@ -135,6 +153,7 @@ export default function DonorsPage() {
           {actionError}
         </div>
       )}
+      {error && <p className="text-sm text-destructive">{error}</p>}
 
       <div className="flex items-center gap-3 flex-wrap">
         <div className="relative">
@@ -142,7 +161,7 @@ export default function DonorsPage() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search name or phone…"
+            placeholder="Name, @username, phone or email"
             className="pl-9 pr-4 py-2 text-sm rounded-lg bg-background border border-input placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring w-56"
           />
         </div>
@@ -157,7 +176,8 @@ export default function DonorsPage() {
             {BLOOD_GROUPS.map((bg) => <option key={bg} value={bg}>{bg}</option>)}
           </select>
         </div>
-        <span className="text-xs text-muted-foreground">{filtered.length} results</span>
+        <Button size="sm" variant={pending ? 'default' : 'secondary'} onClick={() => setPending(!pending)}>Pending verification</Button>
+        <span className="text-xs text-muted-foreground">{filtered.length} loaded</span>
       </div>
 
       <Card className="overflow-hidden">
@@ -205,6 +225,7 @@ export default function DonorsPage() {
           </Table>
         </div>
       </Card>
+      {hasMore && <Button disabled={loadingMore} onClick={loadMore}>{loadingMore ? 'Loading…' : 'Load more'}</Button>}
     </div>
   );
 }
