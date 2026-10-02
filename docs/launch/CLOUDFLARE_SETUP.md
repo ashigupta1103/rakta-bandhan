@@ -5,26 +5,22 @@ Owner walkthrough, checked against Cloudflare's documentation on 2026-10-02. Kee
 ## 1. Create or open the account
 
 1. Open [Cloudflare sign-up](https://dash.cloudflare.com/sign-up), or [log in](https://dash.cloudflare.com/login) if you already have an account.
-2. Verify your email and select the account that will own Rakta Bandhan's resources.
+2. Verify your email and select the account that will own Rakta Bandhan's resources. The screenshot you provided shows the existing account and its ID is already recorded in `edge/wrangler.toml`; run `npx wrangler whoami` and make sure Wrangler signs into that account before deploying.
 3. Use the Workers Free plan. A purchased domain is not needed: the Worker can use a Cloudflare-provided `workers.dev` address. [Worker deployment documentation](https://developers.cloudflare.com/workers/get-started/guide/).
 4. Copy your account ID: press **Ctrl+K** in the dashboard, search **Copy account ID**, and select it. Alternatively, find Account Details under Workers & Pages. The account ID can be shared with Codex; it is not an API token. [Official account-ID instructions](https://developers.cloudflare.com/fundamentals/account/find-account-and-zone-ids/).
 
 ## 2. Enable R2 and create the photo bucket
 
-1. In the account dashboard, open **Storage & databases > R2 > Overview**. If R2 is not activated, complete its subscription checkout yourself. Cloudflare requires an R2 subscription; included free usage does not make all usage unlimited. [R2 setup](https://developers.cloudflare.com/r2/get-started/).
-2. Select **Create bucket**.
-3. Enter exactly **`rakta-bandhan-media`** as the bucket name.
-4. Select **Standard** storage; leave the location selection at its default unless the owner has a specific data-location requirement.
-5. Finish creating the bucket. Keep direct public access, `r2.dev` access and bucket custom domains disabled. The Worker serves public community/avatar links and checks authentication for ID proofs.
-6. No R2 API token or S3 access key is needed. The repo already binds this bucket to the Worker as `MEDIA` in `edge/wrangler.toml`.
-
-R2 Standard includes **10 GB-month of storage, 1 million Class A operations and 10 million Class B operations per month**. Usage beyond the allowance is billed; monitor R2 usage and billing. [R2 pricing](https://developers.cloudflare.com/r2/pricing/).
+1. Your screenshot confirms the account has R2 and already contains a bucket named **`bloodbank`**.
+2. Its dashboard shows **Standard** storage and **Public Access: Disabled**. This is the intended setup, and the Worker binding uses this bucket directly.
+3. No new bucket, R2 API token or S3 access key is needed. The repo binds `bloodbank` to the Worker as `MEDIA` in `edge/wrangler.toml`.
+4. R2 requires an account subscription; the screenshot confirms the bucket exists. Standard storage includes **10 GB-month of storage, 1 million Class A operations and 10 million Class B operations per month**. Usage beyond the allowance is billed; monitor R2 usage and billing. [R2 pricing](https://developers.cloudflare.com/r2/pricing/).
 
 ## 3. Create the TURN key for call relay
 
-1. Open Cloudflare's [Realtime dashboard shortcut](https://dash.cloudflare.com/?to=/:account/calls) and select the same account. In the dashboard navigation this may appear under **Media > Realtime**; choose the **TURN** / **TURN Server** section.
-2. Create a TURN key and give it a recognisable project label, for example `rakta-bandhan`.
-3. Save the returned **key ID** and its **API token** privately. If the token is shown only once, save it before leaving the page.
+1. In the Cloudflare left sidebar, choose **Realtime > TURN Server**. Do **not** choose **RealtimeKit** or **Serverless SFU**.
+2. Under the TURN Server page, create a TURN key for this project. Save the TURN key's **ID** and **API token** privately.
+3. A RealtimeKit/Serverless SFU application ID or API token does not work for this app's TURN route. If its API token has been pasted into chat or a screenshot, treat it as exposed: revoke/rotate it in the SFU application's dashboard and never reuse it here. The app uses only TURN Server credentials.
 4. The app's Worker secret names are **`TURN_KEY_ID`** and **`TURN_API_TOKEN`**. Use the API token belonging to the TURN key, rather than a general Cloudflare account API token.
 
 These credentials stay on the Worker. The existing `/ice` route checks that the signed-in caller is one of the two people on a matched request, then requests credentials lasting one hour. The long-lived TURN key never belongs in the APK. [Cloudflare TURN credentials](https://developers.cloudflare.com/realtime/turn/generate-credentials/).
@@ -51,7 +47,7 @@ Replace only `YOUR_ACCOUNT_ID` with the actual ID. Do not run the commands under
 
 ## 5. Deploy the existing Worker and set its secrets
 
-The owner runs these deployment commands. They change Cloudflare resources; Codex has not run them.
+The owner runs these deployment commands. They change Cloudflare resources; Codex has not run them. The Worker config already selects that account and the existing `bloodbank` bucket.
 
 First deploy the checked-in code:
 
@@ -68,10 +64,9 @@ npx wrangler secret put TURN_KEY_ID
 npx wrangler secret put TURN_API_TOKEN
 ```
 
-For each command, paste the corresponding value **at its interactive prompt**, then press Enter. Do not append the value to the command, put it into tracked code or paste it into chat. The first command takes the key ID; the second takes the key's API token. Afterwards deploy once more so the final code and bindings are in place:
+For each command, paste the corresponding value **at its interactive prompt**, then press Enter. Do not append the value to the command, put it into tracked code or paste it into chat. The first command takes the key ID; the second takes the key's API token. Each successful `wrangler secret put` immediately publishes a new Worker version, so another deploy is unnecessary unless you subsequently change the Worker code or configuration. [Cloudflare secret behavior](https://developers.cloudflare.com/workers/configuration/secrets/).
 
 ```powershell
-npx wrangler deploy
 npx wrangler secret list
 ```
 
@@ -84,7 +79,7 @@ https://rakta-bandhan2026.web.app
 https://rakta-bandhan2026.firebaseapp.com
 ```
 
-Use the Worker dashboard's bindings/settings to confirm `MEDIA` refers to `rakta-bandhan-media`, `FIREBASE_PROJECT_ID` is `rakta-bandhan2026`, and both secrets exist. Do not enable `AUTH_EMULATOR` or `FIRESTORE_EMULATOR_HOST` on a deployed Worker. If another admin/web domain is used later, add its exact origin to `ALLOWED_ORIGINS` in `edge/wrangler.toml` before deploying.
+Use the Worker dashboard's bindings/settings to confirm `MEDIA` refers to `bloodbank`, `FIREBASE_PROJECT_ID` is `rakta-bandhan2026`, and both TURN secrets exist. Do not enable `AUTH_EMULATOR` or `FIRESTORE_EMULATOR_HOST` on a deployed Worker. If another admin/web domain is used later, add its exact origin to `ALLOWED_ORIGINS` in `edge/wrangler.toml` before deploying.
 
 ## 6. Copy and check the Worker address
 

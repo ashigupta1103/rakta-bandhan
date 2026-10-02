@@ -15,8 +15,8 @@ Checked locally on 2026-10-02, branch `feat/prelaunch`. Application/backend code
 | Input | Where it belongs | Needed for |
 |---|---|---|
 | Firebase Blaze status and actual Firestore region | Owner confirmation; project stays `rakta-bandhan2026` | Functions rollout; app/server regions must agree |
-| Cloudflare account ID; confirmation R2 is enabled | Selected authenticated Wrangler account | Worker deployment and `rakta-bandhan-media` bucket |
-| `TURN_KEY_ID` and `TURN_API_TOKEN` | Cloudflare Worker secrets | Authenticated short-lived relay credentials |
+| Cloudflare account ID `361246d2529c9324af1bacc33d2adfb8` | Already set in `edge/wrangler.toml`; select this account for Wrangler login | Worker deployment |
+| TURN Server's key ID and API token | Cloudflare Worker secrets `TURN_KEY_ID` and `TURN_API_TOKEN`; see [the dashboard walkthrough](CLOUDFLARE_SETUP.md) | Authenticated short-lived relay credentials; the SFU token shared in chat does not work here and should be revoked |
 | Verified Resend domain and sender address | `MAIL_FROM` in ignored `functions/.env.rakta-bandhan2026` | Email codes for real users |
 | Resend API key | Firebase `SMTP_URL` secret, formatted as below | Functions email delivery |
 | Production review code | Firebase `REVIEW_CODE` secret | Required secret binding for first deployment, even with review access off |
@@ -44,7 +44,7 @@ Cloudflare requires an [R2 subscription](https://developers.cloudflare.com/r2/ge
 
 ## Activation order
 
-1. Owner completes account/subscription/billing and domain setup; authenticates Cloudflare. Existing instructions reserve live deployment for the owner. A change to that deployment responsibility needs an explicit owner instruction.
+1. Owner signs Wrangler into the existing Cloudflare account and creates a TURN Server key. The existing private R2 bucket is `bloodbank`. Existing instructions reserve live deployment for the owner. A change to that deployment responsibility needs an explicit owner instruction.
 2. Deploy the R2/TURN Worker with both TURN secrets and exact browser origins. Record its URL; verify health, private ID-photo access and relay responses.
 3. Configure/build the admin with the Worker URL, then deploy reviewed Firestore rules/indexes and Hosting. Wait for indexes. Review search backfill and historical phone cleanup separately; do not apply them implicitly.
 4. Once Blaze and the sender are ready, provision both Functions secrets, verify region and runtime token-signing IAM permissions, then deploy Functions. Verify sign-in, bans/deletion, jobs and push on the owner's devices.

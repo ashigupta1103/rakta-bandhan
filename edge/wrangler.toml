@@ -2,11 +2,12 @@
 name = "rakta-bandhan-edge"
 main = "src/index.ts"
 compatibility_date = "2025-09-01"
+account_id = "361246d2529c9324af1bacc33d2adfb8"
 
-# Photos live here. Create the bucket once: `npx wrangler r2 bucket create rakta-bandhan-media`.
+# Photos live in the owner's existing private Standard bucket.
 [[r2_buckets]]
 binding = "MEDIA"
-bucket_name = "rakta-bandhan-media"
+bucket_name = "bloodbank"
 
 [vars]
 FIREBASE_PROJECT_ID = "rakta-bandhan2026"

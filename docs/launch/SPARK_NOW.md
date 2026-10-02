@@ -10,7 +10,6 @@ See the [complete Windows Cloudflare walkthrough](CLOUDFLARE_SETUP.md) for accou
 cd edge
 npm ci
 npx wrangler login
-npx wrangler r2 bucket create rakta-bandhan-media
 npx wrangler deploy
 npx wrangler secret put TURN_KEY_ID
 npx wrangler secret put TURN_API_TOKEN
