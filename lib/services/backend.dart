@@ -15,6 +15,7 @@ import 'package:image_picker/image_picker.dart' show XFile;
 import 'geo_config.dart';
 import 'edge.dart';
 import 'photos.dart';
+import 'usernames.dart';
 
 /// Recipient blood group -> donor groups that can give to it.
 const bloodCompatibility = <String, List<String>>{
@@ -320,12 +321,15 @@ class Backend {
   /// admins in the console (donor docs otherwise only have raw lat/lng).
   Future<void> registerDonor({
     required String name,
+    required String username,
     required String phone,
     required String bloodGroup,
     required double lat,
     required double lng,
     String? locationLabel,
   }) async {
+    final invalid = validateUsername(username);
+    if (invalid != null) throw FirebaseFunctionsException(code: 'invalid-argument', message: invalid);
     final geohash = encodeGeohash(lat, lng);
     final now = FieldValue.serverTimestamp();
     // Neighbourhood-level name ("Adyar, Chennai") for the public listing —
@@ -333,14 +337,19 @@ class Backend {
     // precise than the ~1 km the listing promises.
     final area = await reverseGeocodeArea(_coarse(lat), _coarse(lng)) ?? '';
 
-    // A real transaction, not a batch: donors_public's create rule reads
-    // donors/{uid} (get()) to confirm is_verified/is_available match —
-    // that read is only guaranteed to see this write's own donors/{uid}
-    // value within the same transaction, not necessarily within a plain
-    // batch. See backend/firestore.rules.
+    // Availability and the claim are checked atomically. Rules bind both
+    // profile mirrors to this claim through getAfter().
     await _db.runTransaction((tx) async {
+      final claim = _db.collection('usernames').doc(username);
+      final profile = _db.collection('donors').doc(_uid);
+      if ((await tx.get(profile)).exists) throw FirebaseFunctionsException(code: 'already-exists', message: 'Your profile already exists.');
+      if ((await tx.get(claim)).exists) throw FirebaseFunctionsException(code: 'already-exists', message: 'That username is taken. Choose another.');
+      tx.set(claim, {'uid': _uid, 'created_at': now});
       tx.set(_db.collection('donors').doc(_uid), {
         'name': name,
+        'name_lower': name.trim().toLowerCase(),
+        'username': username,
+        'username_changed_at': now,
         'phone': phone,
         'email': _auth.currentUser?.email ?? '',
         'blood_group': bloodGroup,
@@ -356,6 +365,7 @@ class Backend {
       });
       tx.set(_db.collection('donors_public').doc(_uid), {
         'name': name,
+        'username': username,
         'blood_group': bloodGroup,
         'geohash': encodeGeohash(_coarse(lat), _coarse(lng), precision: 6),
         'lat': _coarse(lat),
@@ -367,6 +377,31 @@ class Backend {
       });
     });
     _logEvent('donor_registered', {'blood_group': bloodGroup});
+  }
+
+  Future<bool> usernameAvailable(String username) async =>
+      validateUsername(username) == null && !(await _db.collection('usernames').doc(username).get()).exists;
+
+  Future<void> changeUsername(String username) async {
+    final invalid = validateUsername(username);
+    if (invalid != null) throw FirebaseFunctionsException(code: 'invalid-argument', message: invalid);
+    await _db.runTransaction((tx) async {
+      final profile = _db.collection('donors').doc(_uid);
+      final data = (await tx.get(profile)).data();
+      if (data == null) throw FirebaseFunctionsException(code: 'failed-precondition', message: 'Register your profile first.');
+      final old = data['username'] as String?;
+      if (old == username) return;
+      final allowed = usernameChangeAllowedAt((data['username_changed_at'] as Timestamp?)?.toDate());
+      if (old != null && allowed != null && allowed.isAfter(DateTime.now())) {
+        throw FirebaseFunctionsException(code: 'failed-precondition', message: 'You can change your username once every 30 days.');
+      }
+      final claim = _db.collection('usernames').doc(username);
+      if ((await tx.get(claim)).exists) throw FirebaseFunctionsException(code: 'already-exists', message: 'That username is taken. Choose another.');
+      tx.set(claim, {'uid': _uid, 'created_at': FieldValue.serverTimestamp()});
+      tx.update(profile, {'username': username, 'username_changed_at': FieldValue.serverTimestamp()});
+      tx.set(_db.collection('donors_public').doc(_uid), {'username': username}, SetOptions(merge: true));
+      if (old != null) tx.delete(_db.collection('usernames').doc(old));
+    });
   }
 
   /// The donor moved: new exact point on the private profile, and the
@@ -665,6 +700,7 @@ class Backend {
     final ref = await _db.collection('requests').add({
       'requester_uid': _uid,
       'requester_name': requester?['name'] ?? 'Requester',
+      'requester_username': requester?['username'],
       'requester_phone': requester?['phone'] ?? '',
       'blood_group': bloodGroup,
       'units_needed': unitsNeeded,
@@ -751,6 +787,7 @@ class Backend {
         'status': 'matched',
         'matched_donor_id': _uid,
         'matched_donor_name': donor['name'],
+        'matched_donor_username': donor['username'],
         'requester_phone': FieldValue.delete(), // Remove legacy values without copying contact details.
         'matched_donor_phone': FieldValue.delete(),
         'matched_at': FieldValue.serverTimestamp(),
@@ -777,6 +814,7 @@ class Backend {
         'status': 'open',
         'matched_donor_id': null,
         'matched_donor_name': null,
+        'matched_donor_username': FieldValue.delete(),
         'requester_phone': FieldValue.delete(),
         'matched_donor_phone': FieldValue.delete(),
         'matched_at': null,
@@ -1292,9 +1330,17 @@ class Backend {
     if (kEdgeUrl.isNotEmpty) {
       await _edge.deleteMedia('id_proofs/$donorId/proof.jpg');
     }
-    await _idProofRef(donorId).delete();
-    await _db.collection('donors_public').doc(donorId).delete();
-    await _db.collection('donors').doc(donorId).delete();
+    await _db.runTransaction((tx) async {
+      final profile = _db.collection('donors').doc(donorId);
+      final username = (await tx.get(profile)).data()?['username'] as String?;
+      if (username != null) {
+        final claim = _db.collection('usernames').doc(username);
+        if ((await tx.get(claim)).data()?['uid'] == donorId) tx.delete(claim);
+      }
+      tx.delete(_idProofRef(donorId));
+      tx.delete(_db.collection('donors_public').doc(donorId));
+      tx.delete(profile);
+    });
     await _logAdminAction('delete_donor', donorId);
   }
 
@@ -1327,7 +1373,7 @@ class Backend {
   /// untouched here — the rules reject an owner write that changes either.
   Future<void> updateProfile({required String name, required String phone}) async {
     await _db.runTransaction((tx) async {
-      tx.update(_db.collection('donors').doc(_uid), {'name': name.trim(), 'phone': phone.trim()});
+      tx.update(_db.collection('donors').doc(_uid), {'name': name.trim(), 'name_lower': name.trim().toLowerCase(), 'phone': phone.trim()});
       tx.update(_db.collection('donors_public').doc(_uid), {
         'name': name.trim(),
         'updated_at': FieldValue.serverTimestamp(),
@@ -1367,6 +1413,7 @@ class Backend {
     await ref.set({
       'author_uid': _uid,
       'author_name': donor?['name'] ?? 'A donor',
+      'author_username': donor?['username'],
       'topic': topic,
       'body': body.trim(),
       'blood_group': bloodGroup,
@@ -1377,6 +1424,33 @@ class Backend {
       'created_at': FieldValue.serverTimestamp(),
     });
     _logEvent('story_posted', {'has_photo': photo != null ? 1 : 0});
+  }
+
+  /// The author removes their own post (the photo goes with it).
+  Future<void> updateCommunityStory(String storyId, {required String topic, required String body, XFile? photo}) async {
+    final ref = _db.collection('community_stories').doc(storyId);
+    final existing = (await ref.get()).data();
+    if (existing?['author_uid'] != _uid) throw FirebaseFunctionsException(code: 'permission-denied', message: 'You can only edit your own story.');
+    final data = <String, dynamic>{'topic': topic, 'body': body.trim(), 'edited_at': FieldValue.serverTimestamp()};
+    String? uploadedPath;
+    if (photo != null) {
+      final bytes = await photoForUpload(await photo.readAsBytes());
+      uploadedPath = 'community/$_uid/${newMediaName()}';
+      final response = await _edge.request('PUT', '/media/$uploadedPath', bytes: bytes, contentType: 'image/jpeg');
+      data['image_path'] = uploadedPath;
+      data['image_url'] = (jsonDecode(response.body) as Map<String, dynamic>)['url'] as String;
+      final image = await decodeImageFromList(bytes);
+      data['image_aspect'] = image.width / image.height;
+      image.dispose();
+    }
+    try {
+      await ref.update(data);
+    } catch (_) {
+      if (uploadedPath != null) await _edge.deleteMedia(uploadedPath).catchError((_) {});
+      rethrow;
+    }
+    final oldPath = existing?['image_path'] as String?;
+    if (uploadedPath != null && oldPath != null) await _edge.deleteMedia(oldPath).catchError((_) {});
   }
 
   /// The author removes their own post (the photo goes with it).

@@ -10,6 +10,7 @@ import '../widgets/loading_button.dart';
 import 'login_screen.dart';
 import 'main_navigation_screen.dart';
 import 'registration_screen.dart';
+import 'username_screen.dart';
 import '../widgets/rb_icon.dart';
 
 /// "Enter the code we emailed you." Six boxes over one real text field, so
@@ -93,10 +94,11 @@ class _LoginCodeScreenState extends State<LoginCodeScreen> {
     try {
       await Backend.instance.verifyLoginCode(widget.email, code);
       final hasProfile = await Backend.instance.hasProfile();
+      final needsUsername = hasProfile && (await Backend.instance.myDonorDoc()).data()?['username'] == null;
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(builder: (_) => hasProfile ? const MainNavigationScreen() : const RegistrationScreen()),
+        MaterialPageRoute(builder: (_) => !hasProfile ? const RegistrationScreen() : needsUsername ? const UsernameScreen(requiredChoice: true) : const MainNavigationScreen()),
         (route) => false,
       );
     } catch (e) {

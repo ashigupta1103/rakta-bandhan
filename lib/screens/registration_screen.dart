@@ -14,6 +14,8 @@ import 'login_screen.dart';
 import 'phone_verify_screen.dart';
 import '../demo/demo.dart';
 import '../widgets/rb_icon.dart';
+import '../widgets/username_field.dart';
+import '../services/usernames.dart';
 
 class RegistrationScreen extends StatefulWidget {
   /// Pre-fills the mobile field when known (preview gallery); the email
@@ -28,12 +30,14 @@ class RegistrationScreen extends StatefulWidget {
 
 class _RegistrationScreenState extends State<RegistrationScreen> {
   final TextEditingController _nameController = TextEditingController();
+  final _usernameController = TextEditingController();
   final TextEditingController _whatsappController = TextEditingController();
   final TextEditingController _locationController = TextEditingController();
 
   String? _selectedBloodGroup;
 
   String? _nameError;
+  String? _usernameError;
   String? _whatsappError;
   String? _bloodGroupError;
   bool _isSubmitting = false;
@@ -63,6 +67,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     if (Demo.on) {
       // Demo persona, pre-filled so the presenter can tap straight through.
       _nameController.text = Demo.instance.myName;
+      _usernameController.text = demoUsername;
       _whatsappController.text = Demo.demoPhone;
       _selectedBloodGroup = Demo.bloodGroup;
       _locationController.text = Demo.area;
@@ -130,6 +135,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   void dispose() {
     _addressDebounce?.cancel();
     _nameController.dispose();
+    _usernameController.dispose();
     _whatsappController.dispose();
     _locationController.dispose();
     super.dispose();
@@ -165,10 +171,12 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
   Future<void> _handleRegister() async {
     final name = _nameController.text.trim();
+    final username = _usernameController.text.trim();
     final whatsapp = _whatsappController.text.trim();
 
     setState(() {
       _nameError = name.isEmpty ? 'Name is required' : null;
+      _usernameError = validateUsername(username);
       _whatsappError = whatsapp.isEmpty
           ? 'Mobile number is required'
           : !RegExp(r'^[6-9]\d{9}$').hasMatch(whatsapp)
@@ -179,9 +187,10 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           : null;
     });
 
-    if (_nameError != null || _whatsappError != null || _bloodGroupError != null) return;
+    if (_nameError != null || _usernameError != null || _whatsappError != null || _bloodGroupError != null) return;
 
     if (Demo.on) {
+      demoUsername = username;
       // Client demo: nothing is written. The demo then shows the phone
       // check — production has no SMS provider yet (PhoneVerifyScreen).
       Navigator.push(context, MaterialPageRoute(builder: (_) => PhoneVerifyScreen(phone: whatsapp)));
@@ -207,6 +216,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       }
       await Backend.instance.registerDonor(
         name: name,
+        username: username,
         phone: whatsapp,
         bloodGroup: _selectedBloodGroup!,
         lat: lat,
@@ -229,7 +239,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           content: Text(
             e is FirebaseException && (e.code == 'unavailable' || e.code == 'deadline-exceeded')
                 ? 'We couldn’t reach Rakta Bandhan. Check your connection and try again.'
-                : 'We couldn’t complete your registration. Please try again.',
+                : Backend.authErrorMessage(e),
           ),
         ),
       );
@@ -345,6 +355,12 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                 const SizedBox(height: 24),
 
                 // Mobile number field
+                UsernameField(controller: _usernameController),
+                if (_usernameError != null) Text(_usernameError!, style: const TextStyle(color: AppColors.primary)),
+                Wrap(spacing: 8, children: [for (final suggestion in suggestUsernames(_nameController.text))
+                  ActionChip(label: Text('@$suggestion'), onPressed: () => _usernameController.text = suggestion),
+                ]),
+                const SizedBox(height: 24),
                 const Text(
                   'Mobile number',
                   style: TextStyle(

@@ -31,7 +31,9 @@ const callable = (name, data) =>
 const email = `banned-${Date.now()}@example.com`;
 const user = await auth.createUser({ email, emailVerified: true });
 const donor = db.doc(`donors/${user.uid}`);
-await donor.set({ name: 'Donor', email, is_banned: false, is_available: true });
+const username = `donor_${Date.now()}`;
+await db.doc(`usernames/${username}`).set({ uid: user.uid });
+await donor.set({ name: 'Donor', username, email, is_banned: false, is_available: true });
 await db.doc(`donors/${user.uid}/private/id_proof`).set({ id_proof_base64: 'abc' });
 await sleep(1500);
 assert.equal((await auth.getUser(user.uid)).disabled, false, 'an ordinary update leaves the account alone');
@@ -60,7 +62,19 @@ await waitFor(async () => {
   }
 }, 'sign-in account removed with the donor');
 await waitFor(async () => !(await db.doc(`donors/${user.uid}/private/id_proof`).get()).exists, 'ID photo doc removed with the donor');
+assert.equal((await db.doc(`usernames/${username}`).get()).exists, false, 'removal releases the donor username');
 console.log('✔ removing a donor removes the sign-in account and the subcollection left behind (the ID photo doc)');
+
+const oldUser = await auth.createUser({ email: `old-${Date.now()}@example.com` });
+const reused = `reused_${Date.now()}`;
+await db.doc(`donors/${oldUser.uid}`).set({ username: reused, is_banned: false });
+await db.doc(`usernames/${reused}`).set({ uid: 'new-owner' });
+await db.doc(`donors/${oldUser.uid}`).delete();
+await waitFor(async () => {
+  try { await auth.getUser(oldUser.uid); return false; } catch (e) { return e.code === 'auth/user-not-found'; }
+}, 'old account removal');
+assert.equal((await db.doc(`usernames/${reused}`).get()).get('uid'), 'new-owner', 'late cleanup must preserve a reused name');
+console.log('✔ username cleanup preserves a new owner of a released name');
 
 console.log('\nAccount smoke checks passed.');
 process.exit(0);

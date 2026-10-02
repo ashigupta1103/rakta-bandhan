@@ -247,7 +247,9 @@ class _CommunityScreenState extends State<CommunityScreen> {
     final canEdit = isMine;
     // Report / hide are moderation actions — not simulated in the demo.
     final showMenu = isMine || !demo;
-    final name = data['author_name'] as String? ?? 'A donor';
+    final author = data['author_name'] as String? ?? 'A donor';
+    final username = data['author_username'] as String?;
+    final name = username == null ? author : '${author.split(' ').first} @$username';
     final meta = [
       if (location != null && location.isNotEmpty) location,
       if (created != null) _timeAgo(created),

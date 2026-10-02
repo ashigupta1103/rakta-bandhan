@@ -42,8 +42,8 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
       'Marking a donation as fulfilled automatically pauses your availability for 90 days from that date. It turns back on by itself once the 90 days pass — there is nothing to request or wait on manually.',
     ),
     (
-      'How do I change my community name?',
-      "This isn't available yet — there is no community-name field in the app today. Your profile only stores the name, phone number and blood group you registered with, and you can change your name and mobile number in My Page › Personal information.",
+      'How do I change my username?',
+      'Open My Page and tap your @username. It must start with a letter and use 3–20 lowercase letters, numbers or underscores. You can change it once every 30 days. Your registered name and mobile number can be edited under Personal information.',
     ),
     (
       'How do I create a blood request?',

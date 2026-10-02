@@ -83,6 +83,51 @@ service cloud.firestore {
       return exists(features) && get(features).data.get('server_jobs', false) == true;
     }
 
+    function validUsername(name) {
+      return name is string && name.matches('^[a-z][a-z0-9_]{2,19}$')
+        && !(name in ['admin', 'administrator', 'support', 'help', 'rakta', 'bandhan',
+          'raktabandhan', 'rotary', 'official', 'team', 'moderator', 'system', 'root', 'null', 'undefined']);
+    }
+
+    function usernameBound(uid) {
+      let name = request.resource.data.get('username', null);
+      return validUsername(name)
+        && request.resource.data.username_changed_at == request.time
+        && getAfter(/databases/$(database)/documents/usernames/$(name)).data.uid == uid
+        && getAfter(/databases/$(database)/documents/donors_public/$(uid)).data.username == name;
+    }
+
+    function usernameUpdate(uid) {
+      let before = resource.data.get('username', null);
+      let after = request.resource.data.get('username', null);
+      return (before == after
+          && resource.data.get('username_changed_at', null) == request.resource.data.get('username_changed_at', null))
+        || (usernameBound(uid)
+          && (before == null || (resource.data.username_changed_at + duration.value(30, 'd') <= request.time
+            && !existsAfter(/databases/$(database)/documents/usernames/$(before)))));
+    }
+
+    function publicUsernameMatches(uid) {
+      let name = request.resource.data.get('username', null);
+      let profile = /databases/$(database)/documents/donors/$(uid);
+      return (name == null && (!existsAfter(profile) || getAfter(profile).data.get('username', null) == null))
+        || (validUsername(name) && getAfter(profile).data.username == name);
+    }
+
+    match /usernames/{name} {
+      allow get: if isSignedIn();
+      allow list: if false;
+      allow create: if isVerifiedUser() && !isBanned() && validUsername(name)
+        && request.resource.data.keys().hasOnly(['uid', 'created_at'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.created_at == request.time
+        && getAfter(/databases/$(database)/documents/donors/$(request.auth.uid)).data.username == name;
+      allow update: if false;
+      allow delete: if isAdmin() || (isOwner(resource.data.uid)
+        && (!existsAfter(/databases/$(database)/documents/donors/$(request.auth.uid))
+          || getAfter(/databases/$(database)/documents/donors/$(request.auth.uid)).data.get('username', null) != name));
+    }
+
     // ---------------------------------------------------------------
     // donors/{uid} — private profile: name, phone, exact location.
     // Owner or admin only, ever. is_verified / is_banned are admin-set
@@ -93,14 +138,16 @@ service cloud.firestore {
       allow create: if isOwner(uid)
         && isVerifiedUser()
         && request.resource.data.is_verified == false
-        && request.resource.data.is_banned == false;
+        && request.resource.data.is_banned == false
+        && usernameBound(uid);
 
       allow update: if isAdmin()
         || (isOwner(uid)
             && resource.data.is_banned == false
             && request.resource.data.is_verified == resource.data.is_verified
             && request.resource.data.is_banned == resource.data.is_banned
-            && cooldownRespected());
+            && cooldownRespected()
+            && usernameUpdate(uid));
 
       // Owner delete = in-app account deletion (App Store 5.1.1(v) /
       // Google Play account-deletion policy). See AccountService.
@@ -126,22 +173,24 @@ service cloud.firestore {
     // together in one transaction, so a rule here that called
     // get(donors/{uid}) would read a doc that doesn't exist yet (brand-new
     // donor) or a stale pre-write value (verify/ban/availability) — always
-    // denying. Every check below reads only this document's own fields
-    // instead, so it can't depend on write order within the transaction.
+    // denying. Username coherence uses getAfter(), which sees both sibling
+    // writes. Verification checks below still use this document's own fields.
     match /donors_public/{uid} {
       allow read: if isSignedIn();
 
       // A fresh donor always starts unverified (see registerDonor).
       allow create: if ((isOwner(uid) && isVerifiedUser()) || isAdmin())
         && !('phone' in request.resource.data)
-        && request.resource.data.is_verified == false;
+        && request.resource.data.is_verified == false
+        && (isAdmin() || publicUsernameMatches(uid));
 
       // is_verified can only change via an admin write — an owner's own
       // update must leave it exactly as it already was.
       allow update: if (isOwner(uid) || isAdmin())
         && !('phone' in request.resource.data)
         && (isAdmin() || (!isBanned()
-              && request.resource.data.is_verified == resource.data.is_verified));
+              && request.resource.data.is_verified == resource.data.is_verified
+              && publicUsernameMatches(uid)));
 
       allow delete: if isOwner(uid) || isAdmin();
     }
@@ -290,10 +339,10 @@ service cloud.firestore {
           // account deletion scrubs the leaving user's own name/phone
           // (and the inbox preview, which may quote them)
           (resource.data.requester_uid == request.auth.uid
-            && onlyChanges(['requester_name', 'requester_phone', 'requester_deleted', 'last_message']))
+            && onlyChanges(['requester_name', 'requester_username', 'requester_phone', 'requester_deleted', 'last_message']))
           ||
           (resource.data.get('matched_donor_id', null) == request.auth.uid
-            && onlyChanges(['matched_donor_name', 'matched_donor_phone', 'matched_donor_deleted', 'last_message']))
+            && onlyChanges(['matched_donor_name', 'matched_donor_username', 'matched_donor_phone', 'matched_donor_deleted', 'last_message']))
           ||
           // chat bookkeeping: each side moves only its own read marker, and
           // only the sender may write the inbox preview (always batched
@@ -431,11 +480,11 @@ service cloud.firestore {
 
     // community_stories/{id} — "Share an experience". Readable by any
     // signed-in user (that's the point), written only under the author's
-    // own uid, and never edited by the author afterwards. Admins moderate:
+    // own uid; authors can edit text, topic and their own photo. Admins moderate:
     // `is_hidden` (reversible — the feed filters it out client-side) or an
     // outright delete.
     // Photo posts: `image_path` must point into the author's own folder in
-    // this project's Storage bucket (see storage.rules), never an arbitrary
+    // the R2 community folder, never an arbitrary
     // external link. Authors may delete their own post.
     match /community_stories/{id} {
       allow read: if isSignedIn();
@@ -445,7 +494,14 @@ service cloud.firestore {
         && request.resource.data.body.size() <= 2000
         && (request.resource.data.get('image_path', null) == null
             || request.resource.data.image_path.matches('community/' + request.auth.uid + '/[^/]+'));
-      allow update: if isAdmin();
+      allow update: if isAdmin() || (isVerifiedUser() && !isBanned()
+        && resource.data.author_uid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['body', 'topic', 'image_path', 'image_url', 'image_aspect', 'edited_at'])
+        && request.resource.data.body is string && request.resource.data.body.size() > 0 && request.resource.data.body.size() <= 2000
+        && request.resource.data.topic is string && request.resource.data.topic.size() <= 80
+        && request.resource.data.edited_at == request.time
+        && (request.resource.data.get('image_path', null) == null
+          || request.resource.data.image_path.matches('community/' + request.auth.uid + '/[^/]+')));
       allow delete: if isAdmin() || (isSignedIn() && resource.data.author_uid == request.auth.uid);
     }
 

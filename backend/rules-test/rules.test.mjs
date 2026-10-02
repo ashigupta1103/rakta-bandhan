@@ -17,6 +17,7 @@ import {
   deleteField,
   doc,
   getDoc,
+  getDocs,
   serverTimestamp,
   setDoc,
   Timestamp,
@@ -79,6 +80,14 @@ async function seed(fn) {
   await env.withSecurityRulesDisabled(async (ctx) => fn(ctx.firestore()));
 }
 
+function register(db, uid, name = 'donor_one', extra = {}) {
+  const batch = writeBatch(db);
+  batch.set(doc(db, `usernames/${name}`), { uid, created_at: serverTimestamp() });
+  batch.set(doc(db, `donors/${uid}`), donorDoc({ username: name, username_changed_at: serverTimestamp(), ...extra }));
+  batch.set(doc(db, `donors_public/${uid}`), { name: 'Test Donor', username: name, is_verified: false, is_available: true });
+  return batch.commit();
+}
+
 before(async () => {
   env = await initializeTestEnvironment({
     projectId: 'demo-rakta-bandhan',
@@ -101,11 +110,11 @@ describe('sign-up and verified accounts', () => {
   });
 
   test('a verified account can create its own donor profile', async () => {
-    await assertSucceeds(setDoc(doc(verified('u1'), 'donors/u1'), donorDoc()));
+    await assertSucceeds(register(verified('u1'), 'u1'));
   });
 
   test('an account signed in with an emailed code counts as verified', async () => {
-    await assertSucceeds(setDoc(doc(codeLogin('u2'), 'donors/u2'), donorDoc()));
+    await assertSucceeds(register(codeLogin('u2'), 'u2'));
     await assertSucceeds(addDoc(collection(codeLogin('u2'), 'requests'), openRequest({ requester_uid: 'u2' })));
   });
 
@@ -151,6 +160,95 @@ describe('private data', () => {
     await assertSucceeds(getDoc(doc(verified('stranger'), 'requests/open1')));
     await assertFails(getDoc(doc(verified('stranger'), 'requests/matched1')));
     await assertSucceeds(getDoc(doc(verified('donor'), 'requests/matched1')));
+  });
+});
+
+describe('username claims', () => {
+  const change = (db, uid, name, old, release = true) => {
+    const batch = writeBatch(db);
+    batch.set(doc(db, `usernames/${name}`), { uid, created_at: serverTimestamp() });
+    batch.update(doc(db, `donors/${uid}`), { username: name, username_changed_at: serverTimestamp() });
+    batch.update(doc(db, `donors_public/${uid}`), { username: name });
+    if (old && release) batch.delete(doc(db, `usernames/${old}`));
+    return batch.commit();
+  };
+  async function existing(changedAt = past(31)) {
+    await seed(async (db) => {
+      await setDoc(doc(db, 'donors/u1'), donorDoc({ username: 'donor_old', username_changed_at: changedAt }));
+      await setDoc(doc(db, 'donors_public/u1'), { username: 'donor_old', is_verified: false });
+      await setDoc(doc(db, 'usernames/donor_old'), { uid: 'u1', created_at: past(40) });
+    });
+  }
+  test('registration requires a claim and matching public mirror', async () => {
+    await assertFails(setDoc(doc(verified('u1'), 'donors/u1'), donorDoc({ username: 'donor_one', username_changed_at: serverTimestamp() })));
+    await assertSucceeds(register(verified('u1'), 'u1'));
+    await assertSucceeds(getDoc(doc(verified('u2'), 'usernames/donor_one')));
+    await assertFails(register(verified('u2'), 'u2'));
+  });
+  test('uppercase, invalid formats and reserved names are rejected', async () => {
+    for (const name of ['ABC', 'ab', '1abc', '_abc', 'bad-name', 'a'.repeat(21), 'admin', 'support', 'raktabandhan']) {
+      await assertFails(register(verified('u1'), 'u1', name));
+    }
+  });
+  test('a claim cannot be created for someone else or without the profile write', async () => {
+    await assertFails(setDoc(doc(verified('u1'), 'usernames/donor_one'), { uid: 'u2', created_at: serverTimestamp() }));
+    await assertFails(setDoc(doc(verified('u1'), 'usernames/donor_one'), { uid: 'u1', created_at: serverTimestamp() }));
+  });
+  test('claims cannot be listed, overwritten or deleted while still in use', async () => {
+    await existing();
+    const db = verified('u1');
+    await assertFails(getDocs(collection(db, 'usernames')));
+    await assertFails(updateDoc(doc(db, 'usernames/donor_old'), { created_at: serverTimestamp() }));
+    await assertFails(deleteDoc(doc(db, 'usernames/donor_old')));
+  });
+  test('a change releases the old name and stamps a new cooldown', async () => {
+    await existing();
+    await assertSucceeds(change(verified('u1'), 'u1', 'donor_new', 'donor_old'));
+    const old = await getDoc(doc(verified('u1'), 'usernames/donor_old'));
+    if (old.exists()) throw new Error('old claim was not released');
+    await assertFails(change(verified('u1'), 'u1', 'donor_next', 'donor_new'));
+  });
+  test('the cooldown and old-claim release cannot be bypassed', async () => {
+    await existing(past(1));
+    await assertFails(change(verified('u1'), 'u1', 'donor_new', 'donor_old'));
+    await existing();
+    await assertFails(change(verified('u1'), 'u1', 'donor_new', 'donor_old', false));
+    await assertFails(updateDoc(doc(verified('u1'), 'donors/u1'), { username_changed_at: past(90) }));
+    await assertFails(updateDoc(doc(verified('u1'), 'donors/u1'), { username: 'donor_new' }));
+    await assertFails(updateDoc(doc(verified('u1'), 'donors_public/u1'), { username: 'donor_new' }));
+  });
+  test('legacy members can choose once and banned members cannot claim', async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db, 'donors/u1'), donorDoc());
+      await setDoc(doc(db, 'donors_public/u1'), { is_verified: false });
+    });
+    await assertSucceeds(change(verified('u1'), 'u1', 'donor_first'));
+    await seed((db) => updateDoc(doc(db, 'donors/u1'), { is_banned: true, username_changed_at: past(31) }));
+    await assertFails(change(verified('u1'), 'u1', 'donor_second', 'donor_first'));
+  });
+  test('account deletion releases its claim atomically; admin can remove claims', async () => {
+    await existing();
+    const db = verified('u1');
+    const batch = writeBatch(db);
+    batch.delete(doc(db, 'usernames/donor_old'));
+    batch.delete(doc(db, 'donors/u1'));
+    batch.delete(doc(db, 'donors_public/u1'));
+    await assertSucceeds(batch.commit());
+    await existing();
+    await seed((db) => setDoc(doc(db, 'admins/admin1'), {}));
+    await assertSucceeds(deleteDoc(doc(verified('admin1'), 'usernames/donor_old')));
+  });
+});
+
+describe('community story editing', () => {
+  test('authors edit only content and their own photo; moderation and attribution stay protected', async () => {
+    await seed((db) => setDoc(doc(db, 'community_stories/story1'), { author_uid: 'u1', author_name: 'Donor', body: 'Original', topic: 'Other', created_at: past(1) }));
+    const ref = doc(verified('u1'), 'community_stories/story1');
+    await assertSucceeds(updateDoc(ref, { body: 'Edited', topic: 'Other', edited_at: serverTimestamp() }));
+    await assertFails(updateDoc(ref, { body: 'x', author_uid: 'u2', edited_at: serverTimestamp() }));
+    await assertFails(updateDoc(ref, { is_hidden: false, edited_at: serverTimestamp() }));
+    await assertFails(updateDoc(ref, { image_path: 'community/u2/photo.jpg', edited_at: serverTimestamp() }));
+    await assertFails(updateDoc(doc(verified('u2'), 'community_stories/story1'), { body: 'x', edited_at: serverTimestamp() }));
   });
 });
 

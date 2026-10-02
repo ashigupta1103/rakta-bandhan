@@ -4,6 +4,7 @@ import '../theme/app_colors.dart';
 import 'login_screen.dart';
 import 'main_navigation_screen.dart';
 import 'registration_screen.dart';
+import 'username_screen.dart';
 
 /// Branded launch — a deliberate brand reveal, not a loading screen.
 ///
@@ -95,7 +96,10 @@ class _SplashScreenState extends State<SplashScreen>
     final user = Backend.instance.currentUser;
     if (user == null) return const LoginScreen();
     try {
-      return await Backend.instance.hasProfile() ? const MainNavigationScreen() : const RegistrationScreen();
+      final profile = await Backend.instance.myDonorDoc();
+      if (!profile.exists) return const RegistrationScreen();
+      if (profile.data()?['username'] == null) return const UsernameScreen(requiredChoice: true);
+      return const MainNavigationScreen();
     } catch (_) {
       // Offline at launch: Firestore's cache usually answers; if it can't,
       // open the app rather than strand the user on the splash.

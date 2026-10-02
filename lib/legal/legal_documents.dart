@@ -50,6 +50,7 @@ const privacyPolicy = LegalDocument(
       '- Your email address, used to sign you in. Each time you sign in we email you a one-time 6-digit code; there is no password. A code works once, expires after 10 minutes, and we keep it only in hashed form.',
       '- Sign-in safeguards: to stop abuse we keep a small record holding a hash of your email address (not the address itself), when we last sent you a code, how many codes were sent today and how many wrong tries were made. We also count sign-in requests per network, using a hash of the IP address.',
       '- Your name and mobile number. Your number is never shown to other users — matched people reach each other through in-app messages and calls.',
+      '- Your unique username and the date it was last changed. Usernames are visible to signed-in members on profiles, community posts and matched chats; changes are limited to once every 30 days.',
       '- Your blood group.',
       '- The area you register from: a location label you choose and its map coordinates.',
       '- Whether you are available to donate, and the date of your last donation recorded in the app.',
@@ -78,7 +79,7 @@ const privacyPolicy = LegalDocument(
       'Any signed-in user can see open requests: the blood group and units needed, urgency, and the request’s location.',
       'Only after a match — when a donor accepts a request — the two people involved can see each other’s name, message each other in the app, and call each other in the app. Phone numbers stay in private profiles, accessible only to the owner and administrators. Nobody else can see that conversation. Tapping a shared location opens it in your maps app (for example Google Maps), which then handles it under its own privacy terms.',
       'In-app call audio travels directly between the two phones, or through an encrypted Cloudflare TURN relay when needed. A direct connection can reveal the other phone’s network (IP) address for the duration of the call; it does not reveal a phone number. The relay sees network addresses but cannot read the encrypted audio.',
-      'Community posts are visible to every signed-in user, under your registered name. Anyone with a community photo’s link can open the photo.',
+      'Community posts are visible to every signed-in user, under your first name and @username. Older posts may still show the registered name. Anyone with a community photo’s link can open the photo.',
       'We share information with hospitals, blood banks or service partners only to the extent necessary to facilitate a blood request or operate the platform, and as the law allows. We will not sell personal information to third parties.',
     ]),
     LegalSection('admins', 'What our administrators can see', [

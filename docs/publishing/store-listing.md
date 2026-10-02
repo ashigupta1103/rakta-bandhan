@@ -65,6 +65,7 @@ Deploy Hosting first; see the README. The pages come from the in-app text.
 | Data type (Play category) | Collected | Shared | Purpose | Optional? |
 |---|---|---|---|---|
 | Name (Personal info) | Yes | No* | App functionality | Required |
+| User IDs (username and account UID) | Yes | No* | App functionality, account management | Required |
 | Email address (Personal info) | Yes | No | Account management | Required |
 | Phone number (Personal info) | Yes | No | App functionality, account management (owner and administrators only) | Required |
 | Approximate and precise location (Location) | Yes | No | App functionality | Required (area); current location optional |
@@ -100,6 +101,7 @@ Tracking: **No** (no IDFA, no data brokers, no cross-app tracking).
 | Data type | Linked to user | Used for tracking | Purposes |
 |---|---|---|---|
 | Name | Yes | No | App Functionality |
+| User ID (username and account UID) | Yes | No | App Functionality |
 | Email Address | Yes | No | App Functionality |
 | Phone Number | Yes | No | App Functionality |
 | Health (blood group) | Yes | No | App Functionality |

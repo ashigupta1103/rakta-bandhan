@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../demo/demo.dart';
 import '../services/backend.dart';
+import '../services/usernames.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/app_header.dart';
@@ -21,6 +22,7 @@ import 'legal_reader_screen.dart';
 import 'notifications_screen.dart';
 import 'personal_information_screen.dart';
 import 'settings_screen.dart';
+import 'username_screen.dart';
 import '../widgets/rb_icon.dart';
 
 /// My Page — the donor's own identity and the one place availability is
@@ -190,6 +192,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               return const Center(child: CircularProgressIndicator(strokeWidth: 2));
             }
             final data = snapshot.data!;
+            final username = Demo.on ? demoUsername : data['username'] as String?;
             final name = (data['name'] as String? ?? '').trim();
             final bloodGroup = data['blood_group'] as String?;
             final isVerified = data['is_verified'] as bool? ?? false;
@@ -237,6 +240,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       children: [
                         RbRow(icon: RbGlyph.certificate, bare: true, title: 'Donation history & certificates', onTap: () => _push(const DonationHistoryScreen())),
                         RbRow(icon: RbGlyph.person, bare: true, title: 'Personal information', onTap: () => _push(const PersonalInformationScreen())),
+                        RbRow(icon: RbGlyph.person, bare: true, title: username == null ? 'Choose a username' : '@$username', subtitle: 'Change once every 30 days', onTap: () async {
+                          await Navigator.push(context, MaterialPageRoute(builder: (_) => UsernameScreen(currentUsername: username, changedAt: (data['username_changed_at'] as Timestamp?)?.toDate())));
+                          if (mounted) setState(() {});
+                        }),
                         RbRow(icon: RbGlyph.phoneHeart, bare: true, title: 'Emergency contact', onTap: () => _push(const EmergencyContactScreen())),
                       ],
                     ),

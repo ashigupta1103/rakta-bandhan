@@ -70,7 +70,7 @@ class AccountService {
         await doc.reference.update({'status': 'cancelled', 'cancelled_at': FieldValue.serverTimestamp()});
       }
       await ChatService.instance.deleteMyMessages(doc.id).catchError((_) {});
-      await doc.reference.update({'requester_name': 'Deleted user', 'requester_phone': FieldValue.delete(), 'requester_deleted': true, 'last_message': FieldValue.delete()});
+      await doc.reference.update({'requester_name': 'Deleted user', 'requester_username': FieldValue.delete(), 'requester_phone': FieldValue.delete(), 'requester_deleted': true, 'last_message': FieldValue.delete()});
     }
 
     final asDonor = await _db.collection('requests').where('matched_donor_id', isEqualTo: _uid).get();
@@ -79,15 +79,19 @@ class AccountService {
       if (doc.data()['status'] == 'matched') {
         await Backend.instance.releaseMatch(doc.id);
       } else {
-        await doc.reference.update({'matched_donor_name': 'Deleted user', 'matched_donor_phone': FieldValue.delete(), 'matched_donor_deleted': true, 'last_message': FieldValue.delete()});
+        await doc.reference.update({'matched_donor_name': 'Deleted user', 'matched_donor_username': FieldValue.delete(), 'matched_donor_phone': FieldValue.delete(), 'matched_donor_deleted': true, 'last_message': FieldValue.delete()});
       }
     }
 
     await PushService.instance.unregisterDevice();
     await Backend.instance.deleteMyIdProof();
     await Backend.instance.removeProfilePhoto(keepProfileField: true).catchError((_) {});
-    await _db.collection('donors_public').doc(_uid).delete();
-    await _db.collection('donors').doc(_uid).delete();
+    final username = (await _db.collection('donors').doc(_uid).get()).data()?['username'] as String?;
+    final removal = _db.batch();
+    if (username != null) removal.delete(_db.collection('usernames').doc(username));
+    removal.delete(_db.collection('donors_public').doc(_uid));
+    removal.delete(_db.collection('donors').doc(_uid));
+    await removal.commit();
     // The sign-in account goes last, server-side (deleteMyAuthAccount). If
     // this step fails the user can simply retry: every step above is safe
     // to repeat.

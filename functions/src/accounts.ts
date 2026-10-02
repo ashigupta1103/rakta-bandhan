@@ -36,6 +36,15 @@ export const onDonorUpdated = onDocumentUpdated('donors/{uid}', async (event) =>
  */
 export const onDonorDeleted = onDocumentDeleted('donors/{uid}', async (event) => {
   const { uid } = event.params;
+  const username = event.data?.get('username');
+  if (typeof username === 'string') {
+    const claim = db.doc(`usernames/${username}`);
+    await db.runTransaction(async (tx) => {
+      // A released name may already belong to someone else by the time this
+      // event is delivered. Never remove the new owner's claim.
+      if ((await tx.get(claim)).get('uid') === uid) tx.delete(claim);
+    });
+  }
   await db.recursiveDelete(db.doc(`donors/${uid}`));
   try {
     await auth.deleteUser(uid);

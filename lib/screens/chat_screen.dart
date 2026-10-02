@@ -332,6 +332,7 @@ class _ChatScreenState extends State<ChatScreen> {
             final peer = _Peer(
               uid: (amRequester ? request['matched_donor_id'] : request['requester_uid']) as String? ?? '',
               name: (amRequester ? request['matched_donor_name'] : request['requester_name']) as String? ?? 'Donor',
+              username: (amRequester ? request['matched_donor_username'] : request['requester_username']) as String?,
             );
             final closure = _closure(request);
 
@@ -394,7 +395,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(peer.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppTextStyles.display(fontSize: 17, color: AppColors.ink, height: 1.15)),
+                          Text(peer.username == null ? peer.name : '${peer.firstName} @${peer.username}', maxLines: 1, overflow: TextOverflow.ellipsis, style: AppTextStyles.display(fontSize: 17, color: AppColors.ink, height: 1.15)),
                           const SizedBox(height: 1),
                           Text(
                             '$bloodGroup · $units unit${units == 1 ? '' : 's'}${open ? ' · tap for details' : ' · closed'}',
@@ -635,7 +636,8 @@ class _ChatScreenState extends State<ChatScreen> {
 class _Peer {
   final String uid;
   final String name;
-  const _Peer({required this.uid, required this.name});
+  final String? username;
+  const _Peer({required this.uid, required this.name, this.username});
 
   String get firstName => name.trim().isEmpty ? 'them' : name.trim().split(RegExp(r'\s+')).first;
   String get initials {

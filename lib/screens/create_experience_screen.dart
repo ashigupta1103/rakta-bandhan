@@ -16,8 +16,7 @@ import '../widgets/rb_icon.dart';
 /// costs ~150–300 KB of storage instead of a 4–6 MB camera original.
 class CreateExperienceScreen extends StatefulWidget {
   /// Set when editing the user's own story: the form opens pre-filled with
-  /// its text and topic. Saving works in the client demo; for published
-  /// stories the backend update is still to be connected.
+  /// its text and topic. Saves use the author's authenticated backend path.
   final String? editStoryId;
   final String initialBody;
   final String? initialTopic;
@@ -100,14 +99,22 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
     if (_editing) {
       final messenger = ScaffoldMessenger.of(context);
       if (Demo.isDemoId(widget.editStoryId)) {
-        Demo.instance.updateStory(widget.editStoryId!, body: body, topic: _topic);
+        Demo.instance.updateStory(widget.editStoryId!, body: body, topic: _topic, photo: _photoBytes);
         Navigator.pop(context);
         messenger.showSnackBar(const SnackBar(content: Text('Story updated.')));
         return;
       }
-      // Saving an edit to a published story needs a backend update that
-      // isn't connected yet (backend team). Say so — never fake a save.
-      messenger.showSnackBar(const SnackBar(content: Text('Saving edits isn’t available yet. Your story hasn’t changed.')));
+      setState(() => _submitting = true);
+      try {
+        await Backend.instance.updateCommunityStory(widget.editStoryId!, body: body, topic: _topic, photo: _photo);
+        if (!mounted) return;
+        Navigator.pop(context);
+        messenger.showSnackBar(const SnackBar(content: Text('Story updated.')));
+      } catch (_) {
+        if (!mounted) return;
+        setState(() => _submitting = false);
+        messenger.showSnackBar(const SnackBar(content: Text('Could not save your changes. Please try again.')));
+      }
       return;
     }
     if (Demo.on) {

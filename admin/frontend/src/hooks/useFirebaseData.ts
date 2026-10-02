@@ -623,7 +623,9 @@ export function useAdminActions() {
   const deleteDonor = (donorId: string, name?: string) =>
     run(async () => {
       await deleteIdProof(donorId);
+      const username = (await getDoc(doc(db, 'donors', donorId))).data()?.username;
       const batch = writeBatch(db);
+      if (typeof username === 'string' && (await getDoc(doc(db, 'usernames', username))).data()?.uid === donorId) batch.delete(doc(db, 'usernames', username));
       batch.delete(doc(db, 'donors', donorId, 'private', 'id_proof'));
       batch.delete(doc(db, 'donors_public', donorId));
       batch.delete(doc(db, 'donors', donorId));
