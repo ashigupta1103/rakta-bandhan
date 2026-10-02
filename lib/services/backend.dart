@@ -12,6 +12,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart' show XFile;
 
+import 'features.dart';
 import 'geo_config.dart';
 import 'edge.dart';
 import 'photos.dart';
@@ -231,11 +232,13 @@ class Backend {
 
   // ------------------------------------------------------------ Sign-in
   //
-  // Passwordless: a 6-digit code goes to the user's email
-  // (requestLoginCode), and verifyLoginCode trades it for a Firebase custom
-  // token — see functions/src/login.ts. The same email always lands on the
-  // same account. Codes by SMS plug into the same two functions later
-  // (channel: 'sms'). Firestore rules treat a code-login token as verified
+  // Two ways in, chosen at build time (features.dart):
+  //  - kEmailCodeLive: passwordless. A 6-digit code goes to the user's email
+  //    (requestLoginCode) and verifyLoginCode trades it for a Firebase custom
+  //    token — functions/src/login.ts, needs the Blaze plan.
+  //  - otherwise (free plan): email + password, with the address confirmed
+  //    by the verification email Firebase sends itself.
+  // Firestore rules and the edge Worker treat both as a verified account
   // (isVerifiedUser in firestore.rules).
 
   FirebaseFunctions get _functions => FirebaseFunctions.instanceFor(region: kFunctionsRegion);
@@ -263,12 +266,63 @@ class Backend {
     return cred.user!;
   }
 
+  /// Creates the account and sends the verification email. A failed send
+  /// doesn't fail the sign-up: the verify screen has "Resend".
+  Future<User> signUpWithEmail(String email, String password) async {
+    final cred = await _auth.createUserWithEmailAndPassword(email: email.trim(), password: password);
+    try {
+      await cred.user!.sendEmailVerification();
+    } catch (_) {}
+    _logEvent('sign_up', {'method': 'email'});
+    return cred.user!;
+  }
+
+  Future<User> signInWithEmail(String email, String password) async {
+    final cred = await _auth.signInWithEmailAndPassword(email: email.trim(), password: password);
+    _logEvent('login', {'method': 'email'});
+    return cred.user!;
+  }
+
+  Future<void> sendPasswordReset(String email) => _auth.sendPasswordResetEmail(email: email.trim());
+
+  Future<void> resendVerificationEmail() async => _auth.currentUser?.sendEmailVerification();
+
+  /// Re-reads the account from Firebase. After the user taps the link in
+  /// the email, `emailVerified` only flips once the account is reloaded,
+  /// and the ID token that Firestore rules (and the edge Worker) see only
+  /// carries the new claim once it's force-refreshed — both happen here.
+  Future<bool> refreshEmailVerified() async {
+    final user = _auth.currentUser;
+    if (user == null) return false;
+    await user.reload();
+    final fresh = _auth.currentUser;
+    if (fresh == null || !fresh.emailVerified) return false;
+    await fresh.getIdToken(true);
+    return true;
+  }
+
+  /// Firebase wants a recent sign-in before deleting an account, so the
+  /// password is asked for again (free-plan sign-in only).
+  Future<void> reauthenticateWithPassword(String password) async {
+    final user = _auth.currentUser;
+    final email = user?.email;
+    if (user == null || email == null) return;
+    await user.reauthenticateWithCredential(EmailAuthProvider.credential(email: email, password: password));
+  }
+
   Future<void> signOut() => _auth.signOut();
 
-  /// Last step of account deletion: the sign-in account itself, removed by
-  /// a function (a passwordless account can't re-enter a password to
-  /// satisfy Firebase's recent-login rule on the device).
-  Future<void> deleteMyAuthAccount() => _functions.httpsCallable('deleteMyAuthAccount').call<Map<String, dynamic>>();
+  /// Last step of account deletion: the sign-in account itself. With code
+  /// sign-in a function removes it (the user has no password to re-enter
+  /// for Firebase's recent-login rule); with password sign-in the app does
+  /// it after [reauthenticateWithPassword].
+  Future<void> deleteMyAuthAccount() async {
+    if (kEmailCodeLive) {
+      await _functions.httpsCallable('deleteMyAuthAccount').call<Map<String, dynamic>>();
+    } else {
+      await _auth.currentUser?.delete();
+    }
+  }
 
   /// Human wording for sign-in errors. The sign-in functions already send
   /// a readable message; anything else gets a generic one. Never echoes a
@@ -286,9 +340,15 @@ class Backend {
     }
     final code = e is FirebaseAuthException ? e.code : '';
     return switch (code) {
+      'invalid-email' => 'That email address doesn’t look right.',
+      'email-already-in-use' => 'An account already exists for this email. Sign in instead.',
+      'weak-password' => 'Choose a stronger password — at least 8 characters.',
+      'user-not-found' || 'wrong-password' || 'invalid-credential' => 'Incorrect email or password.',
       'user-disabled' => 'This account has been disabled. Contact support.',
       'too-many-requests' => 'Too many attempts. Wait a few minutes and try again.',
       'network-request-failed' => 'No internet connection. Check your network and try again.',
+      'requires-recent-login' => 'Please sign in again to continue.',
+      'operation-not-allowed' => 'Email sign-in isn’t switched on for this project yet. Contact support.',
       _ => 'Something went wrong. Please try again.',
     };
   }
@@ -706,7 +766,6 @@ class Backend {
       'requester_uid': _uid,
       'requester_name': requester?['name'] ?? 'Requester',
       'requester_username': requester?['username'],
-      'requester_phone': requester?['phone'] ?? '',
       'blood_group': bloodGroup,
       'units_needed': unitsNeeded,
       'urgency': urgency,

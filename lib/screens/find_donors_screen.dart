@@ -23,7 +23,7 @@ import '../widgets/rb_icon.dart';
 
 enum _MapPermissionState { checking, prompt, granted, denied }
 
-/// A donor id and its public listing — from Firestore, or the client demo.
+/// A donor id and its public listing from Firestore.
 typedef _Doc = ({String id, Map<String, dynamic> data});
 
 /// Find tab root — a real tiled map with every marker projected from the

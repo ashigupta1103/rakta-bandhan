@@ -6,10 +6,8 @@ import '../services/backend.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/loading_button.dart';
+import 'entry_route.dart';
 import 'login_screen.dart';
-import 'main_navigation_screen.dart';
-import 'registration_screen.dart';
-import 'username_screen.dart';
 import '../widgets/rb_icon.dart';
 
 /// "Enter the code we emailed you." Six boxes over one real text field, so
@@ -73,14 +71,9 @@ class _LoginCodeScreenState extends State<LoginCodeScreen> {
     });
     try {
       await Backend.instance.verifyLoginCode(widget.email, code);
-      final hasProfile = await Backend.instance.hasProfile();
-      final needsUsername = hasProfile && (await Backend.instance.myDonorDoc()).data()?['username'] == null;
+      final next = await signedInDestination();
       if (!mounted) return;
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (_) => !hasProfile ? const RegistrationScreen() : needsUsername ? const UsernameScreen(requiredChoice: true) : const MainNavigationScreen()),
-        (route) => false,
-      );
+      Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => next), (route) => false);
     } catch (e) {
       if (!mounted) return;
       HapticFeedback.mediumImpact();
@@ -196,8 +189,8 @@ class _LoginCodeScreenState extends State<LoginCodeScreen> {
   }
 }
 
-/// Six digit boxes drawn over a single hidden TextField (sign-in code and
-/// the demo phone check share it).
+/// Six digit boxes drawn over a single hidden TextField (the sign-in code
+/// and the phone check share it).
 class CodeBoxes extends StatelessWidget {
   final TextEditingController controller;
   final FocusNode focusNode;

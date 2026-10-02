@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/backend.dart';
 import '../theme/app_colors.dart';
+import 'entry_route.dart';
 import 'login_screen.dart';
-import 'main_navigation_screen.dart';
-import 'registration_screen.dart';
-import 'username_screen.dart';
 
 /// Branded launch — a deliberate brand reveal, not a loading screen.
 ///
@@ -86,22 +84,10 @@ class _SplashScreenState extends State<SplashScreen>
     );
   }
 
-  /// signed out               -> LoginScreen
-  /// signed in, no profile    -> RegistrationScreen
-  /// signed in with a profile -> MainNavigationScreen
+  /// signed out -> LoginScreen; signed in -> see [signedInDestination].
   Future<Widget> _resolveDestination() async {
-    final user = Backend.instance.currentUser;
-    if (user == null) return const LoginScreen();
-    try {
-      final profile = await Backend.instance.myDonorDoc();
-      if (!profile.exists) return const RegistrationScreen();
-      if (profile.data()?['username'] == null) return const UsernameScreen(requiredChoice: true);
-      return const MainNavigationScreen();
-    } catch (_) {
-      // Offline at launch: Firestore's cache usually answers; if it can't,
-      // open the app rather than strand the user on the splash.
-      return const MainNavigationScreen();
-    }
+    if (Backend.instance.currentUser == null) return const LoginScreen();
+    return signedInDestination();
   }
 
   @override

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../app_info.dart';
 import '../screens/about_screen.dart';
 import '../screens/corporate_partnerships_screen.dart';
 import '../screens/help_support_screen.dart';
@@ -150,7 +151,7 @@ void showMoreSheet(BuildContext context) {
                 (RbGlyph.page, AppColors.warmBorder, AppColors.ink2, 'Terms of use', (ctx) => const LegalReaderScreen(title: 'Terms of use')),
               ]),
               const SizedBox(height: 16),
-              const Text('Rakta Bandhan · version placeholder', textAlign: TextAlign.center, style: TextStyle(fontSize: 11.5, color: AppColors.disabledTint)),
+              const Text('Rakta Bandhan · version $kAppVersion', textAlign: TextAlign.center, style: TextStyle(fontSize: 11.5, color: AppColors.disabledTint)),
               const Text('An initiative of Rotary Club of Madras Cosmos', textAlign: TextAlign.center, style: TextStyle(fontSize: 11.5, color: AppColors.disabledTint)),
             ],
           ),

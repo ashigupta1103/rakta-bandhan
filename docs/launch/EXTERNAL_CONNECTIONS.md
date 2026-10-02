@@ -4,7 +4,7 @@ The agent builds the clients and server code locally. The owner creates accounts
 
 | Connection | Owner setup | Configuration | Current activation |
 |---|---|---|---|
-| Firebase | Keep the existing project; create an Auth admin plus `admins/<uid>`; deploy rules/indexes | Existing client config; no secret key in the app | Needs Blaze for donor email sign-in |
+| Firebase | Keep the existing project; create an Auth admin plus `admins/<uid>`; deploy rules/indexes | Existing client config; no secret key in the app | Email/Password sign-in provider switched on (free); Blaze only for the emailed code |
 | Cloudflare photos | Existing private Standard R2 bucket `bloodbank`; deploy `edge/` | `EDGE_URL` in Flutter, `VITE_EDGE_URL` in admin; exact `ALLOWED_ORIGINS` | Account/bucket confirmed by owner screenshot; Worker deployment pending |
 | Cloudflare TURN | Create a TURN Server key in Realtime > TURN Server; put `TURN_KEY_ID` and `TURN_API_TOKEN` into Worker secrets | Never place the TURN API token in an app or `.env` committed to Git; RealtimeKit/SFU tokens do not work | TURN key and Worker setup pending; STUN fallback remains |
 | Resend | Buy and verify a domain, create API key and SMTP sender | Functions `SMTP_URL` secret and verified `MAIL_FROM` | Domain absent; Blaze pending |

@@ -8,27 +8,29 @@ Source: `feat/prelaunch` at `fda233cfc6b427b383f93f3044bb5198a513dd3e`. Upstream
 |---|---|
 | Full `bash tool/preflight.sh` | Passed |
 | Flutter analyzer | No issues |
-| Flutter tests | Pass (re-run after the demo layer was removed) |
+| Flutter tests | 62 pass; the login tests also pass with `--dart-define=EMAIL_CODE_LIVE=true` (12 pass) |
+| Real app on an Android emulator (Firebase auth + Firestore emulators, this repo's rules) | Donor journey passes: sign up → confirm email → register → phone-check simulation → accept a request → in-app call → both confirm → rest period + record → certificate → Find → Community. The requester, account and community/support journeys in `integration_test/` were not completed (unverified). |
 | Functions unit tests | 27 pass |
 | Functions emulator smoke | Login/review, accounts, jobs, support and 410-record migration/search/cursor checks pass |
 | Edge tests and dry-run bundle | 23 pass; bundle succeeds |
 | Firestore/legacy Storage rules | 73 pass |
 | Admin types/build/lint | Pass, including follow-up document-ID mapping check |
-| Release APK | See the section below |
+| Release APK | Built and signature-verified; see the section below |
 
 Smoke tests used `demo-rakta-bandhan` emulators. No real email, SMS or push was sent. Production Firebase was not mutated. The existing admin lint/chunk-size and local SDK/Kotlin migration warnings remain; all listed checks exit zero.
 
 ## APK for owner testing
 
-Local path: `X:\BloodBankkk\build\app\outputs\flutter-apk\app-release.apk` (the older `build/RaktaBandhan-demo.apk` is obsolete: it contained the demo layer, now removed).
+Local path: `X:\BloodBankkk\build\RaktaBandhan.apk` (a copy of `build\app\outputs\flutter-apk\app-release.apk`; the older `build/RaktaBandhan-demo.apk` is obsolete: it contained the demo layer, now removed).
 
-- Build: `flutter build apk --release --dart-define=EDGE_URL=https://rakta-bandhan-edge.rakta-bandhan-edge.workers.dev`
+- Build: `flutter build apk --release` (`EDGE_URL` defaults to the live Worker)
 - Package: `com.raktabandhan.app`, version `1.0.0` (code 1).
 - Minimum Android API: 24. Target API: 36.
-- Size: 112,562,718 bytes (107.3 MiB).
+- Size: 111,972,894 bytes (106.8 MiB).
 - Signature: APK v2 verification passes.
-- SHA-256: `58eeb0e06e4663e6df4952662782c580b5d633d989d583fd07241669b80a924a`.
-- Sign-in needs the emailed-code Functions, so it cannot complete on the Spark project; there is no demo path any more.
+- SHA-256: `9a6ac1c4c2089887b17b72d93cb81d851f6822685669f4c2f68dfbf0770c20d9`.
+- Permissions audited: no `AD_ID`, `USE_FULL_SCREEN_INTENT`, `CALL_PHONE`, call-log or camera foreground-service permission. The compiled app contains no demo or sample strings; its one simulation is labelled "Simulation".
+- Sign-in is email + password with Firebase's verification email (free plan). It needs Email/Password switched on in the Firebase console, and the rules and indexes in this repo deployed to the live project: see [Spark now](SPARK_NOW.md). The phone-number check after registration is a labelled simulation (code `246810`).
 
 Use the normal Flutter release command after tests. On this SDK, skipping package setup with `--no-pub` left a generated integration-test plugin entry and failed Android compilation; the normal command regenerated the release plugin setup and built successfully. Generated registrant noise was restored before committing.
 
@@ -36,4 +38,4 @@ The artifact and logs in `build/checks/` are ignored local outputs. Code/docs ar
 
 ## Remaining owner work
 
-Device testing, domain/account provisioning and deployment remain owner tasks. Follow [external connections](EXTERNAL_CONNECTIONS.md) and [the deploy runbook](DEPLOY_RUNBOOK.md). Real sign-in and push activation remain pending Blaze and a verified sender, per [accepted decisions](DECISIONS.md). Production acceptance and a configured real APK follow that rollout. Legal approval/signing/store setup also remains owner-provided.
+Device testing, domain/account provisioning and deployment remain owner tasks. Follow [external connections](EXTERNAL_CONNECTIONS.md) and [the deploy runbook](DEPLOY_RUNBOOK.md). The emailed sign-in code and push delivery remain pending Blaze and a verified sender, per [accepted decisions](DECISIONS.md); until then sign-in is email + password. Production acceptance follows the owner's Firebase deployment. Legal approval/signing/store setup also remains owner-provided.

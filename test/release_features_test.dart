@@ -10,24 +10,62 @@ import 'package:rakta_bandhan/screens/legal_reader_screen.dart';
 import 'package:rakta_bandhan/screens/login_code_screen.dart';
 import 'package:rakta_bandhan/screens/login_screen.dart';
 import 'package:rakta_bandhan/services/backend.dart';
+import 'package:rakta_bandhan/services/features.dart';
 import 'package:rakta_bandhan/services/push_service.dart';
 
 void main() {
-  group('passwordless sign-in', () {
-    testWidgets('asks only for an email — no password field', (tester) async {
+  // The login form depends on a build flag (EMAIL_CODE_LIVE), so CI runs
+  // this file twice: once as is (email + password) and once with
+  // --dart-define=EMAIL_CODE_LIVE=true (emailed code, no password).
+  group(kEmailCodeLive ? 'passwordless sign-in' : 'email + password sign-in', () {
+    testWidgets(kEmailCodeLive ? 'asks only for an email — no password field' : 'asks for an email and a password', (tester) async {
       await tester.pumpWidget(const MaterialApp(home: LoginScreen()));
-      expect(find.byType(TextField), findsOneWidget);
-      expect(find.textContaining('password', findRichText: true), findsOneWidget); // "No password needed…"
-      expect(find.text('Send me a code'), findsOneWidget);
+      if (kEmailCodeLive) {
+        expect(find.byType(TextField), findsOneWidget);
+        expect(find.textContaining('password', findRichText: true), findsOneWidget); // "No password…"
+        expect(find.text('Send me a code'), findsOneWidget);
+      } else {
+        expect(find.byType(TextField), findsNWidgets(2));
+        expect(find.text('Sign in'), findsOneWidget);
+        expect(find.text('New here? Create an account'), findsOneWidget);
+        expect(find.text('Forgot password?'), findsOneWidget);
+      }
     });
 
     testWidgets('rejects a malformed email before calling the server', (tester) async {
       await tester.pumpWidget(const MaterialApp(home: LoginScreen()));
-      await tester.enterText(find.byType(TextField), 'not-an-email');
-      await tester.tap(find.text('Send me a code'));
+      await tester.enterText(find.byType(TextField).first, 'not-an-email');
+      await tester.tap(find.text(kEmailCodeLive ? 'Send me a code' : 'Sign in'));
       await tester.pump();
       expect(find.text('Enter a valid email address.'), findsOneWidget);
     });
+
+    if (!kEmailCodeLive) {
+      testWidgets('asks for the password, and for 8+ characters when creating an account', (tester) async {
+        await tester.pumpWidget(const MaterialApp(home: LoginScreen()));
+        await tester.enterText(find.byType(TextField).first, 'donor@example.com');
+        await tester.tap(find.text('Sign in'));
+        await tester.pump();
+        expect(find.text('Enter your password.'), findsOneWidget);
+
+        await tester.tap(find.text('New here? Create an account'));
+        await tester.pump();
+        expect(find.text('Forgot password?'), findsNothing);
+        await tester.enterText(find.byType(TextField).last, 'short');
+        await tester.tap(find.widgetWithText(ElevatedButton, 'Create account'));
+        await tester.pump();
+        expect(find.text('Use at least 8 characters for your password.'), findsOneWidget);
+      });
+
+      testWidgets('the password is hidden until the eye is tapped', (tester) async {
+        await tester.pumpWidget(const MaterialApp(home: LoginScreen()));
+        TextField password() => tester.widget<TextField>(find.byType(TextField).last);
+        expect(password().obscureText, isTrue);
+        await tester.tap(find.byTooltip('Show password'));
+        await tester.pump();
+        expect(password().obscureText, isFalse);
+      });
+    }
 
     testWidgets('code screen shows the address, counts down, and needs all 6 digits', (tester) async {
       await tester.pumpWidget(const MaterialApp(home: LoginCodeScreen(email: 'donor@example.com', resendAfterSeconds: 30)));

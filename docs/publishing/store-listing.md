@@ -121,11 +121,12 @@ Tracking: **No** (no IDFA, no data brokers, no cross-app tracking).
 
 ## App Review notes (paste into App Store Connect › App Review Information)
 
-> **Sign-in:** the app has no passwords. Enter one of the review emails below and continue; on the 6-digit code screen enter the review code (no email is sent for these two addresses).
-> - Account A (requester): `<REVIEW_EMAIL_A>`
-> - Account B (donor): `<REVIEW_EMAIL_B>`
-> - Review code: `<REVIEW_CODE>`
-> *(Both accounts, and B as a verified, available O+ donor near A's location, are created beforehand with `functions/scripts/seed-review-accounts.mjs`.)*
+> **Sign-in:** use the review email and password below (the free-plan build signs in with email + password).
+> - Account A (requester): `<REVIEW_EMAIL_A>` / `<REVIEW_PASSWORD_A>`
+> - Account B (donor): `<REVIEW_EMAIL_B>` / `<REVIEW_PASSWORD_B>`
+> *(Create both beforehand: sign up in the app with two inboxes you control, tap each verification link, register each as a donor (B as an available O+ donor near A's location) and verify B in the admin console.)*
+>
+> **If the build uses the emailed code instead** (after the Blaze upgrade, built with `EMAIL_CODE_LIVE=true`): the app has no passwords. Enter one of the review emails and, on the 6-digit code screen, the review code `<REVIEW_CODE>` (no email is sent for these two addresses). Both accounts are then created beforehand with `functions/scripts/seed-review-accounts.mjs`.
 >
 > **To see matching, chat and calling**, use two devices or simulators, one signed in as A and one as B:
 > 1. On device A, Request tab › "Need blood yourself?" › pick a blood group B can donate to (O+, A+, B+ or AB+), urgency and location.

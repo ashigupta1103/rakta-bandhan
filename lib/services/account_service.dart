@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import 'backend.dart';
+import 'features.dart';
 import 'push_service.dart';
 import 'chat_service.dart';
 
@@ -63,9 +64,14 @@ class AccountService {
   /// - every chat message this user sent is deleted;
   /// - donation_history rows stay (they only hold the now-orphaned uid —
   ///   an anonymous count, not personal data).
-  Future<void> deleteMyAccount() async {
+  ///
+  /// With password sign-in Firebase wants a recent sign-in before it lets
+  /// the app delete the account, so [password] is checked first, before
+  /// anything is removed.
+  Future<void> deleteMyAccount({String? password}) async {
     final user = _auth.currentUser;
     if (user == null) return;
+    if (!kEmailCodeLive) await Backend.instance.reauthenticateWithPassword(password ?? '');
 
     final asRequester = await _db.collection('requests').where('requester_uid', isEqualTo: _uid).get();
     for (final doc in asRequester.docs) {
@@ -106,9 +112,8 @@ class AccountService {
     removal.delete(_db.collection('donors_public').doc(_uid));
     removal.delete(_db.collection('donors').doc(_uid));
     await removal.commit();
-    // The sign-in account goes last, server-side (deleteMyAuthAccount). If
-    // this step fails the user can simply retry: every step above is safe
-    // to repeat.
+    // The sign-in account goes last (deleteMyAuthAccount). If this step
+    // fails the user can simply retry: every step above is safe to repeat.
     await Backend.instance.deleteMyAuthAccount();
     await Backend.instance.signOut();
   }

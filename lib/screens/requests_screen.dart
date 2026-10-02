@@ -34,7 +34,7 @@ class RequestsScreen extends StatefulWidget {
 
 enum _Tab { nearby, yours }
 
-/// A request id and its fields — from Firestore, or from the client demo.
+/// A request id and its fields from Firestore.
 typedef _Doc = ({String id, Map<String, dynamic> data});
 
 class _RequestsScreenState extends State<RequestsScreen> {

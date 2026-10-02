@@ -1,8 +1,11 @@
+import 'package:firebase_auth/firebase_auth.dart' show FirebaseAuthException;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import '../theme/app_colors.dart';
 import '../services/account_service.dart';
+import '../services/backend.dart';
+import '../services/features.dart';
 import '../widgets/confirm_sheet.dart';
 import '../widgets/logout_flow.dart';
 import '../widgets/rb_ui.dart';
@@ -108,19 +111,56 @@ class _SettingsScreenState extends State<SettingsScreen> {
       cancelLabel: 'Keep my account',
     );
     if (!confirmed || !mounted) return;
+    String? password;
+    if (!kEmailCodeLive) {
+      password = await _askPassword();
+      if (password == null || !mounted) return;
+    }
     setState(() => _deleting = true);
     try {
-      await AccountService.instance.deleteMyAccount();
+      await AccountService.instance.deleteMyAccount(password: password);
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const LoginScreen()), (route) => false);
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Your account has been deleted.')));
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       setState(() => _deleting = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not finish deleting your account. Check your connection and try again — nothing is lost by retrying.')),
-      );
+      // A wrong password is caught before anything is deleted.
+      final wrongPassword = e is FirebaseAuthException && const {'wrong-password', 'invalid-credential', 'user-mismatch'}.contains(e.code);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(wrongPassword
+            ? Backend.authErrorMessage(e)
+            : 'Could not finish deleting your account. Check your connection and try again — nothing is lost by retrying.'),
+      ));
     }
+  }
+
+  /// Password sign-in only: Firebase wants a recent sign-in before it lets
+  /// an account be deleted.
+  Future<String?> _askPassword() {
+    final controller = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Enter your password'),
+        content: TextField(
+          controller: controller,
+          obscureText: true,
+          autofocus: true,
+          autocorrect: false,
+          enableSuggestions: false,
+          decoration: const InputDecoration(hintText: 'Your password'),
+          onSubmitted: (v) => Navigator.pop(dialogContext, v),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, controller.text),
+            child: const Text('Delete account', style: TextStyle(color: AppColors.red700)),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _confirmLogOut() => confirmAndLogOut(

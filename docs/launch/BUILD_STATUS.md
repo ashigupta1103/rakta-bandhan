@@ -4,7 +4,9 @@ Branch: `feat/prelaunch`. Upstream `origin/master` at `0e19c5d` was merged, pres
 
 ## Implemented
 
-- All demo/preview code is removed (2026-10-02): no demo sign-in, sample content, preview gallery or simulated calls. The app only talks to the real backend.
+- All demo/preview code is removed (2026-10-02): no demo sign-in, sample content, preview gallery or simulated calls. The app only talks to the real backend. The one labelled simulation is the phone-number check after registration (no SMS provider yet).
+- Free-plan sign-in: email + password with Firebase's verification email, "Forgot password", and a password re-check before account deletion. `--dart-define=EMAIL_CODE_LIVE=true` switches to the emailed code once Blaze and a sender exist.
+- A real request lifecycle on the free plan: the donor's thank-you screen and 90-day rest now start as soon as the requester's confirmation completes the donation while the donor's screen is open; new requests carry no phone number.
 - Functions account ban/unban/removal, bounded reactivation, request expiry, two-person completion and switchable server impact counting.
 - Cloudflare R2 client uploads/downloads/deletions, JPEG compression, private ID-proof access and legacy read fallback; TURN credentials with caching and STUN fallback. Both admin clients use authenticated ID-photo access.
 - Atomic username claims, signup/existing-account prompt, 30-day changes, profile/post/chat display, release on deletion and protection against late cleanup deleting a reused name.
@@ -24,7 +26,8 @@ The real production acceptance in the original handoff remains pending owner pro
 
 ## Local validation
 
-- Flutter: analyzer clean; tests pass (the demo-only tests were removed with the demo layer).
+- Flutter: analyzer clean; tests pass, and the login tests also pass in emailed-code mode (`EMAIL_CODE_LIVE=true`). The demo-only tests were removed with the demo layer.
+- On an Android emulator, against the Firebase emulators and this repo's rules: the donor journey (sign up → confirm email → register → phone-check simulation → accept a request → in-app call → both confirm → rest period → certificate → Find → Community) passes. The requester, account (log out/in, export, delete) and community/support journeys are written in `integration_test/` but were **not** completed, so they are unverified.
 - Functions: 27 unit tests. Emulator smoke covers login/review accounts, lifecycle, jobs, username release/reuse, support delivery off and migration/search/cursor behaviour across 410 records.
 - Edge: 23 tests and dry-run Worker bundle.
 - Rules: 73 tests, including username atomicity/cooldown, phone protection, contact privacy and private support access.

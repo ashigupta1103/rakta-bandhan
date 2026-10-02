@@ -11,7 +11,7 @@ import 'tracking_screen.dart';
 /// "A donor accepted your request" — the requester's matched moment on the
 /// ember field. The donor identity comes from FirestoreDonorMatchService,
 /// reading the real match written by Backend.acceptRequest (see
-/// donor_match_service.dart); in a client demo, from the demo persona.
+/// donor_match_service.dart).
 class DonorFoundScreen extends StatelessWidget {
   final String requestId;
 

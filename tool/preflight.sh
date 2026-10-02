@@ -19,6 +19,8 @@ flutter analyze
 
 step "flutter test"
 flutter test
+# The login form differs once the emailed-code sign-in is switched on.
+flutter test --dart-define=EMAIL_CODE_LIVE=true test/release_features_test.dart
 
 step "functions: unit tests"
 (cd functions && deps && npm test)

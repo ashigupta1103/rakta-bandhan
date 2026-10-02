@@ -22,7 +22,7 @@ Legend: ✅ done in the repo · ⬜ someone must do it (needs an account, a deci
 
 ## Done in this branch
 
-- ✅ **Real sign-in.** Passwordless: a 6-digit code is emailed to the user and exchanged for a Firebase sign-in token (needs the Blaze functions and an email provider — see `docs/launch/AFTER_BLAZE_UPGRADE.md`). Account deletion needs no password. The old any-code test login is gone. Firestore and Storage rules only let **verified** accounts create anything.
+- ✅ **Real sign-in.** On the free plan: email + password, and a new account confirms its address from Firebase's own verification email. Once Blaze and an email provider exist, build with `--dart-define=EMAIL_CODE_LIVE=true` for the passwordless version: a 6-digit code is emailed and exchanged for a Firebase sign-in token, and account deletion needs no password (see `docs/launch/AFTER_BLAZE_UPGRADE.md`). The old any-code test login is gone. Firestore and Storage rules only let **verified** accounts create anything.
 - ✅ **Push notifications** (Cloud Functions in `functions/`): chat messages, missed calls, request accepted / released / cancelled / expired, two-sided donation confirmation prompts, nearby compatible donors on every new request (urgent alerts on a loud channel), and admin broadcasts to FCM topics.
 - ✅ **Ringing calls when the app is closed** (Android): a high-priority data push opens the native incoming-call screen with ringtone (flutter_callkit_incoming). Answer goes straight into the call; Decline tells the caller at once. iOS gets a time-sensitive "Incoming call" alert until PushKit + CallKit are added.
 - ✅ **Two-sided completion.** Donor taps "I donated" → their 90-day rest starts and history + certificate are written; the request becomes *completed* only when the requester also confirms (or an admin does). Enforced in the rules.
@@ -46,7 +46,8 @@ Legend: ✅ done in the repo · ⬜ someone must do it (needs an account, a deci
 | Security rules (Firestore + Storage, emulator) | `cd backend/rules-test && npm install && npm test` (needs Java 21) | 73 / 73 |
 | Functions unit tests | `cd functions && npm test` | 27 / 27 |
 | Functions smoke test (emulator) | `cd functions && FUNCTIONS_DISCOVERY_TIMEOUT=120 npm run smoke` | login, review seed, lifecycle/jobs, support and 410-record migration checks pass |
-| Android build | `flutter build apk --release --dart-define=EDGE_URL=<worker url>` | APK builds; real-device acceptance is owner-run |
+| Real app on an Android emulator (Firebase emulators, real rules) | `bash tool/e2e_screenshots.sh build/e2e_donor integration_test/app_flow_test.dart` (also `requester_flow_`, `account_flow_`, `engagement_flow_test.dart`) | see [verification](../launch/VERIFICATION.md) |
+| Android build | `flutter build apk --release` (`EDGE_URL` defaults to the live Worker) | APK builds; real-device acceptance is owner-run |
 | Admin console | `cd admin/frontend && npm run build` | builds, type-checks |
 
 Not testable here: real push delivery, real calls between two phones, and the Google map (need the live project, two devices and the Maps key) — see the two-phone checklist in step 3.
@@ -57,7 +58,7 @@ Not testable here: real push delivery, real calls between two phones, and the Go
 1. **Billing account in the club's name**, linked to the project; upgrade to Blaze.
    - Budget: **₹3,000/month**, alerts at 50% / 90% / 100% (Cloud Console › Billing › Budgets & alerts). Blaze has no hard cap; the alerts are the guardrail.
    - The payment method can be changed any time (Billing › Payment method), and the project can be moved to a different billing account (Billing › Account management › Change billing) — no downtime.
-2. **Authentication** › Sign-in method › enable **Email/Password**. Only the two admin consoles use it; users sign in with an emailed code, which needs the `SMTP_URL` secret (see `docs/launch/AFTER_BLAZE_UPGRADE.md`).
+2. **Authentication** › Sign-in method › enable **Email/Password**. The two admin consoles and the free-plan donor sign-in use it. The passwordless emailed code (after Blaze) additionally needs the `SMTP_URL` secret (see `docs/launch/AFTER_BLAZE_UPGRADE.md`).
 3. **Photos and call relay**: provision Cloudflare R2/TURN and deploy the Worker following `docs/launch/SPARK_NOW.md`. New app photos do not use Firebase Storage.
 4. Check `REGION` in `functions/src/app.ts` equals the Firestore location (Firestore › the location shown at the top). Change it if needed.
 5. Deploy everything:

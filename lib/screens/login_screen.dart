@@ -1,10 +1,13 @@
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_auth/firebase_auth.dart' show FirebaseAuthException;
 import 'package:flutter/material.dart';
 import '../services/backend.dart';
+import '../services/features.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/loading_button.dart';
 import '../widgets/rb_icon.dart';
+import 'entry_route.dart';
 import 'legal_reader_screen.dart';
 import 'login_code_screen.dart';
 
@@ -31,10 +34,11 @@ String friendlyAuthError(Object e) {
   return Backend.authErrorMessage(e);
 }
 
-/// Sign in with no password: enter your email, we send a 6-digit code
-/// (LoginCodeScreen). New and returning users take the same path — the
-/// same email always opens the same account; a new account then completes
-/// registration. Phone verification belongs to registration, not sign-in.
+/// Sign in. With [kEmailCodeLive] there is no password: enter your email
+/// and we send a 6-digit code (LoginCodeScreen). Until then (free Firebase
+/// plan) it is email + password, and a new account confirms its address
+/// from the verification email Firebase sends (VerifyEmailScreen). Either
+/// way a new account then completes registration.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -44,7 +48,11 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
   bool _busy = false;
+  bool _creating = false;
+  bool _showPassword = false;
+  String? _emailError;
   String? _error;
 
   static final emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]{2,}$');
@@ -52,24 +60,51 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void dispose() {
     _emailController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
-  Future<void> _sendCode() async {
+  Future<void> _submit() async {
     final email = _emailController.text.trim();
     if (!emailPattern.hasMatch(email)) {
-      setState(() => _error = 'Enter a valid email address.');
+      setState(() => _emailError = 'Enter a valid email address.');
       return;
+    }
+    final password = _passwordController.text;
+    if (!kEmailCodeLive) {
+      if (password.isEmpty) {
+        setState(() => _error = 'Enter your password.');
+        return;
+      }
+      if (_creating && password.length < 8) {
+        setState(() => _error = 'Use at least 8 characters for your password.');
+        return;
+      }
     }
     setState(() {
       _busy = true;
+      _emailError = null;
       _error = null;
     });
     try {
-      final resendAfter = await Backend.instance.requestLoginCode(email);
+      if (kEmailCodeLive) {
+        final resendAfter = await Backend.instance.requestLoginCode(email);
+        if (!mounted) return;
+        setState(() => _busy = false);
+        Navigator.push(context, MaterialPageRoute(builder: (_) => LoginCodeScreen(email: email, resendAfterSeconds: resendAfter)));
+        return;
+      }
+      if (_creating) {
+        await Backend.instance.signUpWithEmail(email, password);
+      } else {
+        final user = await Backend.instance.signInWithEmail(email, password);
+        // Someone who never confirmed their address lands on the "check your
+        // inbox" screen next; make sure there is a fresh link waiting.
+        if (!user.emailVerified) await Backend.instance.resendVerificationEmail().catchError((_) {});
+      }
+      final next = await signedInDestination();
       if (!mounted) return;
-      setState(() => _busy = false);
-      Navigator.push(context, MaterialPageRoute(builder: (_) => LoginCodeScreen(email: email, resendAfterSeconds: resendAfter)));
+      Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => next), (route) => false);
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -77,6 +112,26 @@ class _LoginScreenState extends State<LoginScreen> {
         _error = friendlyAuthError(e);
       });
     }
+  }
+
+  /// Sends Firebase's password-reset email. The wording never says whether
+  /// an account exists for the address.
+  Future<void> _forgotPassword() async {
+    final email = _emailController.text.trim();
+    if (!emailPattern.hasMatch(email)) {
+      setState(() => _emailError = 'Enter your email above first.');
+      return;
+    }
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await Backend.instance.sendPasswordReset(email);
+    } catch (e) {
+      if (!(e is FirebaseAuthException && e.code == 'user-not-found')) {
+        if (mounted) setState(() => _error = friendlyAuthError(e));
+        return;
+      }
+    }
+    messenger.showSnackBar(SnackBar(content: Text('If an account exists for $email, a reset link is on its way. Check Spam too.')));
   }
 
   @override
@@ -111,33 +166,95 @@ class _LoginScreenState extends State<LoginScreen> {
                   TextField(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
-                    textInputAction: TextInputAction.send,
+                    textInputAction: kEmailCodeLive ? TextInputAction.send : TextInputAction.next,
                     autocorrect: false,
                     autofillHints: const [AutofillHints.email],
                     style: const TextStyle(fontSize: 15.5, color: AppColors.ink),
-                    onSubmitted: (_) => _busy ? null : _sendCode(),
-                    onChanged: (_) => _error == null ? null : setState(() => _error = null),
+                    onSubmitted: kEmailCodeLive ? (_) => _busy ? null : _submit() : null,
+                    onChanged: (_) => _emailError == null && _error == null ? null : setState(() {
+                      _emailError = null;
+                      _error = null;
+                    }),
                     decoration: InputDecoration(
                       hintText: 'you@example.com',
                       contentPadding: const EdgeInsets.symmetric(vertical: 15, horizontal: 14),
                       prefixIcon: const RbIcon(RbGlyph.mail, size: 19, color: AppColors.ink2),
-                      errorText: _error,
+                      errorText: _emailError,
                       errorMaxLines: 3,
                     ),
                   ),
+                  if (!kEmailCodeLive) ...[
+                    const SizedBox(height: 16),
+                    const Text('Password', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.ink)),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _passwordController,
+                      obscureText: !_showPassword,
+                      textInputAction: TextInputAction.done,
+                      autocorrect: false,
+                      enableSuggestions: false,
+                      autofillHints: [_creating ? AutofillHints.newPassword : AutofillHints.password],
+                      style: const TextStyle(fontSize: 15.5, color: AppColors.ink),
+                      onSubmitted: (_) => _busy ? null : _submit(),
+                      onChanged: (_) => _error == null ? null : setState(() => _error = null),
+                      decoration: InputDecoration(
+                        hintText: _creating ? 'At least 8 characters' : 'Your password',
+                        contentPadding: const EdgeInsets.symmetric(vertical: 15, horizontal: 14),
+                        prefixIcon: const RbIcon(RbGlyph.lock, size: 19, color: AppColors.ink2),
+                        suffixIcon: IconButton(
+                          tooltip: _showPassword ? 'Hide password' : 'Show password',
+                          icon: RbIcon(_showPassword ? RbGlyph.eyeOff : RbGlyph.eye, size: 19, color: AppColors.ink2),
+                          onPressed: () => setState(() => _showPassword = !_showPassword),
+                        ),
+                      ),
+                    ),
+                  ],
+                  if (_error != null) ...[
+                    const SizedBox(height: 10),
+                    Text(_error!, style: const TextStyle(fontSize: 13, color: AppColors.brandRed, height: 1.4)),
+                  ],
                   const SizedBox(height: 16),
-                  LoadingButton(label: 'Send me a code', isLoading: _busy, onPressed: _sendCode),
-                  const SizedBox(height: 14),
-                  const Row(
+                  LoadingButton(
+                    label: kEmailCodeLive ? 'Send me a code' : (_creating ? 'Create account' : 'Sign in'),
+                    isLoading: _busy,
+                    onPressed: _submit,
+                  ),
+                  if (!kEmailCodeLive) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        TextButton(
+                          onPressed: _busy ? null : () => setState(() {
+                            _creating = !_creating;
+                            _error = null;
+                          }),
+                          child: Text(
+                            _creating ? 'Have an account? Sign in' : 'New here? Create an account',
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.brandRed),
+                          ),
+                        ),
+                        if (!_creating)
+                          TextButton(
+                            onPressed: _busy ? null : _forgotPassword,
+                            child: const Text('Forgot password?', style: TextStyle(fontSize: 13, color: AppColors.ink2)),
+                          ),
+                      ],
+                    ),
+                  ],
+                  const SizedBox(height: 10),
+                  Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      RbIcon(RbGlyph.lock, size: 14, color: AppColors.ink2, accent: Colors.transparent),
-                      SizedBox(width: 6),
+                      const RbIcon(RbGlyph.lock, size: 14, color: AppColors.ink2, accent: Colors.transparent),
+                      const SizedBox(width: 6),
                       Flexible(
                         child: Text(
-                          'No password. We email a 6-digit code each time.',
+                          kEmailCodeLive
+                              ? 'No password. We email a 6-digit code each time.'
+                              : 'A new account confirms its email once, with a link we send.',
                           textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 12.5, color: AppColors.ink2),
+                          style: const TextStyle(fontSize: 12.5, color: AppColors.ink2),
                         ),
                       ),
                     ],

@@ -11,12 +11,11 @@ import 'chat_screen.dart';
 import 'donation_confirm_screen.dart';
 import '../widgets/rb_icon.dart';
 
-/// Shows the requester's contact info for a request this donor accepted.
-/// `createRequest()` denormalizes `requester_name`/`requester_phone` onto
-/// the request doc itself at creation time specifically so this screen
-/// never needs to read `donors/{requester_uid}` directly — under
-/// firestore.rules that doc is owner/admin-only, and the accepting donor
-/// is neither.
+/// Shows who the donor is helping on a request they accepted, with in-app
+/// chat and calls. `createRequest()` puts `requester_name` (never a phone
+/// number) on the request doc itself so this screen never needs to read
+/// `donors/{requester_uid}` — under firestore.rules that doc is
+/// owner/admin-only, and the accepting donor is neither.
 class MatchContactScreen extends StatefulWidget {
   final String requestId;
 
@@ -28,6 +27,10 @@ class MatchContactScreen extends StatefulWidget {
 
 class _MatchContactScreenState extends State<MatchContactScreen> {
   bool _markingDonated = false;
+  /// The status last drawn, to notice the moment the requester's
+  /// confirmation (the second one) completes the donation while this screen
+  /// is open.
+  String? _lastStatus;
   Stream<Map<String, dynamic>?> get _doc => Backend.instance.requestStream(widget.requestId);
   bool _releasing = false;
 
@@ -117,6 +120,17 @@ class _MatchContactScreenState extends State<MatchContactScreen> {
               final iConfirmed = request['donor_confirmed_at'] != null;
               final theyConfirmed = request['requester_confirmed_at'] != null;
               final busy = _markingDonated || _releasing;
+              if (_lastStatus == 'matched' && status == 'fulfilled' && iConfirmed && !_markingDonated && request['matched_donor_id'] == myUid) {
+                // The requester just completed it: apply this donor's side
+                // (the rest period and the donation record) now rather than
+                // at their next visit to My Page, then say thank you.
+                final navigator = Navigator.of(context);
+                WidgetsBinding.instance.addPostFrameCallback((_) async {
+                  await Backend.instance.completeMyDonationIfConfirmed().catchError((_) => false);
+                  if (mounted) navigator.pushReplacement(MaterialPageRoute(builder: (_) => const DonationConfirmScreen()));
+                });
+              }
+              _lastStatus = status;
 
               return ListView(
                 padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),

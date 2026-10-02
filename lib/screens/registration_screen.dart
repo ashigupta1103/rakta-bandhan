@@ -9,7 +9,7 @@ import 'location_picker_screen.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/blood_group_droplet.dart';
-import 'consent_screen.dart';
+import 'phone_verify_screen.dart';
 import 'login_screen.dart';
 import '../widgets/rb_icon.dart';
 import '../widgets/username_field.dart';
@@ -206,7 +206,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       setState(() => _isSubmitting = false);
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => const ConsentScreen()),
+        MaterialPageRoute(builder: (context) => PhoneVerifyScreen(phone: whatsapp)),
       );
     } catch (e) {
       if (!mounted) return;
