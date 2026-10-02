@@ -103,10 +103,10 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
         if (!mounted) return;
         Navigator.pop(context);
         messenger.showSnackBar(const SnackBar(content: Text('Story updated.')));
-      } catch (_) {
+      } catch (e) {
         if (!mounted) return;
         setState(() => _submitting = false);
-        messenger.showSnackBar(const SnackBar(content: Text('Could not save your changes. Please try again.')));
+        messenger.showSnackBar(SnackBar(content: Text('Could not save your changes. ${Backend.authErrorMessage(e)}')));
       }
       return;
     }
@@ -119,10 +119,10 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
       if (!mounted) return;
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Shared with the community.')));
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       setState(() => _submitting = false);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not share this. Please try again.')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not share this. ${Backend.authErrorMessage(e)}')));
     }
   }
 
