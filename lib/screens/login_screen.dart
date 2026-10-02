@@ -65,10 +65,13 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() => _error = 'Enter a valid email address.');
       return;
     }
+    // Demo APK (free plan): no server can email a code, so start the same
+    // new-user demo journey the hub offers, with whatever email was typed.
+    if (kDemoSignIn && !Demo.on) Demo.instance.start(DemoRole.requester, registered: false);
     if (Demo.on) {
-      // Simulated: no email is sent. Only the demo address is accepted so a
-      // real address typed into a demo build never looks like it worked.
-      if (email.toLowerCase() != Demo.email) {
+      // Simulated: no email is sent. A hub-started demo accepts only the demo
+      // address so a real one typed there never looks like it worked.
+      if (!kDemoSignIn && email.toLowerCase() != Demo.email) {
         setState(() => _error = 'In the demo, sign in with ${Demo.email}.');
         return;
       }
