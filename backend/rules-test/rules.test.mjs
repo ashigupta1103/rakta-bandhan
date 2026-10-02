@@ -442,6 +442,40 @@ describe('community posts', () => {
   });
 });
 
+describe('impact counter', () => {
+  const impact = (n, month = '2026-10') => ({ month_key: month, donations_this_month: n, updated_at: serverTimestamp() });
+  const serverJobsOn = () => seed((db) => setDoc(doc(db, 'config/features'), { server_jobs: true }));
+
+  test('before functions are deployed, the app bumps it by exactly one', async () => {
+    await assertSucceeds(setDoc(doc(verified('u1'), 'public_stats/impact'), impact(1)));
+    await assertSucceeds(updateDoc(doc(verified('u2'), 'public_stats/impact'), impact(2)));
+    await assertFails(updateDoc(doc(verified('u2'), 'public_stats/impact'), impact(9)), 'jumping by more than one');
+    await assertSucceeds(updateDoc(doc(verified('u2'), 'public_stats/impact'), impact(1, '2026-11')), 'a new month starts again at 1');
+  });
+
+  test('once server jobs are on, only an admin can change it', async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db, 'public_stats/impact'), impact(5));
+      await setDoc(doc(db, 'admins/boss'), { role: 'admin' });
+    });
+    await assertSucceeds(updateDoc(doc(verified('u1'), 'public_stats/impact'), impact(6)));
+    await serverJobsOn();
+    await assertFails(updateDoc(doc(verified('u1'), 'public_stats/impact'), impact(7)));
+    await assertFails(setDoc(doc(verified('u1'), 'public_stats/other'), impact(1)));
+    await assertSucceeds(updateDoc(doc(verified('boss'), 'public_stats/impact'), impact(40)));
+  });
+
+  test('config switches can be read by anyone signed in and written only by an admin', async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db, 'config/features'), { server_jobs: false });
+      await setDoc(doc(db, 'admins/boss'), { role: 'admin' });
+    });
+    await assertSucceeds(getDoc(doc(verified('u1'), 'config/features')));
+    await assertFails(updateDoc(doc(verified('u1'), 'config/features'), { server_jobs: true }));
+    await assertSucceeds(updateDoc(doc(verified('boss'), 'config/features'), { server_jobs: true }));
+  });
+});
+
 describe('admin-only areas', () => {
   test('only an admin can queue a broadcast', async () => {
     await seed((db) => setDoc(doc(db, 'admins/boss'), { role: 'admin' }));

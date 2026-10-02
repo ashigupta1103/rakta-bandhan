@@ -125,6 +125,9 @@ const lookup = await fetch(`${AUTH}/accounts:lookup?key=demo`, {
   body: JSON.stringify({ localId: [first.claims.user_id] }),
 }).then((x) => x.json());
 assert.ok(!lookup.users || lookup.users.length === 0, 'the account must be gone');
+// The donor-doc trigger may already have removed the account: deleting twice must still succeed.
+const delAgain = await callable('deleteMyAuthAccount', {}, second.idToken);
+assert.equal(delAgain.result?.deleted, true, JSON.stringify(delAgain));
 console.log('✔ deleteMyAuthAccount removes the caller’s account and refuses anonymous calls');
 
 console.log('\nAll sign-in smoke checks passed.');

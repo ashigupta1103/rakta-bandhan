@@ -92,9 +92,9 @@ function DonorRow({ donor, onVerify, onToggle, onBan, onDelete, busy }: {
             variant="ghost"
             className="text-red-600"
             disabled={busy}
-            title="Delete profile — sign-in stays active, use Ban to lock them out"
+            title="Delete donor profile (sign-in removal requires the deployed backend)"
             onClick={() => {
-              if (confirm(`Delete ${donor.name}'s profile? Their sign-in stays active — this only removes the Firestore record. Use Ban to actually lock them out.`)) {
+              if (confirm(`Delete ${donor.name}'s profile? Once the backend is deployed, this also removes their sign-in account and ID proof.`)) {
                 onDelete(donor.id, donor.name);
               }
             }}

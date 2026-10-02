@@ -7,20 +7,22 @@
 //     a data message; iOS: a time-sensitive alert until PushKit is added);
 //   - nearby-donor fan-out when a request is raised;
 //   - admin broadcasts to FCM topics;
-//   - expiring requests nobody accepted, and deleting a removed post's photo;
+//   - expiring requests nobody accepted, and switching donors back on when their rest ends;
+//   - carrying a ban or removal through to the sign-in account (accounts.ts);
 //   - passwordless sign-in codes (login.ts).
 //
 // Every function stays well inside the Blaze free tier (2M invocations a
 // month) at the volumes in docs/publishing/cost-estimate.md.
 
-import { onDocumentCreated, onDocumentDeleted, onDocumentUpdated } from 'firebase-functions/v2/firestore';
+import { onDocumentCreated, onDocumentUpdated } from 'firebase-functions/v2/firestore';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import * as logger from 'firebase-functions/logger';
 import { DocumentData, FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { Message } from 'firebase-admin/messaging';
-import { getStorage } from 'firebase-admin/storage';
 
-import { db, messaging } from './app';
+import { db, isEmulator, messaging } from './app';
+import { reactivateDueDonors } from './jobs';
+import { nextImpact } from './lifecycle';
 
 import { BLOOD_COMPATIBILITY, bloodGroupTopic, cellsCovering, distanceKm } from './geo';
 import { shortPlace } from './text';
@@ -88,6 +90,7 @@ async function tokenFor(uid: string | undefined | null): Promise<string | null> 
 }
 
 async function sendToUser(uid: string | undefined | null, p: Push): Promise<void> {
+  if (isEmulator) return; // FCM has no emulator: never use real credentials in local checks.
   const token = await tokenFor(uid);
   if (!token || !uid) return;
   try {
@@ -101,6 +104,7 @@ async function sendToUser(uid: string | undefined | null, p: Push): Promise<void
 
 /** Sends one notification to many devices, 500 per FCM call. */
 async function sendToMany(targets: Array<{ uid: string; token: string }>, p: Push): Promise<number> {
+  if (isEmulator) return 0;
   let sent = 0;
   for (let i = 0; i < targets.length; i += 500) {
     const chunk = targets.slice(i, i + 500);
@@ -149,6 +153,7 @@ export const onChatMessage = onDocumentCreated('requests/{requestId}/messages/{m
  * a closed app for data messages, gets a time-sensitive alert instead.
  */
 export const onCallCreated = onDocumentCreated('requests/{requestId}/calls/{callId}', async (event) => {
+  if (isEmulator) return;
   const call = event.data?.data();
   if (!call || call.status !== 'ringing') return;
   const callee = call.callee_uid as string;
@@ -186,6 +191,7 @@ export const onCallCreated = onDocumentCreated('requests/{requestId}/calls/{call
 
 /** Stops the ringing on the callee's phone once the call is answered, declined, cancelled or missed. */
 export const onCallUpdated = onDocumentUpdated('requests/{requestId}/calls/{callId}', async (event) => {
+  if (isEmulator) return;
   const before = event.data?.before.data();
   const after = event.data?.after.data();
   if (!before || !after || before.status !== 'ringing' || after.status === 'ringing') return;
@@ -344,6 +350,7 @@ export const onRequestUpdated = onDocumentUpdated('requests/{requestId}', async 
   }
   if (was !== 'fulfilled' && now === 'fulfilled') {
     jobs.push(applyDonorCompletion(requestId, after));
+    jobs.push(bumpImpact());
     jobs.push(sendToUser(after.requester_uid, push('Donation completed', `Thank you for using Rakta Bandhan. ${donorName} helped today.`)));
     jobs.push(sendToUser(after.matched_donor_id, push('Donation recorded — thank you', 'Your donation certificate is ready in Donation history.')));
   }
@@ -393,6 +400,21 @@ export async function applyDonorCompletion(requestId: string, req: DocumentData)
   });
 }
 
+/**
+ * The Community → Impact figure ("donations this month"). Until the owner
+ * turns server jobs on (`config/features.server_jobs`, once these functions are
+ * deployed) the app bumps it itself; from then on the rules stop the app doing
+ * so, and this does it, once per completed donation.
+ */
+async function bumpImpact(): Promise<void> {
+  if ((await db.doc('config/features').get()).data()?.server_jobs !== true) return;
+  const ref = db.doc('public_stats/impact');
+  await db.runTransaction(async (tx) => {
+    const next = nextImpact((await tx.get(ref)).data(), Date.now());
+    tx.set(ref, { ...next, updated_at: FieldValue.serverTimestamp() }, { merge: true });
+  });
+}
+
 /** Closes open requests nobody accepted before `expires_at` (6 hours). */
 export const expireOldRequests = onSchedule({ schedule: 'every 15 minutes', timeZone: 'Asia/Kolkata' }, async () => {
   const snap = await db
@@ -410,6 +432,23 @@ export const expireOldRequests = onSchedule({ schedule: 'every 15 minutes', time
   logger.info('expired requests', { count: snap.size });
 });
 
+/**
+ * Switches donors back on once their 90-day rest has ended, and tells them.
+ * The app does the same when a donor opens it (Backend.maybeReactivate); this
+ * covers donors who never reopen it. Runs daily at 06:00 India time.
+ */
+export const reactivateDonors = onSchedule({ schedule: '0 6 * * *', timeZone: 'Asia/Kolkata' }, async () => {
+  const count = await reactivateDueDonors(Date.now(), (targets) =>
+    sendToMany(targets, {
+      title: 'You can donate again',
+      body: 'Your rest period is over. You’re available to nearby requests again.',
+      channel: 'general',
+      data: { type: 'reactivated' },
+    }),
+  );
+  logger.info('reactivated donors', { count });
+});
+
 // ────────────────────────────────────────────────────────── Broadcasts
 
 /**
@@ -424,6 +463,10 @@ export const onBroadcast = onDocumentCreated('broadcasts/{id}', async (event) =>
   const body = String(b.body ?? '').slice(0, 300);
   if (!title && !body) return;
   const topic = b.blood_group ? bloodGroupTopic(String(b.blood_group)) : 'all';
+  if (isEmulator) {
+    await event.data.ref.update({ status: 'skipped', topic });
+    return;
+  }
   try {
     const messageId = await messaging.send({
       topic,
@@ -439,14 +482,8 @@ export const onBroadcast = onDocumentCreated('broadcasts/{id}', async (event) =>
   }
 });
 
-// ─────────────────────────────────────────────────────────── Community
-
-/** A deleted post takes its photo (and thumbnail) with it. */
-export const onStoryDeleted = onDocumentDeleted('community_stories/{id}', async (event) => {
-  const data = event.data?.data();
-  const paths = [data?.image_path, data?.thumb_path].filter((p): p is string => typeof p === 'string' && p.length > 0);
-  const bucket = getStorage().bucket();
-  await Promise.all(paths.map((p) => bucket.file(p).delete({ ignoreNotFound: true })));
-});
+// Photos live on Cloudflare R2 behind the edge Worker (edge/), so there is no
+// Storage cleanup here: the app asks the Worker to delete a photo with its post.
 
 export { requestLoginCode, verifyLoginCode, deleteMyAuthAccount } from './login';
+export { onDonorUpdated, onDonorDeleted } from './accounts';

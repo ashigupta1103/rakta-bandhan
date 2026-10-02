@@ -74,6 +74,15 @@ service cloud.firestore {
         && request.resource.data.blood_group == r.blood_group;
     }
 
+    // The owner sets config/features.server_jobs = true once the Cloud
+    // Functions are deployed. From then on the functions keep the Community
+    // Impact counter and the app may no longer touch it; until then (the free
+    // Spark plan has no functions) the app keeps it, one donation at a time.
+    function serverJobs() {
+      let features = /databases/$(database)/documents/config/features;
+      return exists(features) && get(features).data.get('server_jobs', false) == true;
+    }
+
     // ---------------------------------------------------------------
     // donors/{uid} — private profile: name, phone, exact location.
     // Owner or admin only, ever. is_verified / is_banned are admin-set
@@ -486,10 +495,10 @@ service cloud.firestore {
     match /public_stats/{id} {
       allow read: if isSignedIn();
 
-      allow create: if isAdmin() || (isSignedIn()
+      allow create: if isAdmin() || (isSignedIn() && !serverJobs()
         && request.resource.data.donations_this_month == 1);
 
-      allow update: if isAdmin() || (isSignedIn() && (
+      allow update: if isAdmin() || (isSignedIn() && !serverJobs() && (
           (request.resource.data.month_key == resource.data.month_key
             && request.resource.data.donations_this_month == resource.data.donations_this_month + 1)
           ||
@@ -498,6 +507,14 @@ service cloud.firestore {
       ));
 
       allow delete: if isAdmin();
+    }
+
+    // config/features — switches the owner flips from the Firebase console
+    // (server_jobs: functions are deployed). Any signed-in user may read it,
+    // only an admin may write it.
+    match /config/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
     }
 
     match /{document=**} {

@@ -21,7 +21,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { createHash } from 'node:crypto';
 import nodemailer from 'nodemailer';
 
-import { auth, db, isEmulator } from './app';
+import { auth, db, isEmulator, requireAppCheck } from './app';
 import {
   CODE_TTL_MS,
   Channel,
@@ -82,6 +82,10 @@ function reviewCodeForEmail(email: string): string | null {
 }
 
 async function sendEmail(to: string, code: string): Promise<void> {
+  if (isEmulator) {
+    logger.info(`[emulator] login code for ${to}: ${code}`);
+    return;
+  }
   const smtp = readSmtpUrl();
   if (!smtp) {
     if (isEmulator) {
@@ -109,6 +113,7 @@ async function chargeIp(ip: string): Promise<void> {
 }
 
 export const requestLoginCode = onCall({ secrets: [SMTP_URL, REVIEW_CODE] }, async (req) => {
+  requireAppCheck(req);
   const channel: Channel = req.data?.channel === 'sms' ? 'sms' : 'email';
   if (channel === 'sms') {
     throw new HttpsError('unimplemented', 'Codes by SMS are coming soon. Please use your email for now.');
@@ -160,7 +165,8 @@ export const requestLoginCode = onCall({ secrets: [SMTP_URL, REVIEW_CODE] }, asy
   return { sent: true, resendAfterS: Math.round(RESEND_GAP_MS / 1000) };
 });
 
-export const verifyLoginCode = onCall(async (req) => {
+export const verifyLoginCode = onCall({ secrets: [REVIEW_CODE] }, async (req) => {
+  requireAppCheck(req);
   const email = normalizeEmail(req.data?.email);
   const code = typeof req.data?.code === 'string' ? req.data.code.trim() : '';
   if (!email || !/^\d{6}$/.test(code)) throw new HttpsError('invalid-argument', 'Enter the 6-digit code from the email.');
@@ -225,8 +231,14 @@ export const verifyLoginCode = onCall(async (req) => {
  * to satisfy Firebase's recent-login rule on the client.
  */
 export const deleteMyAuthAccount = onCall(async (req) => {
+  requireAppCheck(req);
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError('unauthenticated', 'Sign in first.');
-  await auth.deleteUser(uid);
+  try {
+    await auth.deleteUser(uid);
+  } catch (e) {
+    // Already gone: deleting the donor doc triggers the same removal (accounts.ts), and either may win.
+    if ((e as { code?: string }).code !== 'auth/user-not-found') throw e;
+  }
   return { deleted: true };
 });
