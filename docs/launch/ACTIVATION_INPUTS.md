@@ -16,7 +16,7 @@ Checked locally on 2026-10-02, branch `feat/prelaunch`. Application/backend code
 |---|---|---|
 | Firebase Blaze status and actual Firestore region | Owner confirmation; project stays `rakta-bandhan2026` | Functions rollout; app/server regions must agree |
 | Cloudflare account ID `361246d2529c9324af1bacc33d2adfb8` | Already set in `edge/wrangler.toml`; select this account for Wrangler login | Worker deployment |
-| TURN Server's key ID and API token (**set 2026-10-02**; rotate them, see [build status](BUILD_STATUS.md)) | Cloudflare Worker secrets `TURN_KEY_ID` and `TURN_API_TOKEN`; see [the dashboard walkthrough](CLOUDFLARE_SETUP.md) | Authenticated short-lived relay credentials; the SFU token shared in chat does not work here and should be revoked |
+| TURN Server's key ID and API token (**set 2026-10-02**) | Cloudflare Worker secrets `TURN_KEY_ID` and `TURN_API_TOKEN`; see [the dashboard walkthrough](CLOUDFLARE_SETUP.md) | Authenticated short-lived relay credentials; RealtimeKit/SFU application tokens do not work here |
 | Verified Resend domain and sender address | `MAIL_FROM` in ignored `functions/.env.rakta-bandhan2026` | Email codes for real users |
 | Resend API key | Firebase `SMTP_URL` secret, formatted as below | Functions email delivery |
 | Production review code | Firebase `REVIEW_CODE` secret | Required secret binding for first deployment, even with review access off |

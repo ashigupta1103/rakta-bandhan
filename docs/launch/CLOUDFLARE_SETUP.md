@@ -20,7 +20,7 @@ Owner walkthrough, checked against Cloudflare's documentation on 2026-10-02. Kee
 
 1. In the Cloudflare left sidebar, choose **Realtime > TURN Server**. Do **not** choose **RealtimeKit** or **Serverless SFU**.
 2. Under the TURN Server page, create a TURN key for this project. Save the TURN key's **ID** and **API token** privately.
-3. A RealtimeKit/Serverless SFU application ID or API token does not work for this app's TURN route. If its API token has been pasted into chat or a screenshot, treat it as exposed: revoke/rotate it in the SFU application's dashboard and never reuse it here. The app uses only TURN Server credentials.
+3. A RealtimeKit/Serverless SFU application ID or API token does not work for this app's TURN route. The app uses only TURN Server credentials.
 4. The app's Worker secret names are **`TURN_KEY_ID`** and **`TURN_API_TOKEN`**. Use the API token belonging to the TURN key, rather than a general Cloudflare account API token.
 
 These credentials stay on the Worker. The existing `/ice` route checks that the signed-in caller is one of the two people on a matched request, then requests credentials lasting one hour. The long-lived TURN key never belongs in the APK. [Cloudflare TURN credentials](https://developers.cloudflare.com/realtime/turn/generate-credentials/).
@@ -47,7 +47,7 @@ Replace only `YOUR_ACCOUNT_ID` with the actual ID. Do not run the commands under
 
 ## 5. Deploy the existing Worker and set its secrets
 
-The owner runs these deployment commands. They change Cloudflare resources; Codex has not run them. The Worker config already selects that account and the existing `bloodbank` bucket.
+These commands change Cloudflare resources. They were already run on 2026-10-02 (see [build status](BUILD_STATUS.md)); keep them for a redeploy or a fresh account. The Worker config already selects that account and the existing `bloodbank` bucket.
 
 First deploy the checked-in code:
 
@@ -83,13 +83,13 @@ Use the Worker dashboard's bindings/settings to confirm `MEDIA` refers to `blood
 
 ## 6. Copy and check the Worker address
 
-Wrangler prints the actual deployed HTTPS address, shaped like:
+The deployed address (printed by `wrangler deploy`) is:
 
 ```text
-https://rakta-bandhan-edge.YOUR_SUBDOMAIN.workers.dev
+https://rakta-bandhan-edge.rakta-bandhan-edge.workers.dev
 ```
 
-Do not use the example literally. Copy your real address and open it with **`/health`** appended in a browser. Expected response:
+Open it with **`/health`** appended in a browser. Expected response:
 
 ```json
 {"ok":true}
@@ -97,7 +97,7 @@ Do not use the example literally. Copy your real address and open it with **`/he
 
 This proves the Worker responds. It does not prove uploads, private-photo authorization or TURN credentials. Those require real Firebase authentication and the later device acceptance tests. `/ice` is an authenticated POST endpoint, so opening it as a browser page will not generate call credentials.
 
-Send Codex only the **account ID**, confirmation that the bucket/secrets are set, and the **Worker URL**. No server token needs to be shared in chat. The URL will be used as Flutter `EDGE_URL` and admin `VITE_EDGE_URL`.
+The URL is used as Flutter `EDGE_URL` and admin `VITE_EDGE_URL`; the admin value is already in the ignored `admin/frontend/.env.local`.
 
 ## 7. What happens after this setup
 

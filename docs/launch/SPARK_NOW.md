@@ -33,7 +33,7 @@ Build the current demo APK:
 flutter build apk --release --dart-define=DEMO_SIGNIN=true
 ```
 
-After upgrading to Blaze and deploying Functions, build with `--dart-define=EDGE_URL=https://<worker-host>` and **without** `DEMO_SIGNIN`. The admin console needs `VITE_EDGE_URL=https://<worker-host>` at build time. Neither value is a secret. Until then a non-demo build cannot perform real email sign-in.
+After upgrading to Blaze and deploying Functions, build with `--dart-define=EDGE_URL=https://rakta-bandhan-edge.rakta-bandhan-edge.workers.dev` and **without** `DEMO_SIGNIN`. The admin console needs `VITE_EDGE_URL=https://rakta-bandhan-edge.rakta-bandhan-edge.workers.dev` at build time. Neither value is a secret. Until then a non-demo build cannot perform real email sign-in.
 
 JPEG uploads are resized to at most 1440 pixels and quality 78, capped at 2 MB. Community/avatar links are public to anyone who has a link; ID-photo reads require an owner/admin bearer token. Legacy Firestore ID proofs remain a read fallback, with no bulk migration. Existing request phone fields require owner cleanup before using a new policy on historical data; new requests cannot contain them.
 

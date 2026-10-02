@@ -47,7 +47,7 @@ Smoke tests use `demo-rakta-bandhan` emulators. Local emulator secrets are dummy
 
    ```sh
    flutter build apk --release --dart-define=DEMO_SIGNIN=true
-   flutter build apk --release --dart-define=EDGE_URL=https://<worker-host>
+   flutter build apk --release --dart-define=EDGE_URL=https://rakta-bandhan-edge.rakta-bandhan-edge.workers.dev
    ```
 
    Copy each artifact to a distinct name before the next build. The second command produces the real app and requires the owner-deployed services. Verify signing and legal approval before store release.

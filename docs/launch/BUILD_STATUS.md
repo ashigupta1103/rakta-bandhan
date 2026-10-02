@@ -43,8 +43,8 @@ Not verified: uploads, private-photo access and relay credentials for a real sig
 ## Owner next steps
 
 1. Install `build/RaktaBandhan-demo.apk` and do the device testing you requested.
-2. Purchase a domain and create Cloudflare/Resend accounts. Follow [external connections](EXTERNAL_CONNECTIONS.md).
-3. R2 and TURN are deployed (see above). **Rotate the TURN key:** its token was pasted into a chat. Create a second TURN Server key, run `npx wrangler secret put TURN_KEY_ID` and `npx wrangler secret put TURN_API_TOKEN` yourself at the prompts, then delete the first key. Also revoke the two SFU application tokens that were shared earlier.
+2. Purchase a domain and create the Resend account. Follow [external connections](EXTERNAL_CONNECTIONS.md).
+3. R2 and TURN are deployed (see above).
 4. When ready, upgrade Firebase to Blaze and follow [after Blaze](AFTER_BLAZE_UPGRADE.md) and [the deploy runbook](DEPLOY_RUNBOOK.md).
 5. Configure signing, App Check, legal contacts and store accounts. Enable real delivery only after owner verification.
 
