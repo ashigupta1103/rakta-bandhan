@@ -89,6 +89,15 @@ service cloud.firestore {
           'raktabandhan', 'rotary', 'official', 'team', 'moderator', 'system', 'root', 'null', 'undefined']);
     }
 
+    // Reserved for a real provider. Demo entry never writes this field.
+    function phoneAllowed() {
+      let features = /databases/$(database)/documents/config/features;
+      let profile = /databases/$(database)/documents/donors/$(request.auth.uid);
+      return !exists(features) || get(features).data.get('phone_required', false) != true
+        || (exists(profile) && get(profile).data.get('phone_verified_for', null) != null
+          && get(profile).data.phone_verified_for == get(profile).data.phone);
+    }
+
     function usernameBound(uid) {
       let name = request.resource.data.get('username', null);
       return validUsername(name)
@@ -139,6 +148,7 @@ service cloud.firestore {
         && isVerifiedUser()
         && request.resource.data.is_verified == false
         && request.resource.data.is_banned == false
+        && request.resource.data.get('phone_verified_for', null) == null
         && usernameBound(uid);
 
       allow update: if isAdmin()
@@ -146,6 +156,7 @@ service cloud.firestore {
             && resource.data.is_banned == false
             && request.resource.data.is_verified == resource.data.is_verified
             && request.resource.data.is_banned == resource.data.is_banned
+            && request.resource.data.get('phone_verified_for', null) == resource.data.get('phone_verified_for', null)
             && cooldownRespected()
             && usernameUpdate(uid));
 
@@ -268,6 +279,7 @@ service cloud.firestore {
 
       allow create: if isVerifiedUser()
         && !isBanned()
+        && phoneAllowed()
         && !('requester_phone' in request.resource.data)
         && !('matched_donor_phone' in request.resource.data)
         && request.resource.data.requester_uid == request.auth.uid
@@ -290,6 +302,7 @@ service cloud.firestore {
             && request.resource.data.matched_donor_id == request.auth.uid
             && isVerifiedUser()
             && !isBanned()
+            && phoneAllowed()
             && canTakeMatch())
           ||
           // two-sided completion: each side stamps only its own

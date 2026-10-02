@@ -252,6 +252,27 @@ describe('community story editing', () => {
   });
 });
 
+describe('phone verification stays server-owned and optional', () => {
+  test('clients cannot grant or clear phone verification, including at signup', async () => {
+    await assertFails(register(verified('u1'), 'u1', 'donor_one', { phone_verified_for: '9876543210' }));
+    await assertSucceeds(register(verified('u1'), 'u1'));
+    await assertFails(updateDoc(doc(verified('u1'), 'donors/u1'), { phone_verified_for: '9876543210' }));
+    await seed((db) => updateDoc(doc(db, 'donors/u1'), { phone_verified_for: '9876543210' }));
+    await assertFails(updateDoc(doc(verified('u1'), 'donors/u1'), { phone_verified_for: deleteField() }));
+  });
+  test('the disabled gate allows requests; enabled gate requires the current number', async () => {
+    await seed((db) => setDoc(doc(db, 'donors/requester'), donorDoc()));
+    const db = verified('requester');
+    await assertSucceeds(addDoc(collection(db, 'requests'), openRequest()));
+    await seed((db) => setDoc(doc(db, 'config/features'), { phone_required: true }));
+    await assertFails(addDoc(collection(db, 'requests'), openRequest()));
+    await seed((db) => updateDoc(doc(db, 'donors/requester'), { phone_verified_for: '9876543210' }));
+    await assertSucceeds(addDoc(collection(db, 'requests'), openRequest()));
+    await assertSucceeds(updateDoc(doc(db, 'donors/requester'), { phone: '9876543211' }));
+    await assertFails(addDoc(collection(db, 'requests'), openRequest()));
+  });
+});
+
 describe('90-day cooldown', () => {
   test('a resting donor cannot switch themselves back to available', async () => {
     await seed((db) => setDoc(doc(db, 'donors/u1'), donorDoc({ is_available: false, reactivation_scheduled_at: future(60) })));
@@ -368,6 +389,17 @@ describe('accepting requests', () => {
     await seedDonor();
     await seed((db) => setDoc(doc(db, 'requests/r1'), openRequest()));
     await assertFails(updateDoc(doc(verified('donor'), 'requests/r1'), { status: 'matched', matched_donor_id: 'someone-else' }));
+  });
+
+  test('accepting respects the optional current-number verification gate', async () => {
+    await seedDonor();
+    await seed(async (db) => {
+      await setDoc(doc(db, 'requests/r1'), openRequest());
+      await setDoc(doc(db, 'config/features'), { phone_required: true });
+    });
+    await assertFails(accept('donor', 'r1'));
+    await seed((db) => updateDoc(doc(db, 'donors/donor'), { phone_verified_for: '9876543210' }));
+    await assertSucceeds(accept('donor', 'r1'));
   });
 
   describe('one active match per donor', () => {
