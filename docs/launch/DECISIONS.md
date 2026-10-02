@@ -1,6 +1,6 @@
 # Owner decisions, 2026-10-02
 
-- No domain has been purchased. Real email delivery remains pending a verified domain.
+- No domain has been purchased. The owner reconfirmed leaving Resend and real email delivery pending; Cloudflare setup can proceed without a purchased domain.
 - Use demo sign-in until Blaze. Real sign-in stays in Cloud Functions; do not provision or upload a Firebase service-account key to Cloudflare. Handoff steps 1 and 2 and key-dependent Worker admin/cron routes are deferred by this choice.
 - Usernames are required, lowercase, start with a letter, 3–20 characters (`a-z`, digits, `_`), changeable once every 30 days, shown as `@name` on posts and chat.
 - Phone checking remains simulated in demo builds. Real phone ownership is unverified and the gate stays off.

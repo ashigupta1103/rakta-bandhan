@@ -3,7 +3,7 @@
 The owner chose demo sign-in until Blaze; no Firebase service-account key goes on Cloudflare. These commands are for the owner. See [decisions](DECISIONS.md) and the [deploy runbook](DEPLOY_RUNBOOK.md).
 
 1. Upgrade `rakta-bandhan2026` to Blaze and create billing alerts. Alerts notify you; they do not cap spending. Confirm the Firestore region matches `asia-south1` in `functions/src/app.ts` and the app's `kFunctionsRegion` before deploying.
-2. Purchase a domain, verify it with Resend using its DNS records, and choose the sending address. The repository's default `no-reply@raktabandhan.org` is a placeholder, not a verified sender. Set `MAIL_FROM` in `functions/.env` to the actual verified sender.
+2. Purchase a domain, verify it with Resend using its DNS records, and choose the sending address. The repository's default `no-reply@raktabandhan.org` is a placeholder, not a verified sender. Set `MAIL_FROM` in the ignored, project-specific `functions/.env.rakta-bandhan2026` to the actual verified sender. See [activation inputs](ACTIVATION_INPUTS.md) for the configuration list.
 3. Set the SMTP credential interactively:
 
    ```sh
@@ -11,7 +11,7 @@ The owner chose demo sign-in until Blaze; no Firebase service-account key goes o
    ```
 
    Value format: `smtps://resend:<RESEND_API_KEY>@smtp.resend.com:465`. Never paste the key in tracked files or shell history. [Resend SMTP documentation](https://resend.com/docs/send-with-smtp).
-4. If store review access is needed, set `REVIEW_EMAILS` to the owner-created review addresses, and set `REVIEW_CODE` through `firebase functions:secrets:set REVIEW_CODE`. Keep `REVIEW_EMAILS` empty until intentionally enabled. Production reviewers must receive the owner-provided addresses and code privately. The demo emulator code is not a production review credential.
+4. Provision `REVIEW_CODE` through `npx -y firebase-tools@latest functions:secrets:set REVIEW_CODE --project rakta-bandhan2026`, even when review access is off: the login functions bind this secret at deployment. Use a privately generated six-digit code and keep `REVIEW_EMAILS` empty until intentionally enabled. If store review access is needed, set `REVIEW_EMAILS` in the project-specific params file to the owner-created review addresses. Production reviewers must receive the owner-provided addresses and code privately. The demo emulator code is not a production review credential.
    The owner runs `functions/scripts/seed-review-accounts.mjs` with explicit production project, `--yes-live` and both review emails. It atomically creates/preserves review username claims. It needs Admin SDK credentials that support both Auth and Firestore; use [Firebase's documented credentials](https://firebase.google.com/docs/admin/setup), including its restrictions for local end-user Auth credentials. Keep credentials outside the repo and Cloudflare.
 5. Give the Functions runtime service account permission to mint custom tokens (Service Account Token Creator, scoped to the account used for signing). Do not download a private key. Enable Email/Password only for the admin console; the donor app uses emailed codes and custom tokens.
 6. Run the checks in the runbook, deploy Functions, and confirm real email sign-in, review access if enabled, scheduled expiry/reactivation, ban/unban/delete, two-sided completion and notifications. Answer the Firebase Artifact Registry retention prompt when deploying.

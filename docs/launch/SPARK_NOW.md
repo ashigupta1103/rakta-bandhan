@@ -4,13 +4,14 @@ Current owner choice: **demo sign-in until Blaze**, no Firebase service-account 
 
 The Worker handles photos and TURN only. It does not provide real sign-in, push delivery, privileged admin Auth actions or cron jobs. Firebase rules and client transactions enforce data invariants; lazy expiry/reactivation remains available.
 
-Owner-only setup (the agent does not run these commands):
+See the [complete Windows Cloudflare walkthrough](CLOUDFLARE_SETUP.md) for account creation, R2 subscription/bucket, TURN keys, login prompts and Worker verification. Resend remains pending. Owner-only setup (the agent does not run these commands):
 
 ```sh
 cd edge
 npm ci
 npx wrangler login
 npx wrangler r2 bucket create rakta-bandhan-media
+npx wrangler deploy
 npx wrangler secret put TURN_KEY_ID
 npx wrangler secret put TURN_API_TOKEN
 npx wrangler deploy

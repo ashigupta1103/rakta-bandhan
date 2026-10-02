@@ -1,6 +1,6 @@
 # External connections
 
-The agent builds the clients and server code locally. The owner creates accounts, provides credentials privately, deploys and tests the connections. Nothing in this checklist confirms a live connection.
+The agent builds the clients and server code locally. The owner creates accounts, provides credentials privately, deploys and tests the connections. Nothing in this checklist confirms a live connection. See [activation inputs](ACTIVATION_INPUTS.md) for the exact information and secret destinations, including the first-deploy secret bindings.
 
 | Connection | Owner setup | Configuration | Current activation |
 |---|---|---|---|
@@ -15,6 +15,6 @@ The agent builds the clients and server code locally. The owner creates accounts
 | Google Maps | Restrict Android key by package and release SHA-1; enable native Maps SDK | `MAPS_API_KEY` in ignored `android/local.properties`; `--dart-define=GOOGLE_MAPS=true` | Optional; OSM fallback available |
 | Store publication | Owner Play Console/Apple accounts, signing material, legal approval/contact details | Private signing config; `docs/publishing/` | Owner pending |
 
-Start with the domain and Cloudflare account. Follow [Spark now](SPARK_NOW.md), then [after Blaze](AFTER_BLAZE_UPGRADE.md). No D1 database or Firebase key on Cloudflare is needed under the accepted plan.
+The owner reconfirmed demo until Blaze and asked to leave Resend pending. Start with the [complete Cloudflare walkthrough](CLOUDFLARE_SETUP.md); it does not require a purchased domain. Follow [Spark now](SPARK_NOW.md), then [after Blaze](AFTER_BLAZE_UPGRADE.md) when real sign-in is wanted. No D1 database or Firebase key on Cloudflare is needed under the accepted plan.
 
 Public client configuration identifies the project; server keys grant privileges and must stay in secret stores. Native app defines are recoverable from binaries: never put Resend, TURN API or service-account credentials there.
