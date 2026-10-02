@@ -119,7 +119,7 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
     }
     if (Demo.on) {
       // Kept in the demo's own feed only — never posted.
-      Demo.instance.addStory(body, _topic, photo: _photoBytes);
+      Demo.instance.addStory(body, _topic, photo: _photoBytes, showBloodGroup: _showBloodGroup, showArea: _tagLocation);
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Demo · added to the demo feed on this device. Nothing was posted or uploaded.')));
       return;
@@ -177,7 +177,7 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
                         children: [
                           const TextSpan(text: 'You post as '),
                           TextSpan(
-                            text: 'your registered name',
+                            text: 'your first name and @username',
                             style: TextStyle(color: AppColors.goldDeep, fontWeight: FontWeight.w700),
                           ),
                           const TextSpan(text: '. Your phone number and exact address are never shown.'),

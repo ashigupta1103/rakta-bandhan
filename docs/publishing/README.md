@@ -42,7 +42,7 @@ Legend: ✅ done in the repo · ⬜ someone must do it (needs an account, a deci
 | Suite | Command | Result |
 |---|---|---|
 | Flutter analyzer | `flutter analyze` | no issues |
-| Flutter tests | `flutter test` | 65 pass; 1 demo-only skip, separately verified with its define |
+| Flutter tests | `flutter test` | 67 pass; 1 demo-only skip, separately verified with its define |
 | Security rules (Firestore + Storage, emulator) | `cd backend/rules-test && npm install && npm test` (needs Java 21) | 73 / 73 |
 | Functions unit tests | `cd functions && npm test` | 27 / 27 |
 | Functions smoke test (emulator) | `cd functions && FUNCTIONS_DISCOVERY_TIMEOUT=120 npm run smoke` | login, review seed, lifecycle/jobs, support and 410-record migration checks pass |

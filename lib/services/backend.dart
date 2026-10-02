@@ -1430,7 +1430,7 @@ class Backend {
     _logEvent('story_posted', {'has_photo': photo != null ? 1 : 0});
   }
 
-  /// The author removes their own post (the photo goes with it).
+  /// Saves an author's content; existing visibility choices and photo are kept unless the photo is replaced.
   Future<void> updateCommunityStory(String storyId, {required String topic, required String body, XFile? photo}) async {
     final ref = _db.collection('community_stories').doc(storyId);
     final existing = (await ref.get()).data();

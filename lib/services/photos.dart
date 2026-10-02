@@ -19,6 +19,8 @@ Uint8List preparePhoto(Uint8List bytes) {
   if (decoded.width > 1440 || decoded.height > 1440) {
     decoded = decoded.width >= decoded.height ? image.copyResize(decoded, width: 1440) : image.copyResize(decoded, height: 1440);
   }
+  // Bake orientation first, then discard camera/GPS EXIF before public uploads.
+  decoded.exif.clear();
   final jpeg = image.encodeJpg(decoded, quality: 78);
   if (jpeg.length > 2 * 1024 * 1024) {
     throw FirebaseFunctionsException(code: 'invalid-argument', message: 'That photo is too large. Choose a smaller photo.');

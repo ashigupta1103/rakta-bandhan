@@ -250,7 +250,7 @@ export function useAuditLog() {
   useEffect(() => {
     const q = query(collection(db, 'audit_log'), orderBy('at', 'desc'), limit(100));
     const unsub = onSnapshot(q, (snapshot) => {
-      setEntries(snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as AuditEntry)));
+      setEntries(snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as AuditEntry)));
       setLoading(false);
     });
     return () => unsub();
@@ -273,7 +273,7 @@ function useCollection<T>(name: string, max = 100) {
     const unsub = onSnapshot(
       q,
       (snapshot) => {
-        setItems(snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as T)));
+      setItems(snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as T)));
         setLoading(false);
       },
       () => setLoading(false)

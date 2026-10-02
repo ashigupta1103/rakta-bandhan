@@ -56,6 +56,7 @@ const privacyPolicy = LegalDocument(
       '- Whether you are available to donate, and the date of your last donation recorded in the app.',
       '- Optionally, a photo of an ID document, if you submit one for verification.',
       '- Optionally, a profile photo. Its link is kept in your private profile and the app shows it only to you. Anyone you give the photo link to can open it.',
+      '- Photos you upload are compressed as JPEG and embedded EXIF metadata is removed before upload.',
       'Requests — when you ask for blood: the blood group and number of units needed, how urgent it is, the location (usually a hospital) and its coordinates, and the request’s status over time.',
       'Conversations — when you are matched: the messages you send in the in-app chat, any location you choose to share in it (the hospital, or your position at that moment — never tracked continuously), when you last read the conversation (shown to the other person as “Seen”), and a record of in-app calls (who called whom, when, how long, and whether it was answered). The audio of calls is never recorded or stored.',
       'Community posts — if you share an experience: the text, the topic, and optionally one photo, your blood group and your neighbourhood if you choose to show them.',

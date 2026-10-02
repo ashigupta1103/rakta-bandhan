@@ -88,7 +88,7 @@
 			</array>
 		</dict>
 		<dict>
-			<!-- Optional ID, profile and community photos on Cloudflare R2; ID reads are authenticated. -->
+            <!-- Optional JPEG photos on Cloudflare R2; EXIF removed, ID reads authenticated. -->
 			<key>NSPrivacyCollectedDataType</key>
 			<string>NSPrivacyCollectedDataTypePhotosorVideos</string>
 			<key>NSPrivacyCollectedDataTypeLinked</key>

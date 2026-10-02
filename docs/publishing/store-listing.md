@@ -80,6 +80,7 @@ Deploy Hosting first; see the README. The pages come from the in-app text.
 - \*"Shared" in Play's sense means transfer to a third party. Showing a matched user your name is a user-initiated disclosure *within* the service. Phone numbers are not copied onto new requests or shown to other users. Firebase, Cloudflare and Resend act as service providers.
 - **Encrypted in transit:** Yes.
 - **App integrity:** configured Firebase App Check uses Play Integrity, Apple DeviceCheck or web reCAPTCHA. Registration and enforcement require owner setup.
+- **Photo metadata:** uploaded JPEGs have embedded EXIF removed; optional community area tags follow the user's choice.
 - **Users can request deletion:** Yes, in the app (Settings › Delete my account) and on the web page above.
 - **Audio from calls:** never recorded or stored. WebRTC audio travels directly between phones or through an encrypted Cloudflare TURN relay when needed.
 - **Health apps declaration:** required. Category: *Blood and organ donation*. The app doesn't use Health Connect.

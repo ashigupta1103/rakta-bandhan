@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import '../preview_mode.dart';
 import '../services/chat_service.dart' show ChatMessage, ChatMessageKind;
 import '../services/donation_history_service.dart' show DonationRecord;
+import '../services/usernames.dart' show demoUsername;
 
 /// Client-demo simulation: local, in-memory state that lets the REAL
 /// screens walk through the whole product journey without the backend —
@@ -288,15 +289,17 @@ class Demo extends ChangeNotifier {
 
   int _storySeq = 0;
 
-  void addStory(String body, String topic, {Uint8List? photo}) {
+  void addStory(String body, String topic, {Uint8List? photo, bool showBloodGroup = true, bool showArea = false}) {
     stories.insert(0, {
       'id': 'demo-story-${_storySeq++}',
       'image_bytes': ?photo,
       'author_uid': myUid,
       'author_name': myName,
+      'author_username': demoUsername,
       'topic': topic,
       'body': body,
-      'blood_group': bloodGroup,
+      'blood_group': showBloodGroup ? bloodGroup : null,
+      'location_label': showArea ? area : null,
       'created_at': Timestamp.now(),
       'is_demo': true,
     });
