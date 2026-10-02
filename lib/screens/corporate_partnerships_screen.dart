@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../services/backend.dart';
-import '../demo/demo.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/filter_chip_row.dart';
@@ -75,29 +74,6 @@ class CorporatePartnershipsScreen extends StatelessWidget {
                         _sponsorCard(RbGlyph.community, AppColors.successBg, AppColors.successText, 'Corporate volunteering'),
                       ],
                     ),
-                    // Sample partners exist only inside a client demo.
-                    if (Demo.on) ...[
-                      const SizedBox(height: 22),
-                      Row(
-                        children: [
-                          const RbIcon(RbGlyph.eye, size: 13, color: AppColors.goldDeep),
-                          const SizedBox(width: 6),
-                          const Text('Demo · sample partner layout', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.goldDeep)),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      _demoPartnerCard(
-                        name: 'Demo Community Partner',
-                        type: 'Community outreach · sample',
-                        description: 'Fictional example of how a local organisation’s support for a donation drive could be recognised here.',
-                      ),
-                      const SizedBox(height: 10),
-                      _demoPartnerCard(
-                        name: 'Demo Healthcare Supporter',
-                        type: 'Health initiative · sample',
-                        description: 'Fictional example of how a healthcare partner’s support for donor recognition could be recognised here.',
-                      ),
-                    ],
                     const SizedBox(height: 18),
                     Container(
                       width: double.infinity,
@@ -146,45 +122,6 @@ class CorporatePartnershipsScreen extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _demoPartnerCard({required String name, required String type, required String description}) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: Colors.white, border: Border.all(color: AppColors.warmBorder), borderRadius: BorderRadius.circular(16)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(color: AppColors.sand, borderRadius: BorderRadius.circular(10)),
-                alignment: Alignment.center,
-                child: const RbIcon(RbGlyph.building, size: 20, color: AppColors.ink2),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(name, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
-                    const SizedBox(height: 2),
-                    Text(type, style: const TextStyle(fontSize: 11.5, color: AppColors.ink2)),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(description, style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary, height: 1.5)),
-          const SizedBox(height: 10),
-          const Text('Awaiting official partner information.', style: TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: AppColors.disabledTint)),
-        ],
       ),
     );
   }
@@ -255,11 +192,6 @@ class _ConversationSheetState extends State<_ConversationSheet> {
       _error = null;
     });
     if (!formOk || _interest == null) return;
-    if (Demo.on) {
-      setState(() => _error = 'Demo · enquiries aren’t sent from the demo.');
-      return;
-    }
-
     setState(() => _submitting = true);
     try {
       await Backend.instance.submitPartnershipInquiry(

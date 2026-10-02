@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import '../demo/demo.dart';
 import '../services/backend.dart';
 import '../services/maps_link.dart';
 import '../theme/app_colors.dart';
@@ -53,29 +52,16 @@ class _RequestsScreenState extends State<RequestsScreen> {
 
   static List<_Doc> _docs(Iterable<QueryDocumentSnapshot<Map<String, dynamic>>> docs) => [for (final d in docs) (id: d.id, data: d.data())];
 
-  // Client demo: the one simulated request, shown to whichever side the
-  // demo user is on — never mixed with real requests.
-  static List<_Doc> _demoWhere(bool Function(Map<String, dynamic> r) test) {
-    final r = Demo.instance.request;
-    return r != null && test(r) ? [(id: Demo.requestId, data: r)] : const [];
-  }
+  static Stream<List<_Doc>> _mineStream() => Backend.instance.myRequestsStream().map((q) => _docs(q.docs));
 
-  static Stream<List<_Doc>> _mineStream() => Demo.on
-      ? Demo.instance.watch(() => Demo.instance.role == DemoRole.requester ? _demoWhere((_) => true) : const <_Doc>[])
-      : Backend.instance.myRequestsStream().map((q) => _docs(q.docs));
+  static Stream<List<_Doc>> _acceptedStream() => FirebaseFirestore.instance
+      .collection('requests')
+      .where('matched_donor_id', isEqualTo: Backend.instance.currentUser?.uid)
+      .where('status', isEqualTo: 'matched')
+      .snapshots()
+      .map((q) => _docs(q.docs));
 
-  static Stream<List<_Doc>> _acceptedStream() => Demo.on
-      ? Demo.instance.watch(() => Demo.instance.role == DemoRole.donor ? _demoWhere((r) => r['status'] == 'matched') : const <_Doc>[])
-      : FirebaseFirestore.instance
-          .collection('requests')
-          .where('matched_donor_id', isEqualTo: Backend.instance.currentUser?.uid)
-          .where('status', isEqualTo: 'matched')
-          .snapshots()
-          .map((q) => _docs(q.docs));
-
-  static Stream<List<_Doc>> _nearStream(double lat, double lng) => Demo.on
-      ? Demo.instance.watch(() => Demo.instance.role == DemoRole.donor ? _demoWhere((r) => r['status'] == 'open') : const <_Doc>[])
-      : Backend.instance.openRequestsNearStream(lat, lng).map(_docs);
+  static Stream<List<_Doc>> _nearStream(double lat, double lng) => Backend.instance.openRequestsNearStream(lat, lng).map(_docs);
 
   void _resubscribe() => setState(() {
         _mine = _mineStream();
@@ -86,16 +72,6 @@ class _RequestsScreenState extends State<RequestsScreen> {
   @override
   void initState() {
     super.initState();
-    if (Demo.on) {
-      // The demo donor lives ~2.4 km from the demo hospital.
-      _profileLoaded = true;
-      _myBloodGroup = Demo.bloodGroup;
-      _myLat = Demo.lat + 0.0216;
-      _myLng = Demo.lng;
-      _nearbyOpen = _nearStream(_myLat!, _myLng!);
-      if (Demo.instance.role == DemoRole.donor) _tab = _Tab.nearby;
-      return;
-    }
     Backend.instance.myDonorDoc().then((snap) {
       if (!mounted) return;
       final data = snap.data();
@@ -162,11 +138,7 @@ class _RequestsScreenState extends State<RequestsScreen> {
     );
     if (!confirmed || !mounted) return;
     try {
-      if (Demo.isDemoId(requestId)) {
-        Demo.instance.cancel();
-      } else {
-        await Backend.instance.cancelRequest(requestId);
-      }
+      await Backend.instance.cancelRequest(requestId);
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not cancel this request. Please try again.')));
@@ -237,7 +209,7 @@ class _RequestsScreenState extends State<RequestsScreen> {
             final open = openSnap.data!.where((d) => d.data['requester_uid'] != myUid && compatible.contains(d.data['blood_group'])).toList();
             for (final d in open) {
               // Lazy stand-in for expiry — a no-op unless genuinely past due.
-              if (!Demo.on) Backend.instance.expireIfStale(d.id, d.data);
+              Backend.instance.expireIfStale(d.id, d.data);
             }
             open.sort((a, b) {
               final ua = _urgencyRank[a.data['urgency']] ?? 2;
@@ -324,7 +296,7 @@ class _RequestsScreenState extends State<RequestsScreen> {
   Widget _yoursList(List<_Doc>? docs) {
     if (docs == null) return const Center(child: CircularProgressIndicator(strokeWidth: 2));
     for (final d in docs) {
-      if (!Demo.on) Backend.instance.expireIfStale(d.id, d.data);
+      Backend.instance.expireIfStale(d.id, d.data);
     }
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),

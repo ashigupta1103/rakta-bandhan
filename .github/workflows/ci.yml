@@ -28,7 +28,6 @@ jobs:
       # No --no-fatal-infos: an info is a failure here, as it is locally.
       - run: flutter analyze
       - run: flutter test
-      - run: flutter test --dart-define=DEMO_SIGNIN=true test/demo_signin_test.dart
 
   functions:
     runs-on: ubuntu-latest

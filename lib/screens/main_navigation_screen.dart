@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../demo/demo.dart';
 import '../services/backend.dart';
 import '../services/chat_service.dart';
 import '../services/push_service.dart';
@@ -33,8 +32,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   @override
   void initState() {
     super.initState();
-    // Client demo: no push registration, no live call/alert listeners.
-    if (Demo.on) return;
     // Push token + topics for this signed-in phone (asks for notification
     // permission the first time). Needs the blood group for its topic.
     Backend.instance.myDonorDoc().then((snap) {
@@ -68,9 +65,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     return Scaffold(
       // LiveEventsHost: incoming in-app calls and opted-in urgent alerts
       // interrupt from here, whichever tab or pushed screen is showing.
-      body: Demo.on
-          ? IndexedStack(index: _currentIndex, children: _screens)
-          : LiveEventsHost(child: IndexedStack(index: _currentIndex, children: _screens)),
+      body: LiveEventsHost(child: IndexedStack(index: _currentIndex, children: _screens)),
       // Unread messages put a dot on the Request tab (where the Messages
       // inbox lives), so a reply is noticed from any tab.
       bottomNavigationBar: StreamBuilder<int>(
@@ -80,7 +75,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     );
   }
 
-  late final Stream<int> _unread = Demo.on ? Stream.value(0) : ChatService.instance.watchUnreadCount();
+  late final Stream<int> _unread = ChatService.instance.watchUnreadCount();
 
   Widget _bottomNav({required bool requestHasUnread}) {
     return Container(

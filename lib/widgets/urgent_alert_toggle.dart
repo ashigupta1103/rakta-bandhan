@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../demo/demo.dart';
 import '../services/backend.dart';
 import '../services/urgent_alert_service.dart';
 import '../theme/app_colors.dart';
@@ -112,10 +111,10 @@ class _UrgentAlertToggleState extends State<UrgentAlertToggle> {
 
   @override
   Widget build(BuildContext context) {
-    // Signed out (e.g. the preview gallery): nothing to toggle.
-    if (!Demo.on && Backend.instance.currentUser == null) return const SizedBox.shrink();
+    // Signed out: nothing to toggle.
+    if (Backend.instance.currentUser == null) return const SizedBox.shrink();
     return StreamBuilder<Map<String, dynamic>?>(
-      stream: Demo.on ? Demo.instance.watch(() => Demo.instance.myProfile) : Backend.instance.myDonorDocStream().map((s) => s.data()),
+      stream: Backend.instance.myDonorDocStream().map((s) => s.data()),
       builder: (context, snap) {
         final on = snap.data?['urgent_alerts'] == true;
         final row = RbRow(
@@ -125,7 +124,7 @@ class _UrgentAlertToggleState extends State<UrgentAlertToggle> {
           subtitle: on ? 'Full-screen alert with sound for urgent needs nearby' : 'Off — you’ll still see requests in the Requests tab',
           trailing: _busy
               ? const Padding(padding: EdgeInsets.all(14), child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)))
-              : RbSwitch(value: on, onChanged: Demo.on ? Demo.instance.setUrgentAlerts : snap.hasData ? ((v) => v ? _turnOn() : _turnOff()) : null),
+              : RbSwitch(value: on, onChanged: snap.hasData ? ((v) => v ? _turnOn() : _turnOff()) : null),
         );
         if (!widget.asCard) return row;
         return RbListGroup(children: [row]);

@@ -3,7 +3,6 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../demo/demo.dart';
 import '../services/backend.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
@@ -98,12 +97,6 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
     }
     if (_editing) {
       final messenger = ScaffoldMessenger.of(context);
-      if (Demo.isDemoId(widget.editStoryId)) {
-        Demo.instance.updateStory(widget.editStoryId!, body: body, topic: _topic, photo: _photoBytes);
-        Navigator.pop(context);
-        messenger.showSnackBar(const SnackBar(content: Text('Story updated.')));
-        return;
-      }
       setState(() => _submitting = true);
       try {
         await Backend.instance.updateCommunityStory(widget.editStoryId!, body: body, topic: _topic, photo: _photo);
@@ -115,13 +108,6 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
         setState(() => _submitting = false);
         messenger.showSnackBar(const SnackBar(content: Text('Could not save your changes. Please try again.')));
       }
-      return;
-    }
-    if (Demo.on) {
-      // Kept in the demo's own feed only — never posted.
-      Demo.instance.addStory(body, _topic, photo: _photoBytes, showBloodGroup: _showBloodGroup, showArea: _tagLocation);
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Demo · added to the demo feed on this device. Nothing was posted or uploaded.')));
       return;
     }
     setState(() => _submitting = true);
@@ -274,10 +260,6 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
                             ),
                           ),
                         ),
-                      if (Demo.on) ...[
-                        const SizedBox(height: 8),
-                        const Text('Demo · a photo you pick stays on this device for the demo feed. Nothing is uploaded.', style: TextStyle(fontSize: 12, color: AppColors.goldDeep, height: 1.4)),
-                      ],
                     ],
                     const SizedBox(height: 22),
                     const Text(

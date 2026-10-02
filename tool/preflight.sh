@@ -19,7 +19,6 @@ flutter analyze
 
 step "flutter test"
 flutter test
-flutter test --dart-define=DEMO_SIGNIN=true test/demo_signin_test.dart
 
 step "functions: unit tests"
 (cd functions && deps && npm test)

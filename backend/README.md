@@ -1,6 +1,6 @@
 # Rakta Bandhan backend
 
-> **Current (2026-10-02):** demo sign-in until owner Blaze upgrade. Real sign-in uses emailed codes and Functions custom tokens. Functions lifecycle/jobs/push/support are built and tested locally; owner deployment remains pending. New photos use Cloudflare R2 and calls can use its TURN relay. `storage.rules` is retained for legacy tests. See [build status](../docs/launch/BUILD_STATUS.md), [decisions](../docs/launch/DECISIONS.md) and [deploy runbook](../docs/launch/DEPLOY_RUNBOOK.md). The older architecture notes below are historical; current code/rules and launch docs take precedence.
+> **Current (2026-10-02):** the app has no demo mode. Sign-in uses emailed codes and Functions custom tokens. Functions lifecycle/jobs/push/support are built and tested locally; owner deployment remains pending. New photos use Cloudflare R2 and calls can use its TURN relay. `storage.rules` is retained for legacy tests. See [build status](../docs/launch/BUILD_STATUS.md), [decisions](../docs/launch/DECISIONS.md) and [deploy runbook](../docs/launch/DEPLOY_RUNBOOK.md). The older architecture notes below are historical; current code/rules and launch docs take precedence.
 
 No Cloud Functions, no custom server. The whole backend is Firestore +
 Firebase Auth, driven directly from the Flutter client in

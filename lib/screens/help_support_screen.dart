@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../services/backend.dart';
-import '../demo/demo.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/filter_chip_row.dart';
@@ -268,10 +267,6 @@ class _ReportIssueSheetState extends State<_ReportIssueSheet> {
 
   Future<void> _submit() async {
     if (_reason == null || _submitting) return;
-    if (Demo.on) {
-      setState(() => _error = 'Demo · reports aren’t sent from the demo.');
-      return;
-    }
     setState(() {
       _submitting = true;
       _error = null;

@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import '../demo/demo.dart';
 import '../services/support_service.dart';
 import '../theme/app_colors.dart';
 
@@ -11,8 +10,7 @@ class MyReportsScreen extends StatelessWidget {
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: AppColors.warmPageBackground,
     appBar: AppBar(title: const Text('My reports & replies')),
-    body: Demo.on ? const Center(child: Padding(padding: EdgeInsets.all(24), child: Text('Demo reports are simulated. An administrator is not connected to this demo.')))
-      : StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+    body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: SupportService.mySubmissions(),
         builder: (context, submissions) => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
           stream: SupportService.myReplies(),

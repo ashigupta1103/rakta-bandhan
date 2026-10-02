@@ -1,6 +1,6 @@
 # Inputs for real-service activation
 
-Checked locally on 2026-10-02, branch `feat/prelaunch`. Application/backend code and local validation are recorded in [verification](VERIFICATION.md). Real-service activation is still separate from those checks. The owner reconfirmed demo until Blaze and asked to leave Resend pending; only the Cloudflare inputs are needed now. Follow the [Cloudflare walkthrough](CLOUDFLARE_SETUP.md).
+Checked locally on 2026-10-02, branch `feat/prelaunch`. Application/backend code and local validation are recorded in [verification](VERIFICATION.md). Real-service activation is still separate from those checks. Demo mode has been removed from the app. Resend stays pending, so real email sign-in waits for Blaze and a sender; the Cloudflare inputs are done. Follow the [Cloudflare walkthrough](CLOUDFLARE_SETUP.md).
 
 ## What was checked
 
@@ -8,7 +8,7 @@ Checked locally on 2026-10-02, branch `feat/prelaunch`. Application/backend code
 - Wrangler reports no authenticated Cloudflare account on this machine.
 - No local Worker credentials, admin `.env.local`, Functions `.env.rakta-bandhan2026` or Android `key.properties` were present.
 - Local Functions discovery exports the expected login, account, notification, expiry/reactivation and support handlers, all in `asia-south1`. Login binds `SMTP_URL` and `REVIEW_CODE`; support binds `SMTP_URL`.
-- The current APK is a demo build. It cannot verify live Firebase, email, R2 or TURN connections.
+- A real APK cannot sign in until Blaze, Functions and an email sender exist, so live R2/TURN connections cannot be exercised yet.
 
 ## Information the owner supplies
 
@@ -49,6 +49,6 @@ Cloudflare requires an [R2 subscription](https://developers.cloudflare.com/r2/ge
 3. Configure/build the admin with the Worker URL, then deploy reviewed Firestore rules/indexes and Hosting. Wait for indexes. Review search backfill and historical phone cleanup separately; do not apply them implicitly.
 4. Once Blaze and the sender are ready, provision both Functions secrets, verify region and runtime token-signing IAM permissions, then deploy Functions. Verify sign-in, bans/deletion, jobs and push on the owner's devices.
 5. Set `server_jobs=true` only after server jobs are verified. Keep `phone_required=false`; real phone ownership verification is still deferred. Turn on support delivery and App Check enforcement only after their verification.
-6. Build a distinct real APK without `DEMO_SIGNIN`, with `EDGE_URL` and the selected map/search configuration. Keep the existing demo APK available.
+6. Build the real APK with `EDGE_URL` and the selected map/search configuration.
 
 Commands and acceptance checks are in [the deploy runbook](DEPLOY_RUNBOOK.md) and [after Blaze](AFTER_BLAZE_UPGRADE.md). No external resource has been provisioned, no key uploaded and no deployment performed by this readiness check.

@@ -1,8 +1,5 @@
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
-import '../demo/demo.dart';
-import '../demo/demo_hub_screen.dart';
-import '../preview_mode.dart';
 import '../services/backend.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
@@ -10,9 +7,6 @@ import '../widgets/loading_button.dart';
 import '../widgets/rb_icon.dart';
 import 'legal_reader_screen.dart';
 import 'login_code_screen.dart';
-import 'main_navigation_screen.dart';
-import 'preview_gallery_screen.dart';
-import 'preview_ui_screen.dart';
 
 /// Human wording for a failed sign-in step. The sign-in functions send
 /// readable messages for expected cases (wrong or expired code); anything
@@ -67,19 +61,6 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() => _error = 'Enter a valid email address.');
       return;
     }
-    // Demo APK (free plan): no server can email a code, so start the same
-    // new-user demo journey the hub offers, with whatever email was typed.
-    if (kDemoSignIn && !Demo.on) Demo.instance.start(DemoRole.requester, registered: false);
-    if (Demo.on) {
-      // Simulated: no email is sent. A hub-started demo accepts only the demo
-      // address so a real one typed there never looks like it worked.
-      if (!kDemoSignIn && email.toLowerCase() != Demo.email) {
-        setState(() => _error = 'In the demo, sign in with ${Demo.email}.');
-        return;
-      }
-      Navigator.push(context, MaterialPageRoute(builder: (_) => LoginCodeScreen(email: email)));
-      return;
-    }
     setState(() {
       _busy = true;
       _error = null;
@@ -114,16 +95,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Frontend-only entry point for internal testing — gated by
-                  // kEnablePreviewUi, off in any normal release build.
-                  if (kEnablePreviewUi) ...[
-                    const SizedBox(height: 16),
-                    OutlinedButton.icon(
-                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const PreviewGalleryScreen())),
-                      icon: const RbIcon(RbGlyph.eye, size: 16),
-                      label: const Text('Preview UI — all screens (no backend)'),
-                    ),
-                  ],
                   const SizedBox(height: 24),
                   Center(child: Image.asset('assets/branding/final-logo-transparent.png', width: 104, fit: BoxFit.contain)),
                   const SizedBox(height: 22),
@@ -135,7 +106,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     style: TextStyle(fontSize: 14.5, color: AppColors.ink2, height: 1.4),
                   ),
                   const SizedBox(height: 32),
-                  if (Demo.on) ...[_demoHint(), const SizedBox(height: 14)],
                   const Text('Email', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.ink)),
                   const SizedBox(height: 8),
                   TextField(
@@ -184,44 +154,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       const Text('.', style: TextStyle(fontSize: 12, color: AppColors.mutedInk)),
                     ],
                   ),
-                  // Client preview — only in preview builds (kEnablePreviewUi);
-                  // a production release has no demo entry, route or data.
-                  if (kEnablePreviewUi && !Demo.on) ...[
-                    const SizedBox(height: 26),
-                    const Divider(height: 1, color: AppColors.warmBorder),
-                    const SizedBox(height: 18),
-                    const Text('Preview', textAlign: TextAlign.center, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.goldDeep)),
-                    const SizedBox(height: 8),
-                    OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(46), foregroundColor: AppColors.ink, side: const BorderSide(color: AppColors.warmBorder)),
-                      onPressed: () {
-                        Demo.instance.start(DemoRole.requester);
-                        Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const MainNavigationScreen()), (r) => false);
-                      },
-                      icon: const RbIcon(RbGlyph.droplet, size: 17, color: AppColors.brandRed),
-                      label: const Text('Explore the Rakta Bandhan demo'),
-                    ),
-                    Center(
-                      child: TextButton(
-                        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DemoHubScreen())),
-                        child: const Text('Choose a demo journey', style: TextStyle(fontSize: 12.5, color: AppColors.ink2)),
-                      ),
-                    ),
-                    const Text(
-                      'Simulated data on this device only — no sign-in, nothing sent or saved.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 11.5, color: AppColors.mutedInk),
-                    ),
-                  ],
-                  if (kEnablePreviewUi) ...[
-                    const SizedBox(height: 12),
-                    Center(
-                      child: TextButton(
-                        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const PreviewUiScreen())),
-                        child: const Text('Preview UI — 4 main tabs only (no backend)', style: TextStyle(fontSize: 12, color: AppColors.disabledTint)),
-                      ),
-                    ),
-                  ],
                   const SizedBox(height: 24),
                 ],
               ),
@@ -235,30 +167,5 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget _link(String label, Widget page) => GestureDetector(
         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => page)),
         child: Text(label, style: const TextStyle(fontSize: 12, color: AppColors.brandRed, fontWeight: FontWeight.w600)),
-      );
-
-  /// Demo builds only: says the code is simulated and fills the address.
-  Widget _demoHint() => Material(
-        color: AppColors.goldTint,
-        borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: () => setState(() {
-            _emailController.text = Demo.email;
-            _error = null;
-          }),
-          child: const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-            child: Text.rich(
-              TextSpan(
-                style: TextStyle(fontSize: 12.5, color: AppColors.goldDeepest, height: 1.45),
-                children: [
-                  TextSpan(text: 'Demo · ', style: TextStyle(fontWeight: FontWeight.w700)),
-                  TextSpan(text: 'no email is sent. Tap to use ${Demo.email}; the code is ${Demo.emailCode}.'),
-                ],
-              ),
-            ),
-          ),
-        ),
       );
 }

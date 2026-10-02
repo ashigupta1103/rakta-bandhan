@@ -25,13 +25,6 @@ abstract class DonorMatchService {
   Future<DonorMatch> fetchMatch(String requestId);
 }
 
-class MockDonorMatchService implements DonorMatchService {
-  @override
-  Future<DonorMatch> fetchMatch(String requestId) async {
-    return const DonorMatch(name: 'Rohan Mehta', initials: 'RM', bloodGroup: 'O+', distance: '2.1 km away');
-  }
-}
-
 /// Real matched-donor lookup: `matched_donor_name` is already written onto
 /// `requests/{id}` by `Backend.acceptRequest`; blood group + coordinates
 /// (to compute distance, same as find_donors_screen.dart) come from the

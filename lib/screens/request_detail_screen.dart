@@ -1,14 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
-import '../demo/demo.dart';
 import '../services/backend.dart';
 import '../theme/app_colors.dart';
 import '../widgets/blood_group_droplet.dart';
 import '../widgets/place_link.dart';
 import '../widgets/loading_button.dart';
 import 'accept_result_screen.dart';
-import 'match_contact_screen.dart';
 import '../widgets/rb_icon.dart';
 
 String _timeAgo(DateTime time) {
@@ -35,12 +33,11 @@ class RequestDetailScreen extends StatefulWidget {
 class _RequestDetailScreenState extends State<RequestDetailScreen> {
   Position? _position;
   bool _isAccepting = false;
-  Stream<Map<String, dynamic>?> get _doc => Demo.requestDoc(widget.requestId);
+  Stream<Map<String, dynamic>?> get _doc => Backend.instance.requestStream(widget.requestId);
 
   @override
   void initState() {
     super.initState();
-    if (Demo.isDemoId(widget.requestId)) return;
     // Distance only when we truly know where the donor is.
     Backend.instance.preciseLocation().then((p) {
       if (mounted) setState(() => _position = p);
@@ -59,11 +56,6 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
   }
 
   Future<void> _handleAccept() async {
-    if (Demo.isDemoId(widget.requestId)) {
-      Demo.instance.match();
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => MatchContactScreen(requestId: widget.requestId)));
-      return;
-    }
     setState(() => _isAccepting = true);
     final activeMatchId = await _findExistingActiveMatch();
     if (activeMatchId != null) {
@@ -131,7 +123,7 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
             if (data == null) {
               return const Center(child: Text('Request not found.', style: TextStyle(color: AppColors.textSecondary)));
             }
-            if (!Demo.isDemoId(widget.requestId)) Backend.instance.expireIfStale(widget.requestId, data);
+            Backend.instance.expireIfStale(widget.requestId, data);
             final status = data['status'] as String? ?? 'open';
             final bloodGroup = data['blood_group'] as String? ?? '';
             final urgency = data['urgency'] as String? ?? 'normal';
@@ -140,9 +132,7 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
             final createdAt = (data['created_at'] as Timestamp?)?.toDate();
             final lat = (data['lat'] as num?)?.toDouble();
             final lng = (data['lng'] as num?)?.toDouble();
-            final distance = Demo.isDemoId(widget.requestId)
-                ? '${Demo.donorDistanceKm} km away'
-                : (_position != null && lat != null && lng != null)
+            final distance = (_position != null && lat != null && lng != null)
                 ? '${distanceKm(_position!.latitude, _position!.longitude, lat, lng).toStringAsFixed(1)} km away'
                 : '—';
 

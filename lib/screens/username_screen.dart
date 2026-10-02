@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../demo/demo.dart';
 import '../services/backend.dart';
 import '../services/usernames.dart';
 import '../widgets/username_field.dart';
@@ -40,11 +39,7 @@ class _UsernameScreenState extends State<UsernameScreen> {
       _error = null;
     });
     try {
-      if (Demo.on) {
-        demoUsername = name;
-      } else {
-        await Backend.instance.changeUsername(name);
-      }
+      await Backend.instance.changeUsername(name);
       if (!mounted) return;
       if (widget.requiredChoice) {
         Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const MainNavigationScreen()), (_) => false);

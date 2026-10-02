@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../demo/demo.dart';
 import 'package:geolocator/geolocator.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
@@ -23,13 +22,11 @@ class _ConsentScreenState extends State<ConsentScreen> {
     if (!_agreed) return;
     // Registration usually already asked for location (to fill in the
     // area). Don't ask a second time — go straight on if it's granted.
-    var granted = Demo.on;
-    if (!granted) {
-      try {
-        final p = await Geolocator.checkPermission();
-        granted = p == LocationPermission.always || p == LocationPermission.whileInUse;
-      } catch (_) {}
-    }
+    var granted = false;
+    try {
+      final p = await Geolocator.checkPermission();
+      granted = p == LocationPermission.always || p == LocationPermission.whileInUse;
+    } catch (_) {}
     if (!mounted) return;
     Navigator.push(
       context,

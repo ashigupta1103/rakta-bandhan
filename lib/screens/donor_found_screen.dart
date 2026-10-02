@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../demo/demo.dart';
 import '../services/donor_match_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
@@ -18,16 +17,7 @@ class DonorFoundScreen extends StatelessWidget {
 
   const DonorFoundScreen({super.key, required this.requestId});
 
-  Future<DonorMatch> _fetch() => Demo.isDemoId(requestId)
-      ? Future.value(const DonorMatch(
-          name: Demo.donorName,
-          initials: 'AM',
-          bloodGroup: Demo.bloodGroup,
-          distance: '${Demo.donorDistanceKm} km away',
-          uid: Demo.donorUid,
-          isVerified: true,
-        ))
-      : FirestoreDonorMatchService().fetchMatch(requestId);
+  Future<DonorMatch> _fetch() => FirestoreDonorMatchService().fetchMatch(requestId);
 
   void _goHome(BuildContext context) => Navigator.of(context).popUntil((route) => route.isFirst);
 
@@ -87,10 +77,9 @@ class DonorFoundScreen extends StatelessWidget {
                             initials: donor.initials,
                             bloodGroup: donor.bloodGroup,
                             isVerified: donor.isVerified,
-                            distanceKm: Demo.isDemoId(requestId) ? Demo.donorDistanceKm : null,
+                            distanceKm: null,
                             isAvailable: true,
                             matched: true,
-                            donationCount: Demo.isDemoId(requestId) ? Demo.donorPriorDonations : null,
                           ),
                         ),
                       ),

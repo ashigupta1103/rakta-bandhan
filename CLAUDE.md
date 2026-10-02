@@ -23,7 +23,7 @@ flutter test                                      # all widget tests
 flutter test test/logout_confirmation_test.dart   # single file
 flutter test --plain-name "substring of test name"
 flutter run -d chrome        # or -d windows / an Android device
-flutter build apk --dart-define=ENABLE_PREVIEW_UI=true   # client demo build with sample content
+flutter build apk --release --dart-define=EDGE_URL=https://rakta-bandhan-edge.rakta-bandhan-edge.workers.dev   # real build (R2 photos + TURN calls)
 
 firebase deploy --only firestore:rules,firestore:indexes,storage,functions  # after editing backend/* or functions/
 cd backend/rules-test && npm test     # rules tests on the emulator (Java 21)
@@ -38,7 +38,7 @@ cd admin/frontend && npm run dev | npm run build | npm run lint   # oxlint
 
 ## Backend model (read before touching data code)
 
-Firebase **Spark** until the owner upgrades to Blaze. Data logic runs client-side in `lib/services/backend.dart` inside Firestore transactions, with `backend/firestore.rules` enforcing every invariant. Cloud Functions are built but pending deployment after Blaze; demo sign-in remains the current test path. Cloudflare Workers provide R2 photos and TURN relay without a Firebase service-account key. Consequences:
+Firebase **Spark** until the owner upgrades to Blaze. Data logic runs client-side in `lib/services/backend.dart` inside Firestore transactions, with `backend/firestore.rules` enforcing every invariant. Cloud Functions are built but pending deployment after Blaze; until then real email sign-in cannot work on the live project (it needs `requestLoginCode`/`verifyLoginCode` and an email sender). There is no demo or preview mode in the app. Cloudflare Workers provide R2 photos and TURN relay without a Firebase service-account key. Consequences:
 - **Auth is passwordless**: email → a 6-digit code emailed by the `requestLoginCode` function, traded by `verifyLoginCode` for a Firebase custom token carrying the claim `login: email_otp` (`functions/src/login.ts`; app side `LoginScreen` → `LoginCodeScreen` → `Backend.requestLoginCode` / `verifyLoginCode`). Rules let a verified account create anything (`isVerifiedUser()`: the `login` claim, a verified email, or a `phone_number` claim). Account deletion needs no password: `deleteMyAuthAccount` removes the Auth user server-side. The phone number is collected on registration, unverified. The two admin consoles still sign in with email + password.
 - **Two donor docs**: `donors/{uid}` (private phone, location, username and change date, owner/admin only) and `donors_public/{uid}` (name, username, group, coarse location, availability). Username claims are `usernames/{lowercase_name}` with `uid` and `created_at`; no list access. Claim/change/release and both mirrors share a transaction, using `getAfter` in rules. Usernames start with a letter, use 3–20 lowercase letters/digits/underscores, and have a 30-day change cooldown. Photos use R2; only legacy ID proofs remain as base64 in private attachments.
 - **Request lifecycle** on `requests/{id}.status`: `open → matched → fulfilled`, or `cancelled` / `expired`. Accept is a transaction that locks via `donors/{uid}.active_request_id` and refuses donors on cooldown. **Completion is two-sided**: `donorConfirmDonation` (starts the donor's 90-day cooldown, writes `donation_history` with hospital + group) and `requesterConfirmDonation`; whichever is second sets `fulfilled` — the rules enforce this. Expiry runs every 15 min in `expireOldRequests` (plus lazy `expireIfStale`); reactivation is lazy (`maybeReactivate`). The rules (`cooldownRespected`) stop a donor going available or shortening the rest period.
@@ -50,7 +50,7 @@ Firebase **Spark** until the owner upgrades to Blaze. Data logic runs client-sid
 - **Community posts** can carry one JPEG on Cloudflare R2 at `community/{uid}/{random}.jpg`. The service prepares JPEG <=1440 px, q78, <=2 MB. The app and admin consoles delete the R2 photo before deleting its post; community and avatar links are readable by anyone who has the link.
 - Blood compatibility table (`bloodCompatibility`) is keyed **recipient → donor groups**.
 - `donors_public` coordinates are coarsened to ~1 km (`Backend._coarse`); exact lat/lng only live on private `donors/{uid}`.
-- **Location:** anything *stored* (registration area, request location, chat location) must come from `Backend.preciseLocation()` (nullable — real GPS or nothing), a search result, or `LocationPickerScreen` (Rapido-style fixed-centre pin). `currentPosition()` falls back to a demo city and is for centring a map only; check `Backend.isFallback`. Map tiles and geocoding providers/keys live in `lib/services/geo_config.dart`; all maps use `appMapBase()` from `widgets/map_tiles.dart`.
+- **Location:** anything *stored* (registration area, request location, chat location) must come from `Backend.preciseLocation()` (nullable — real GPS or nothing), a search result, or `LocationPickerScreen` (Rapido-style fixed-centre pin). `currentPosition()` falls back to a default city and is for centring a map only; check `Backend.isFallback`. Map tiles and geocoding providers/keys live in `lib/services/geo_config.dart`; all maps use `appMapBase()` from `widgets/map_tiles.dart`.
 - Counting donors: use `NearbyDonors.countCompatible` (Firestore `count()` aggregation), not a document listener.
 - **Never scan `donors_public`** from user-facing screens — use `NearbyDonors` (geohash precision-5 cell + 8 neighbours, `limit(30)` per cell; needs the `(is_available, geohash)` index). `Backend.availableDonorsStream()` is a whole-collection scan kept only for admin paths.
 - ID proofs use authenticated Worker reads at `id_proofs/{uid}/proof.jpg`; legacy `donors/{uid}/private/id_proof` remains a read fallback. The profile only has `has_id_proof`. `backend/storage.rules` is retained for legacy tests; the app no longer uses Firebase Storage.
@@ -70,7 +70,7 @@ Firebase **Spark** until the owner upgrades to Blaze. Data logic runs client-sid
 - `main.dart` → `SplashScreen`; on web the whole app is constrained to a 430px centered column in `MaterialApp.builder` (do it there, not per screen).
 - `MainNavigationScreen` is an `IndexedStack` tab shell. Flow screens (find donors, donor details, matching, tracking, contact) are pushed on top so the nav bar hides — don't turn them into tabs.
 - State is plain `StatefulWidget` + `StreamBuilder` over Firestore; no state-management library.
-- `lib/preview_mode.dart` `kEnablePreviewUi`: true in debug/profile, false in release unless `--dart-define=ENABLE_PREVIEW_UI=true`. Gates all sample/fictional content (preview gallery reachable from Login, sample About/Community copy). Release builds must never show invented people, stats or partners.
+- No sample, demo or preview content anywhere: every screen shows real data or an honest empty state. Never add invented people, stats or partners.
 
 ## Design system rules
 

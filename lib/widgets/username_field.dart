@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../demo/demo.dart';
 import '../services/backend.dart';
 import '../services/usernames.dart';
 
@@ -37,7 +36,7 @@ class _UsernameFieldState extends State<UsernameField> {
     if (invalid != null) return;
     _timer = Timer(const Duration(milliseconds: 400), () async {
       try {
-        final available = value == widget.currentUsername || Demo.on || await Backend.instance.usernameAvailable(value);
+        final available = value == widget.currentUsername || await Backend.instance.usernameAvailable(value);
         if (!mounted || widget.controller.text.trim() != value) return;
         setState(() {
           _status = available ? 'Available' : 'Already taken. Choose another.';

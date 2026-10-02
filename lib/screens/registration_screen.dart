@@ -11,15 +11,13 @@ import '../theme/app_text_styles.dart';
 import '../widgets/blood_group_droplet.dart';
 import 'consent_screen.dart';
 import 'login_screen.dart';
-import 'phone_verify_screen.dart';
-import '../demo/demo.dart';
 import '../widgets/rb_icon.dart';
 import '../widgets/username_field.dart';
 import '../services/usernames.dart';
 
 class RegistrationScreen extends StatefulWidget {
-  /// Pre-fills the mobile field when known (preview gallery); the email
-  /// sign-in flow leaves it empty for the donor to type.
+  /// Pre-fills the mobile field when known; the email sign-in flow leaves
+  /// it empty for the donor to type.
   final String phoneNumber;
 
   const RegistrationScreen({super.key, this.phoneNumber = ''});
@@ -64,17 +62,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   void initState() {
     super.initState();
     _whatsappController.text = widget.phoneNumber;
-    if (Demo.on) {
-      // Demo persona, pre-filled so the presenter can tap straight through.
-      _nameController.text = Demo.instance.myName;
-      _usernameController.text = demoUsername;
-      _whatsappController.text = Demo.demoPhone;
-      _selectedBloodGroup = Demo.bloodGroup;
-      _locationController.text = Demo.area;
-      _selectedLat = Demo.lat;
-      _selectedLng = Demo.lng;
-      return;
-    }
     _useCurrentLocation(silent: true);
   }
 
@@ -189,14 +176,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
     if (_nameError != null || _usernameError != null || _whatsappError != null || _bloodGroupError != null) return;
 
-    if (Demo.on) {
-      demoUsername = username;
-      // Client demo: nothing is written. The demo then shows the phone
-      // check — production has no SMS provider yet (PhoneVerifyScreen).
-      Navigator.push(context, MaterialPageRoute(builder: (_) => PhoneVerifyScreen(phone: whatsapp)));
-      return;
-    }
-
     setState(() => _isSubmitting = true);
     try {
       double lat, lng;
@@ -260,7 +239,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     }
     _backHandled = true;
     try {
-      if (!Demo.on) await Backend.instance.signOut();
+      await Backend.instance.signOut();
     } catch (_) {
       // Offline (or no Firebase at all, in widget tests) — still leave.
     }

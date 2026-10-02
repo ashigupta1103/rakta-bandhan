@@ -89,7 +89,7 @@ service cloud.firestore {
           'raktabandhan', 'rotary', 'official', 'team', 'moderator', 'system', 'root', 'null', 'undefined']);
     }
 
-    // Reserved for a real provider. Demo entry never writes this field.
+    // Reserved for a real provider.
     function phoneAllowed() {
       let features = /databases/$(database)/documents/config/features;
       let profile = /databases/$(database)/documents/donors/$(request.auth.uid);

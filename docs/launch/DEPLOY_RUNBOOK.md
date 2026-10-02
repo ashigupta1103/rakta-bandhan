@@ -6,7 +6,6 @@ The agent does not push, deploy or mutate production. PR base is `master`.
 
 ```sh
 bash tool/preflight.sh
-flutter test --dart-define=DEMO_SIGNIN=true test/demo_signin_test.dart
 cd functions
 npm run build
 npm run smoke
@@ -35,7 +34,7 @@ Smoke tests use `demo-rakta-bandhan` emulators. Local emulator secrets are dummy
    The script uses the Admin SDK and needs owner Application Default Credentials with Firestore access; Firebase CLI login alone does not provide these. The owner can configure local ADC with `gcloud auth application-default login` following [Google's Firestore authentication guide](https://docs.cloud.google.com/firestore/native/docs/authentication). The agent does not run that login or the live migration.
 
    The first command is a dry run. Review historical phone removal separately: add `--cleanup-request-phones` to a dry run, then `--apply` only after owner approval/backup. The agent runs this script only against emulators. New requests never include phone fields.
-5. On Spark, leave `server_jobs=false`, `phone_required=false`, real sign-in and delivery pending. Use the demo APK.
+5. On Spark, leave `server_jobs=false`, `phone_required=false`, real sign-in and delivery pending.
 6. After Blaze, follow [the upgrade checklist](AFTER_BLAZE_UPGRADE.md) and deploy Functions explicitly:
 
    ```sh
@@ -46,11 +45,10 @@ Smoke tests use `demo-rakta-bandhan` emulators. Local emulator secrets are dummy
 7. Build artifacts:
 
    ```sh
-   flutter build apk --release --dart-define=DEMO_SIGNIN=true
    flutter build apk --release --dart-define=EDGE_URL=https://rakta-bandhan-edge.rakta-bandhan-edge.workers.dev
    ```
 
-   Copy each artifact to a distinct name before the next build. The second command produces the real app and requires the owner-deployed services. Verify signing and legal approval before store release.
+   This produces the real app and requires the owner-deployed services. Verify signing and legal approval before store release.
 
 ## Owner acceptance
 

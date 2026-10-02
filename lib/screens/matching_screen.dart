@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import '../demo/demo.dart';
 import '../services/backend.dart';
 import '../services/nearby_donors.dart';
 import '../theme/app_colors.dart';
@@ -19,8 +18,7 @@ import '../widgets/rb_icon.dart';
 /// forward on its own), the count of currently-available compatible donors,
 /// and elapsed real time since the request was raised. There is no backend
 /// concept of search radius, "notified" counts, or ladder/escalation
-/// stages — `matching_ladder_service.dart`'s MockMatchingLadderService
-/// fabricated all of that, so this screen no longer uses it. A request with
+/// stages, so none are shown. A request with
 /// no response by its real `expires_at` is treated as unmatched — the same
 /// honest signal request_detail/tracking screens already read.
 class MatchingScreen extends StatefulWidget {
@@ -36,7 +34,6 @@ class MatchingScreen extends StatefulWidget {
 
 class _MatchingScreenState extends State<MatchingScreen> {
   StreamSubscription<Map<String, dynamic>?>? _requestSub;
-  Timer? _demoAccept;
   Timer? _countTimer;
   bool _countStarted = false;
   Timer? _tick;
@@ -55,17 +52,7 @@ class _MatchingScreenState extends State<MatchingScreen> {
     _searchPhaseTimer = Timer(const Duration(seconds: 15), () {
       if (mounted) setState(() => _searchPhaseOver = true);
     });
-    _requestSub = Demo.requestDoc(widget.requestId).listen(_onRequestUpdate);
-    if (Demo.isDemoId(widget.requestId)) {
-      // Client demo: one simulated donor nearby, who accepts after a short,
-      // predictable search (the Demo tab can also skip ahead).
-      _compatibleAvailableCount = 1;
-      _countStarted = true;
-      _demoAccept = Timer(const Duration(seconds: 6), () {
-        if (Demo.instance.request?['status'] == 'open') Demo.instance.match();
-      });
-    }
-
+    _requestSub = Backend.instance.requestStream(widget.requestId).listen(_onRequestUpdate);
 
     // Real elapsed-time display and a real expiry check — no fixed-delay
     // simulation of an outcome.
@@ -152,11 +139,7 @@ class _MatchingScreenState extends State<MatchingScreen> {
     _navigated = true;
     await _requestSub?.cancel();
     try {
-      if (Demo.isDemoId(widget.requestId)) {
-        Demo.instance.cancel();
-      } else {
-        await Backend.instance.cancelRequest(widget.requestId);
-      }
+      await Backend.instance.cancelRequest(widget.requestId);
     } catch (_) {
       // Already terminal server-side (matched/expired) — fine to proceed to
       // the cancel-confirmation screen either way from the requester's view.
@@ -168,7 +151,6 @@ class _MatchingScreenState extends State<MatchingScreen> {
   @override
   void dispose() {
     _requestSub?.cancel();
-    _demoAccept?.cancel();
     _countTimer?.cancel();
     _tick?.cancel();
     _searchPhaseTimer?.cancel();

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import '../theme/app_colors.dart';
-import '../demo/demo.dart';
 import '../services/account_service.dart';
 import '../widgets/confirm_sheet.dart';
 import '../widgets/logout_flow.dart';
@@ -37,15 +36,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   bool _exporting = false;
 
-  /// Data export and deletion act on a real account — not simulated.
-  bool _demoBlocked() {
-    if (!Demo.on) return false;
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Not available in the demo — there is no real account.')));
-    return true;
-  }
-
   Future<void> _downloadData() async {
-    if (_exporting || _demoBlocked()) return;
+    if (_exporting) return;
     setState(() => _exporting = true);
     String json;
     try {
@@ -106,7 +98,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _deleteAccount() async {
-    if (_deleting || _demoBlocked()) return;
+    if (_deleting) return;
     final confirmed = await ConfirmSheet.show(
       context,
       title: 'Delete your account permanently?',

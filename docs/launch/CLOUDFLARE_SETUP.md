@@ -1,6 +1,6 @@
 # Cloudflare setup on this Windows machine
 
-Owner walkthrough, checked against Cloudflare's documentation on 2026-10-02. Keep Firebase on Spark and keep the demo APK. Resend, real email sign-in, push and real phone verification remain pending. This setup prepares photos and call relay for the later real app.
+Owner walkthrough, checked against Cloudflare's documentation on 2026-10-02. Keep Firebase on Spark. Resend, real email sign-in, push and real phone verification remain pending. This setup prepares photos and call relay for the later real app.
 
 ## 1. Create or open the account
 
@@ -101,9 +101,9 @@ The URL is used as Flutter `EDGE_URL` and admin `VITE_EDGE_URL`; the admin value
 
 ## 7. What happens after this setup
 
-- Continue using `build/RaktaBandhan-demo.apk`. Its simulated login/content does not use the live Worker, even if Cloudflare is deployed.
+- The app has no demo mode, so photos and calls can only be tried after real sign-in works (Blaze and an email sender).
 - Firebase production deployment remains reserved for the owner. Rules/indexes/Hosting and later Functions have a separate rollout in [the deploy runbook](DEPLOY_RUNBOOK.md); this guide does not change Firebase.
-- After Blaze and email delivery are ready, build the real APK with `EDGE_URL` and without `DEMO_SIGNIN`. Check R2 uploads, private ID-photo access and calls across two phone networks.
+- After Blaze and email delivery are ready, build the real APK with `EDGE_URL`. Check R2 uploads, private ID-photo access and calls across two phone networks.
 - In Cloudflare, monitor Worker requests, R2 storage/operations and TURN usage. Workers Free currently allows **100,000 requests/day**. [Workers limits](https://developers.cloudflare.com/workers/platform/limits/).
 
 If an account/billing/login prompt differs, finish only the step you understand and provide its wording. No screenshots containing API tokens are needed.

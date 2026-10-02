@@ -313,6 +313,10 @@ class Backend {
   Stream<DocumentSnapshot<Map<String, dynamic>>> myDonorDocStream() =>
       _db.collection('donors').doc(_uid).snapshots();
 
+  /// Live data of one request (null once it no longer exists).
+  Stream<Map<String, dynamic>?> requestStream(String id) =>
+      _db.collection('requests').doc(id).snapshots().map((s) => s.data());
+
   Future<bool> hasProfile() async => (await myDonorDoc()).exists;
 
   /// New donors start unverified and unbanned — `is_verified` is

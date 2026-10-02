@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../demo/demo.dart';
 import '../services/backend.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
@@ -29,8 +28,7 @@ class MatchContactScreen extends StatefulWidget {
 
 class _MatchContactScreenState extends State<MatchContactScreen> {
   bool _markingDonated = false;
-  String? _lastStatus;
-  Stream<Map<String, dynamic>?> get _doc => Demo.requestDoc(widget.requestId);
+  Stream<Map<String, dynamic>?> get _doc => Backend.instance.requestStream(widget.requestId);
   bool _releasing = false;
 
   /// Donor backs out. The request reopens for other donors instead of
@@ -46,11 +44,7 @@ class _MatchContactScreenState extends State<MatchContactScreen> {
     if (!confirmed || !mounted) return;
     setState(() => _releasing = true);
     try {
-      if (Demo.isDemoId(widget.requestId)) {
-        Demo.instance.start(DemoRole.donor);
-      } else {
-        await Backend.instance.releaseMatch(widget.requestId);
-      }
+      await Backend.instance.releaseMatch(widget.requestId);
       if (!mounted) return;
       Navigator.of(context).popUntil((route) => route.isFirst);
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Released. The request is open to other donors again.')));
@@ -72,7 +66,7 @@ class _MatchContactScreenState extends State<MatchContactScreen> {
     if (!confirmed || !mounted) return;
     setState(() => _markingDonated = true);
     try {
-      final completed = Demo.isDemoId(widget.requestId) ? Demo.instance.confirmMine() : await Backend.instance.donorConfirmDonation(widget.requestId);
+      final completed = await Backend.instance.donorConfirmDonation(widget.requestId);
       if (!mounted) return;
       if (completed) {
         Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const DonationConfirmScreen()));
@@ -118,17 +112,9 @@ class _MatchContactScreenState extends State<MatchContactScreen> {
               final first = name.trim().isEmpty ? 'The requester' : name.trim().split(RegExp(r'\s+')).first;
               final requesterUid = request['requester_uid'] as String? ?? '';
               final status = request['status'] as String? ?? 'matched';
-              final myUid = Demo.isDemoId(widget.requestId) ? Demo.donorUid : Backend.instance.currentUser?.uid;
+              final myUid = Backend.instance.currentUser?.uid;
               final isLive = status == 'matched' && request['matched_donor_id'] == myUid;
               final iConfirmed = request['donor_confirmed_at'] != null;
-              // Demo: when the simulated requester completes the donation,
-              // move on to the thank-you screen as the real flow does.
-              if (Demo.isDemoId(widget.requestId) && status == 'fulfilled' && _lastStatus == 'matched' && iConfirmed) {
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const DonationConfirmScreen()));
-                });
-              }
-              _lastStatus = status;
               final theyConfirmed = request['requester_confirmed_at'] != null;
               final busy = _markingDonated || _releasing;
 

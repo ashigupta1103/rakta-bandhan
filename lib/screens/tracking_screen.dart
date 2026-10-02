@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import '../demo/demo.dart';
 import '../services/backend.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
@@ -14,7 +13,6 @@ import 'call_screen.dart';
 import 'cancel_confirm_screen.dart';
 import 'chat_screen.dart';
 import 'create_experience_screen.dart';
-import 'donor_details_screen.dart';
 import 'testimonials_screen.dart';
 import 'create_request_screen.dart';
 import '../widgets/rb_icon.dart';
@@ -39,8 +37,7 @@ class TrackingScreen extends StatefulWidget {
 class _TrackingScreenState extends State<TrackingScreen> {
   bool _cancelling = false;
   bool _confirming = false;
-  bool get _demo => Demo.isDemoId(widget.requestId);
-  Stream<Map<String, dynamic>?> get _doc => Demo.requestDoc(widget.requestId);
+  Stream<Map<String, dynamic>?> get _doc => Backend.instance.requestStream(widget.requestId);
 
   /// Requester's half of the two-sided completion ("I received it").
   Future<void> _confirmReceived(String donorName) async {
@@ -54,7 +51,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
     if (!confirmed || !mounted) return;
     setState(() => _confirming = true);
     try {
-      final closed = _demo ? Demo.instance.confirmMine() : await Backend.instance.requesterConfirmDonation(widget.requestId);
+      final closed = await Backend.instance.requesterConfirmDonation(widget.requestId);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(closed ? 'Donation completed. Thank you for using Rakta Bandhan.' : 'Thanks. We’ve asked $donorName to confirm as well.'),
@@ -78,11 +75,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
     if (!confirmed || !mounted) return;
     setState(() => _cancelling = true);
     try {
-      if (_demo) {
-        Demo.instance.cancel();
-      } else {
-        await Backend.instance.cancelRequest(widget.requestId);
-      }
+      await Backend.instance.cancelRequest(widget.requestId);
       if (!mounted) return;
       Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => CancelConfirmScreen(requestId: widget.requestId)));
     } catch (e) {
@@ -93,7 +86,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
   }
 
   Future<void> _call(Map<String, dynamic> request) async {
-    final me = _demo ? {'name': Demo.instance.myName} : (await Backend.instance.myDonorDoc()).data();
+    final me = (await Backend.instance.myDonorDoc()).data();
     if (!mounted) return;
     await startCallFlow(
       context,
@@ -144,7 +137,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                 children: const [RbStatePanel(icon: RbGlyph.search, title: 'Request not found', message: 'It may have been removed. Your other requests are on the Requests tab.')],
               );
             }
-            if (!_demo) Backend.instance.expireIfStale(widget.requestId, data);
+            Backend.instance.expireIfStale(widget.requestId, data);
             final status = data['status'] as String? ?? 'open';
             final bloodGroup = data['blood_group'] as String? ?? '';
             final units = data['units_needed'] ?? 1;
@@ -239,29 +232,6 @@ class _TrackingScreenState extends State<TrackingScreen> {
                                       isFulfilled ? 'Donated for this request' : (donorConfirmed ? 'Says they have donated' : 'Accepted your request'),
                                       style: const TextStyle(fontSize: 13, color: AppColors.ink2),
                                     ),
-                                    if (_demo)
-                                      GestureDetector(
-                                        onTap: () => Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) => const DonorDetailsScreen(
-                                              donorId: Demo.donorUid,
-                                              name: Demo.donorName,
-                                              initials: 'AM',
-                                              bloodGroup: Demo.bloodGroup,
-                                              isVerified: true,
-                                              distanceKm: Demo.donorDistanceKm,
-                                              isAvailable: true,
-                                              matched: true,
-                                              donationCount: Demo.donorPriorDonations,
-                                            ),
-                                          ),
-                                        ),
-                                        child: const Padding(
-                                          padding: EdgeInsets.only(top: 4),
-                                          child: Text('View profile', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.brandRed)),
-                                        ),
-                                      ),
                                   ],
                                 ),
                               ),

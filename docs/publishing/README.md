@@ -3,7 +3,7 @@
 For the team shipping v1.0 to the App Store and Google Play. Related documents:
 - `store-listing.md`: listing copy and every policy-form answer.
 - `cost-estimate.md`: the Blaze budget.
-- [Current build and owner choices](../launch/BUILD_STATUS.md), [external connections](../launch/EXTERNAL_CONNECTIONS.md) and [owner deploy runbook](../launch/DEPLOY_RUNBOOK.md). Demo sign-in remains in use until the owner upgrades to Blaze and verifies a sending domain.
+- [Current build and owner choices](../launch/BUILD_STATUS.md), [external connections](../launch/EXTERNAL_CONNECTIONS.md) and [owner deploy runbook](../launch/DEPLOY_RUNBOOK.md). Real email sign-in needs the owner to upgrade to Blaze and verify a sending domain; the app has no demo mode.
 
 Legend: ✅ done in the repo · ⬜ someone must do it (needs an account, a decision, or a Mac).
 
@@ -42,11 +42,11 @@ Legend: ✅ done in the repo · ⬜ someone must do it (needs an account, a deci
 | Suite | Command | Result |
 |---|---|---|
 | Flutter analyzer | `flutter analyze` | no issues |
-| Flutter tests | `flutter test` | 67 pass; 1 demo-only skip, separately verified with its define |
+| Flutter tests | `flutter test` | all pass (see [verification](../launch/VERIFICATION.md)) |
 | Security rules (Firestore + Storage, emulator) | `cd backend/rules-test && npm install && npm test` (needs Java 21) | 73 / 73 |
 | Functions unit tests | `cd functions && npm test` | 27 / 27 |
 | Functions smoke test (emulator) | `cd functions && FUNCTIONS_DISCOVERY_TIMEOUT=120 npm run smoke` | login, review seed, lifecycle/jobs, support and 410-record migration checks pass |
-| Android build | `flutter build apk --release --dart-define=DEMO_SIGNIN=true` | demo APK builds; real-device acceptance is owner-run |
+| Android build | `flutter build apk --release --dart-define=EDGE_URL=<worker url>` | APK builds; real-device acceptance is owner-run |
 | Admin console | `cd admin/frontend && npm run build` | builds, type-checks |
 
 Not testable here: real push delivery, real calls between two phones, and the Google map (need the live project, two devices and the Maps key) — see the two-phone checklist in step 3.

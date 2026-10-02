@@ -5,7 +5,6 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart' as gm;
 import 'package:latlong2/latlong.dart' hide Path;
-import '../demo/demo.dart';
 import '../services/backend.dart';
 import '../services/nearby_donors.dart';
 import '../theme/app_colors.dart';
@@ -20,7 +19,6 @@ import '../widgets/rb_ui.dart';
 import '../widgets/state_card.dart';
 import 'donor_details_screen.dart';
 import 'location_picker_screen.dart';
-import 'matching_screen.dart';
 import '../widgets/rb_icon.dart';
 
 enum _MapPermissionState { checking, prompt, granted, denied }
@@ -80,23 +78,6 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
   Stream<List<_Doc>> get _donorStream {
     final p = _position;
     if (p == null) return Stream.value(const []);
-    if (Demo.on) {
-      // Client demo: one simulated donor (shown to the requester persona);
-      // no real donor is queried.
-      return Stream.value(Demo.instance.role == DemoRole.donor
-          ? const []
-          : [
-              (id: Demo.donorUid, data: <String, dynamic>{
-                'name': Demo.donorName,
-                'blood_group': Demo.bloodGroup,
-                'is_verified': true,
-                'is_available': true,
-                'lat': Demo.lat + 0.0216,
-                'lng': Demo.lng,
-                'area': Demo.area,
-              }),
-            ]);
-    }
     final key = '${NearbyDonors.cellOf(p.latitude, p.longitude)}#$_retryToken';
     if (key != _nearbyKey) {
       _nearby?.dispose();
@@ -116,13 +97,7 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
   @override
   void initState() {
     super.initState();
-    if (Demo.on) {
-      // The demo stands at a fixed demo point instead of GPS.
-      _permissionState = _MapPermissionState.granted;
-      _position = Position(latitude: Demo.lat, longitude: Demo.lng, timestamp: DateTime.now(), accuracy: 1, altitude: 0, altitudeAccuracy: 0, heading: 0, headingAccuracy: 0, speed: 0, speedAccuracy: 0);
-    } else {
-      _checkPermission();
-    }
+    _checkPermission();
     _sheetController.addListener(() {
       if (_sheetController.isAttached) setState(() => _sheetExtent = _sheetController.size);
     });
@@ -179,11 +154,6 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
   /// the map back to it.
   Future<void> _recenter() async {
     if (_recentering) return;
-    if (Demo.on) {
-      // The demo never reads GPS: back to the fixed demo point.
-      _moveMap(Demo.lat, Demo.lng, 13);
-      return;
-    }
     setState(() => _recentering = true);
     try {
       final p = await Backend.instance.preciseLocation();
@@ -307,11 +277,6 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
   Future<void> _sendRequestTo(Map<String, dynamic> donor) async {
     final donorId = donor['id'] as String;
     if (_sendingDonorId != null) return; // guards against a double-tap firing two requests
-    if (Demo.on) {
-      Demo.instance.createRequest(group: donor['bloodGroup'] as String, units: 1, urgency: 'urgent', label: Demo.hospital);
-      Navigator.push(context, MaterialPageRoute(builder: (_) => MatchingScreen(requestId: Demo.requestId, bloodGroup: donor['bloodGroup'] as String, urgency: 'urgent')));
-      return;
-    }
     setState(() => _sendingDonorId = donorId);
     final bloodGroup = donor['bloodGroup'] as String;
     try {
@@ -810,7 +775,6 @@ class _FindDonorsScreenState extends State<FindDonorsScreen> {
               isVerified: isVerified,
               distanceKm: distanceKmValue,
               isAvailable: isAvailable,
-              donationCount: Demo.isDemoId(donor['id'] as String) ? Demo.donorPriorDonations : null,
             ),
           ),
         );

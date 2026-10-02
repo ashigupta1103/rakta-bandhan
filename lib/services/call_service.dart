@@ -81,24 +81,6 @@ class ActiveCall extends ChangeNotifier {
 
   ActiveCall._({required this.requestId, required this.callId, required this.peerUid, required this.peerName, required this.isCaller});
 
-  /// Client demo only (lib/demo/demo.dart): a call that never opens the
-  /// microphone, WebRTC or Firestore. An outgoing one rings for a few
-  /// seconds and then "connects"; an answered one is live at once. It is
-  /// never registered as [CallService.active] and logs nothing.
-  factory ActiveCall.simulated({required String requestId, required String peerName, required bool isCaller}) {
-    final call = ActiveCall._(requestId: requestId, callId: 'demo-call', peerUid: 'demo', peerName: peerName, isCaller: isCaller).._simulated = true;
-    if (isCaller) {
-      call._phase = CallPhase.ringing;
-      call._ringTimer = Timer(const Duration(seconds: 3), () => call._setPhase(CallPhase.active));
-    } else {
-      call._setPhase(CallPhase.active);
-    }
-    return call;
-  }
-
-  bool _simulated = false;
-  bool get simulated => _simulated;
-
   CallPhase _phase = CallPhase.connecting;
   CallPhase get phase => _phase;
 
@@ -149,7 +131,7 @@ class ActiveCall extends ChangeNotifier {
 
   Future<void> toggleSpeaker() async {
     _speakerOn = !_speakerOn;
-    if (!kIsWeb && !_simulated) {
+    if (!kIsWeb) {
       try {
         await Helper.setSpeakerphoneOn(_speakerOn);
       } catch (_) {
@@ -163,13 +145,6 @@ class ActiveCall extends ChangeNotifier {
   Future<void> hangUp() async {
     if (_phase == CallPhase.ended) return;
     final wasAnswered = _connectedAt != null;
-    if (_simulated) {
-      _ringTimer?.cancel();
-      _endReason = wasAnswered ? 'Call ended' : 'Call cancelled';
-      _phase = CallPhase.ended;
-      notifyListeners();
-      return;
-    }
     try {
       await _ref.update({
         'status': (!wasAnswered && isCaller) ? 'missed' : 'ended',

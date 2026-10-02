@@ -16,9 +16,6 @@ const reservedUsernames = {
   'undefined',
 };
 
-// Demo-only in-memory choice; no production profile or Auth state is changed.
-String demoUsername = 'donor_demo';
-
 String? validateUsername(String name) {
   if (!RegExp(r'^[a-z][a-z0-9_]{2,19}$').hasMatch(name)) {
     return 'Use 3–20 lowercase letters, numbers or _. Start with a letter.';

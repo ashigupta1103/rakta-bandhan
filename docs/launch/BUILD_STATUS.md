@@ -4,11 +4,11 @@ Branch: `feat/prelaunch`. Upstream `origin/master` at `0e19c5d` was merged, pres
 
 ## Implemented
 
-- Demo sign-in accepts any valid email, with simulated email code `123456` and phone code `246810`.
+- All demo/preview code is removed (2026-10-02): no demo sign-in, sample content, preview gallery or simulated calls. The app only talks to the real backend.
 - Functions account ban/unban/removal, bounded reactivation, request expiry, two-person completion and switchable server impact counting.
 - Cloudflare R2 client uploads/downloads/deletions, JPEG compression, private ID-proof access and legacy read fallback; TURN credentials with caching and STUN fallback. Both admin clients use authenticated ID-photo access.
 - Atomic username claims, signup/existing-account prompt, 30-day changes, profile/post/chat display, release on deletion and protection against late cleanup deleting a reused name.
-- Community story editing saves text/topic/replacement photos through the real backend without replacing the upstream editor design. Demo new-post privacy switches persist their choices; edits keep existing visibility. Uploaded JPEGs strip EXIF metadata after orientation is baked.
+- Community story editing saves text/topic/replacement photos through the real backend without replacing the upstream editor design. Edits keep existing visibility. Uploaded JPEGs strip EXIF metadata after orientation is baked.
 - New request documents contain no phone numbers. The optional phone gate is enforced by rules, and clients cannot grant themselves verification.
 - Both admin consoles use server search and 50-record cursor pages for donors/requests, pending verification queries and aggregate totals. Web hospital/history lists also have cursor pages. Charts based on loaded samples are labelled.
 - Private support submissions/replies, My reports, reply actions in both consoles, status mirrors, export/deletion, and a disabled-by-default Functions email/push trigger.
@@ -18,13 +18,13 @@ Branch: `feat/prelaunch`. Upstream `origin/master` at `0e19c5d` was merged, pres
 
 ## Deferred by owner choice
 
-Worker service-account helper, D1 email sign-in, privileged Worker admin routes/cron, and Worker push delivery are deferred. Use demo until Blaze; no Firebase service-account private key belongs on Cloudflare. Truecaller/SMS/WhatsApp phone ownership verification remains pending. `phone_required=false` and `server_jobs=false` until the relevant owner rollout.
+Worker service-account helper, D1 email sign-in, privileged Worker admin routes/cron, and Worker push delivery are deferred. Real email sign-in waits for Blaze and a verified sender; no Firebase service-account private key belongs on Cloudflare. Truecaller/SMS/WhatsApp phone ownership verification remains pending. `phone_required=false` and `server_jobs=false` until the relevant owner rollout.
 
 The real production acceptance in the original handoff remains pending owner provisioning/deployment and device testing. Code compilation and emulator results do not verify a live third-party connection.
 
 ## Local validation
 
-- Flutter: analyzer clean; 67 tests pass, with the demo-only test skipped in the normal run. The defined demo test passes separately.
+- Flutter: analyzer clean; tests pass (the demo-only tests were removed with the demo layer).
 - Functions: 27 unit tests. Emulator smoke covers login/review accounts, lifecycle, jobs, username release/reuse, support delivery off and migration/search/cursor behaviour across 410 records.
 - Edge: 23 tests and dry-run Worker bundle.
 - Rules: 73 tests, including username atomicity/cooldown, phone protection, contact privacy and private support access.
@@ -38,11 +38,11 @@ Deployed by the coding agent after the owner told it to finish the Cloudflare se
 
 Checked live from outside, without signing in: `/health` returns `{"ok":true}`; `/ice`, ID-photo reads and uploads without a valid token return 401; a missing public photo returns 404 (the R2 binding works); an unsigned "emulator" token is refused with 401, so emulator mode is off in production; a token with an unknown signing key returns 401 and not 503 (the Worker can fetch Google's signing keys); CORS allows the Hosting origin and no other. The TURN key was also validated directly against Cloudflare (HTTP 201 with relay credentials).
 
-Not verified: uploads, private-photo access and relay credentials for a real signed-in user and matched request. They need real Firebase sign-in (Blaze and a verified email sender). The demo APK does not use this Worker.
+Not verified: uploads, private-photo access and relay credentials for a real signed-in user and matched request. They need real Firebase sign-in (Blaze and a verified email sender).
 
 ## Owner next steps
 
-1. Install `build/RaktaBandhan-demo.apk` and do the device testing you requested.
+1. Pick how real sign-in will work (Blaze + verified email sender is the plan of record), then install the real APK built with `EDGE_URL` and test on devices. The old `build/RaktaBandhan-demo.apk` is obsolete.
 2. Purchase a domain and create the Resend account. Follow [external connections](EXTERNAL_CONNECTIONS.md).
 3. R2 and TURN are deployed (see above).
 4. When ready, upgrade Firebase to Blaze and follow [after Blaze](AFTER_BLAZE_UPGRADE.md) and [the deploy runbook](DEPLOY_RUNBOOK.md).

@@ -15,15 +15,6 @@ abstract class DonationHistoryService {
   Future<List<DonationRecord>> fetchHistory();
 }
 
-class MockDonationHistoryService implements DonationHistoryService {
-  @override
-  Future<List<DonationRecord>> fetchHistory() async => const [
-        DonationRecord(hospital: 'Fortis Hospital, Cunningham Rd', date: '14 May 2026', bloodGroup: 'O+'),
-        DonationRecord(hospital: "St. John's Medical College", date: '2 Feb 2026', bloodGroup: 'O+'),
-        DonationRecord(hospital: 'Apollo Hospital, Bannerghatta', date: '9 Nov 2025', bloodGroup: 'O+'),
-      ];
-}
-
 const _months = [
   '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
 ];

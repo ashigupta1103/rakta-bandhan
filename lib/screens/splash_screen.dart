@@ -22,11 +22,8 @@ import 'username_screen.dart';
 /// sits in the image cache *before* the reveal Column is even built — the
 /// animation only ever plays over pixels that are already there.
 ///
-/// Routing precedence — the ring-carousel onboarding step is retired (not
-/// in the approved entry flow: Splash -> Login -> OTP -> Registration, per
-/// design_updated/Rakta Bandhan Redesign.dc.html's "Entry" section). The
-/// screen and its OnboardingService are left in place, still reachable from
-/// Preview Gallery for inspection, just no longer routed to for real users:
+/// Routing precedence — the approved entry flow is Splash -> Login -> OTP
+/// -> Registration (design_updated/Rakta Bandhan Redesign.dc.html, "Entry"):
 ///   has donor profile -> MainNavigationScreen
 ///   no profile         -> LoginScreen
 class SplashScreen extends StatefulWidget {
