@@ -219,10 +219,17 @@ service cloud.firestore {
 
       allow create: if isVerifiedUser()
         && !isBanned()
+        && !('requester_phone' in request.resource.data)
+        && !('matched_donor_phone' in request.resource.data)
         && request.resource.data.requester_uid == request.auth.uid
         && request.resource.data.status == 'open';
 
-      allow update: if isAdmin() || (isSignedIn() && coreUnchanged() && (
+      allow update: if isAdmin() || (isSignedIn()
+        && (request.resource.data.get('requester_phone', null) == null
+            || request.resource.data.get('requester_phone', null) == resource.data.get('requester_phone', null))
+        && (request.resource.data.get('matched_donor_phone', null) == null
+            || request.resource.data.get('matched_donor_phone', null) == resource.data.get('matched_donor_phone', null))
+        && coreUnchanged() && (
           // requester cancels their own open or matched request
           (resource.data.requester_uid == request.auth.uid
             && resource.data.status in ['open', 'matched']

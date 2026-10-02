@@ -377,7 +377,7 @@ class AdminService extends ChangeNotifier {
 
   /// Moderation: rules allow only an admin to delete a story.
   Future<void> deleteStory(String id) async {
-    await _db.collection('community_stories').doc(id).delete();
+    await Backend.instance.deleteMyStory(id);
     await Backend.instance.adminLogStoryRemoval(id);
   }
 

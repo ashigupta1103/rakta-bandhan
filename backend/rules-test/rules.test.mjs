@@ -14,6 +14,7 @@ import {
 } from '@firebase/rules-unit-testing';
 import {
   deleteDoc,
+  deleteField,
   doc,
   getDoc,
   serverTimestamp,
@@ -59,7 +60,6 @@ function openRequest(extra = {}) {
   return {
     requester_uid: 'requester',
     requester_name: 'Req',
-    requester_phone: '9000000000',
     blood_group: 'O+',
     units_needed: 1,
     urgency: 'urgent',
@@ -221,6 +221,22 @@ describe('two-sided donation completion', () => {
 });
 
 describe('accepting requests', () => {
+  test('request documents refuse newly copied phone numbers', async () => {
+    await assertSucceeds(setDoc(doc(verified('requester'), 'requests/clean'), openRequest()));
+    await assertFails(setDoc(doc(verified('requester'), 'requests/leak'), openRequest({ requester_phone: '9000000000' })));
+    await assertFails(updateDoc(doc(verified('requester'), 'requests/clean'), {
+      requester_phone: '9000000000', requester_deleted: true,
+    }));
+  });
+
+  test('legacy phone numbers can be removed while deleting an account', async () => {
+    await seed((db) => setDoc(doc(db, 'requests/legacy'), openRequest({ requester_phone: '9000000000' })));
+    await assertSucceeds(updateDoc(doc(verified('requester'), 'requests/legacy'), {
+      requester_phone: deleteField(), requester_name: 'Deleted user', requester_deleted: true,
+    }));
+    const data = (await getDoc(doc(verified('requester'), 'requests/legacy'))).data();
+    if (data.requester_phone !== undefined) throw new Error('legacy phone survived deletion');
+  });
   /** The write Backend.acceptRequest makes: the request goes to matched and the donor's own lock moves, in one batch. */
   async function accept(uid, requestId) {
     const db = verified(uid);
@@ -229,7 +245,8 @@ describe('accepting requests', () => {
       status: 'matched',
       matched_donor_id: uid,
       matched_donor_name: 'D',
-      matched_donor_phone: '9',
+      requester_phone: deleteField(),
+      matched_donor_phone: deleteField(),
       matched_at: serverTimestamp(),
     });
     batch.update(doc(db, `donors/${uid}`), { active_request_id: requestId });

@@ -6,7 +6,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/painting.dart' show decodeImageFromList;
 import 'package:geolocator/geolocator.dart';
@@ -14,6 +13,8 @@ import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart' show XFile;
 
 import 'geo_config.dart';
+import 'edge.dart';
+import 'photos.dart';
 
 /// Recipient blood group -> donor groups that can give to it.
 const bloodCompatibility = <String, List<String>>{
@@ -214,6 +215,7 @@ class Backend {
   final _auth = FirebaseAuth.instance;
   final _db = FirebaseFirestore.instance;
   final _analytics = FirebaseAnalytics.instance;
+  final _edge = EdgeClient();
 
   /// Best-effort — a broken/offline Analytics call must never break the
   /// funnel step it's reporting on.
@@ -296,7 +298,6 @@ class Backend {
     await FirebaseAuth.instance.useAuthEmulator(host, 9099);
     FirebaseFirestore.instance.useFirestoreEmulator(host, 8080);
     FirebaseFunctions.instanceFor(region: kFunctionsRegion).useFunctionsEmulator(host, 5001);
-    await FirebaseStorage.instance.useStorageEmulator(host, 9199);
   }
 
   /// ~1.1 km precision. donors_public is readable by every signed-in user,
@@ -395,27 +396,18 @@ class Backend {
     return until != null && until.isAfter(DateTime.now());
   }
 
-  /// Base64-encodes the donor's picked ID proof photo directly onto their
-  /// private `donors/{uid}` doc (never `donors_public` — same visibility
-  /// tier as phone). Cloud Storage now requires a Blaze billing account
-  /// (Google policy change, no more free Spark bucket) — this stays on the
-  /// free Firestore-only path instead. Caller (personal_information_
-  /// screen.dart) constrains the picked image's resolution/quality so the
-  /// encoded string comfortably fits Firestore's 1MiB document limit.
-  /// Admins view it from AdminDonorDetailScreen before verifying.
-  ///
-  /// The image lives in its own document (`donors/{uid}/private/id_proof`),
-  /// not inline on the profile: the profile is read on nearly every screen,
-  /// and an inline ~200 KB image made every one of those reads download it.
-  /// The profile keeps only a `has_id_proof` flag.
+  /// ID photos go to R2. Every read requires the owner's or admin's token;
+  /// legacy Firestore ID photos remain a read fallback until removed.
   Future<void> uploadIdProof(XFile file) async {
-    final bytes = await file.readAsBytes();
+    final bytes = await photoForUpload(await file.readAsBytes());
+    await _edge.request(
+      'PUT',
+      '/media/id_proofs/$_uid/proof.jpg',
+      bytes: bytes,
+      contentType: 'image/jpeg',
+    );
     final batch = _db.batch();
-    batch.set(_idProofRef(_uid), {
-      'base64': base64Encode(bytes),
-      'content_type': file.mimeType ?? 'image/jpeg',
-      'uploaded_at': FieldValue.serverTimestamp(),
-    });
+    batch.delete(_idProofRef(_uid));
     batch.update(_db.collection('donors').doc(_uid), {
       'has_id_proof': true,
       'id_proof_base64': FieldValue.delete(),
@@ -430,41 +422,63 @@ class Backend {
   /// Owner/admin only (rules). Falls back to the legacy inline field for
   /// donors who uploaded before the image moved to its own document.
   Future<String?> fetchIdProof(String uid) async {
+    if (kEdgeUrl.isNotEmpty) {
+      try {
+        final response = await _edge.request(
+          'GET',
+          '/media/id_proofs/$uid/proof.jpg',
+        );
+        return base64Encode(response.bodyBytes);
+      } on FirebaseFunctionsException catch (e) {
+        if (e.code != 'not-found') rethrow;
+      }
+    }
     final own = (await _idProofRef(uid).get()).data()?['base64'] as String?;
     if (own != null) return own;
-    return (await _db.collection('donors').doc(uid).get()).data()?['id_proof_base64'] as String?;
+    return (await _db.collection('donors').doc(uid).get())
+            .data()?['id_proof_base64']
+        as String?;
   }
 
   /// Account deletion: the ID image document goes with the profile.
-  Future<void> deleteMyIdProof() => _idProofRef(_uid).delete();
+  Future<void> deleteMyIdProof() async {
+    if (kEdgeUrl.isNotEmpty) {
+      await _edge.deleteMedia('id_proofs/$_uid/proof.jpg');
+    }
+    await _idProofRef(_uid).delete();
+  }
 
-  /// Profile photo, shown only on the owner's own My Page. Stored privately
-  /// at `avatars/{uid}/profile` (storage.rules: owner-only read/write, image,
-  /// < 2 MB; the caller passes an image_picker-downscaled file). The
-  /// download URL lives on the private `donors/{uid}` doc, never public.
+  /// Profile photo on R2 under a random name. Its link is stored only on
+  /// the private profile; anyone who receives that link can read the photo.
   Future<String> uploadProfilePhoto(XFile photo) async {
-    final bytes = await photo.readAsBytes();
-    final contentType = switch (photo.mimeType) {
-      'image/png' => 'image/png',
-      'image/webp' => 'image/webp',
-      _ => 'image/jpeg',
-    };
-    final ref = FirebaseStorage.instance.ref('avatars/$_uid/profile');
-    await ref.putData(bytes, SettableMetadata(contentType: contentType));
-    final url = await ref.getDownloadURL();
-    await _db.collection('donors').doc(_uid).update({'photo_url': url, 'photo_updated_at': FieldValue.serverTimestamp()});
+    final bytes = await photoForUpload(await photo.readAsBytes());
+    final path = 'avatars/$_uid/${newMediaName()}';
+    final response = await _edge.request(
+      'PUT',
+      '/media/$path',
+      bytes: bytes,
+      contentType: 'image/jpeg',
+    );
+    final uploaded = jsonDecode(response.body) as Map<String, dynamic>;
+    final url = uploaded['url'] as String;
+    await _db.collection('donors').doc(_uid).update({
+      'photo_url': url,
+      'photo_path': path,
+      'photo_updated_at': FieldValue.serverTimestamp(),
+    });
     return url;
   }
 
   /// Removes the profile photo (file and link). Also used by account deletion.
   Future<void> removeProfilePhoto({bool keepProfileField = false}) async {
-    try {
-      await FirebaseStorage.instance.ref('avatars/$_uid/profile').delete();
-    } on FirebaseException catch (e) {
-      if (e.code != 'object-not-found') rethrow;
-    }
+    final path = (await myDonorDoc()).data()?['photo_path'] as String?;
+    if (path != null) await _edge.deleteMedia(path);
     if (!keepProfileField) {
-      await _db.collection('donors').doc(_uid).update({'photo_url': FieldValue.delete(), 'photo_updated_at': FieldValue.delete()});
+      await _db.collection('donors').doc(_uid).update({
+        'photo_url': FieldValue.delete(),
+        'photo_path': FieldValue.delete(),
+        'photo_updated_at': FieldValue.delete(),
+      });
     }
   }
 
@@ -636,10 +650,8 @@ class Backend {
       .map((e) => e.key)
       .toList();
 
-  /// Denormalizes the requester's own name/phone onto the request at
-  /// creation time — the matched donor then reads contact info straight
-  /// off this doc (see MatchContactScreen) instead of needing a second,
-  /// separately-authorized read of `donors/{requester_uid}`.
+  /// Names identify the people on a request. Phone numbers remain private;
+  /// matched users communicate through in-app messages and calls.
   Future<String> createRequest({
     required String bloodGroup,
     required int unitsNeeded,
@@ -703,7 +715,9 @@ class Backend {
   /// points at a request that's no longer actually active (matched
   /// elsewhere finished/cancelled without this donor's client seeing it).
   Future<void> acceptRequest(String requestId) async {
-    if (await completeMyDonationIfConfirmed()) throw const DonorOnCooldownException();
+    if (await completeMyDonationIfConfirmed()) {
+      throw const DonorOnCooldownException();
+    }
     await _db.runTransaction((tx) async {
       final donorRef = _db.collection('donors').doc(_uid);
       final donorSnap = await tx.get(donorRef);
@@ -713,12 +727,16 @@ class Backend {
 
       final activeId = donor['active_request_id'] as String?;
       if (activeId != null && activeId != requestId) {
-        final activeSnap = await tx.get(_db.collection('requests').doc(activeId));
-        final stillActive = activeSnap.exists && activeSnap.data()?['status'] == 'matched';
+        final activeSnap = await tx.get(
+          _db.collection('requests').doc(activeId),
+        );
+        final stillActive =
+            activeSnap.exists && activeSnap.data()?['status'] == 'matched';
         if (stillActive) throw const DonorAlreadyMatchedException();
         // Completed while this app wasn't looking: its cooldown applies
         // first (completeMyDonationIfConfirmed, run before this transaction).
-        if (activeSnap.data()?['status'] == 'fulfilled' && activeSnap.data()?['matched_donor_id'] == _uid) {
+        if (activeSnap.data()?['status'] == 'fulfilled' &&
+            activeSnap.data()?['matched_donor_id'] == _uid) {
           throw const DonorOnCooldownException();
         }
       }
@@ -733,7 +751,8 @@ class Backend {
         'status': 'matched',
         'matched_donor_id': _uid,
         'matched_donor_name': donor['name'],
-        'matched_donor_phone': donor['phone'],
+        'requester_phone': FieldValue.delete(), // Remove legacy values without copying contact details.
+        'matched_donor_phone': FieldValue.delete(),
         'matched_at': FieldValue.serverTimestamp(),
       });
       tx.update(donorRef, {'active_request_id': requestId});
@@ -749,17 +768,26 @@ class Backend {
       final reqRef = _db.collection('requests').doc(requestId);
       final reqSnap = await tx.get(reqRef);
       final data = reqSnap.data();
-      if (data == null || data['status'] != 'matched' || data['matched_donor_id'] != _uid) return;
+      if (data == null ||
+          data['status'] != 'matched' ||
+          data['matched_donor_id'] != _uid) {
+        return;
+      }
       tx.update(reqRef, {
         'status': 'open',
         'matched_donor_id': null,
         'matched_donor_name': null,
-        'matched_donor_phone': null,
+        'requester_phone': FieldValue.delete(),
+        'matched_donor_phone': FieldValue.delete(),
         'matched_at': null,
         'released_at': FieldValue.serverTimestamp(),
-        'expires_at': Timestamp.fromDate(DateTime.now().add(const Duration(hours: requestExpiryHours))),
+        'expires_at': Timestamp.fromDate(
+          DateTime.now().add(const Duration(hours: requestExpiryHours)),
+        ),
       });
-      tx.update(_db.collection('donors').doc(_uid), {'active_request_id': null});
+      tx.update(_db.collection('donors').doc(_uid), {
+        'active_request_id': null,
+      });
     });
     _logEvent('request_released', {'request_id': requestId});
   }
@@ -967,6 +995,9 @@ class Backend {
   /// it, keeping a copy of someone's ID only adds risk (and storage). The
   /// profile records that it was checked, and when.
   Future<void> adminVerifyDonor(String donorId) async {
+    if (kEdgeUrl.isNotEmpty) {
+      await _edge.deleteMedia('id_proofs/$donorId/proof.jpg');
+    }
     await _db.runTransaction((tx) async {
       tx.delete(_idProofRef(donorId));
       tx.update(_db.collection('donors').doc(donorId), {
@@ -1258,6 +1289,10 @@ class Backend {
   /// is the Spark-compatible way to actually lock someone out; use delete
   /// only when the record itself, not just access, needs to go.
   Future<void> adminDeleteDonor(String donorId) async {
+    if (kEdgeUrl.isNotEmpty) {
+      await _edge.deleteMedia('id_proofs/$donorId/proof.jpg');
+    }
+    await _idProofRef(donorId).delete();
     await _db.collection('donors_public').doc(donorId).delete();
     await _db.collection('donors').doc(donorId).delete();
     await _logAdminAction('delete_donor', donorId);
@@ -1303,10 +1338,8 @@ class Backend {
   /// Community stories ("Share an experience"). Public to signed-in users,
   /// authored under the poster's own uid; admins can moderate/remove.
   ///
-  /// An optional photo goes to Cloud Storage at `community/{uid}/{postId}`
-  /// (storage.rules: own folder, images only, < 2 MB). The caller passes an
-  /// already-downscaled image (image_picker maxWidth/imageQuality), ~150–300
-  /// KB. Deleting the post deletes the photo (onStoryDeleted function).
+  /// The shared photo helper prepares a JPEG for R2. Deleting a post
+  /// removes its photo through the Worker before removing the Firestore doc.
   Future<void> submitCommunityStory({
     required String topic,
     required String body,
@@ -1320,17 +1353,11 @@ class Backend {
     String? imagePath;
     double? imageAspect;
     if (photo != null) {
-      final bytes = await photo.readAsBytes();
-      final contentType = switch (photo.mimeType) {
-        'image/png' => 'image/png',
-        'image/webp' => 'image/webp',
-        _ => 'image/jpeg',
-      };
-      final ext = contentType.split('/').last.replaceAll('jpeg', 'jpg');
-      imagePath = 'community/$_uid/${ref.id}.$ext';
-      final storageRef = FirebaseStorage.instance.ref(imagePath);
-      await storageRef.putData(bytes, SettableMetadata(contentType: contentType, cacheControl: 'public, max-age=604800'));
-      imageUrl = await storageRef.getDownloadURL();
+      final bytes = await photoForUpload(await photo.readAsBytes());
+      imagePath = 'community/$_uid/${newMediaName()}';
+      final response = await _edge.request('PUT', '/media/$imagePath', bytes: bytes, contentType: 'image/jpeg');
+      imageUrl = (jsonDecode(response.body) as Map<String, dynamic>)['url'] as String?;
+      if (imageUrl == null) throw FirebaseFunctionsException(code: 'unavailable', message: 'Photo upload failed.');
       try {
         final image = await decodeImageFromList(bytes);
         if (image.height > 0) imageAspect = image.width / image.height;
@@ -1353,7 +1380,12 @@ class Backend {
   }
 
   /// The author removes their own post (the photo goes with it).
-  Future<void> deleteMyStory(String storyId) => _db.collection('community_stories').doc(storyId).delete();
+  Future<void> deleteMyStory(String storyId) async {
+    final ref = _db.collection('community_stories').doc(storyId);
+    final path = (await ref.get()).data()?['image_path'] as String?;
+    if (path != null && kEdgeUrl.isNotEmpty) await _edge.deleteMedia(path);
+    await ref.delete();
+  }
 
   /// Report a community post for review (Apple guideline 1.2 — user
   /// content must be reportable). Admins see it in the reports inbox.

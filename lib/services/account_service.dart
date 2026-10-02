@@ -70,7 +70,7 @@ class AccountService {
         await doc.reference.update({'status': 'cancelled', 'cancelled_at': FieldValue.serverTimestamp()});
       }
       await ChatService.instance.deleteMyMessages(doc.id).catchError((_) {});
-      await doc.reference.update({'requester_name': 'Deleted user', 'requester_phone': '', 'requester_deleted': true, 'last_message': FieldValue.delete()});
+      await doc.reference.update({'requester_name': 'Deleted user', 'requester_phone': FieldValue.delete(), 'requester_deleted': true, 'last_message': FieldValue.delete()});
     }
 
     final asDonor = await _db.collection('requests').where('matched_donor_id', isEqualTo: _uid).get();
@@ -79,7 +79,7 @@ class AccountService {
       if (doc.data()['status'] == 'matched') {
         await Backend.instance.releaseMatch(doc.id);
       } else {
-        await doc.reference.update({'matched_donor_name': 'Deleted user', 'matched_donor_phone': '', 'matched_donor_deleted': true, 'last_message': FieldValue.delete()});
+        await doc.reference.update({'matched_donor_name': 'Deleted user', 'matched_donor_phone': FieldValue.delete(), 'matched_donor_deleted': true, 'last_message': FieldValue.delete()});
       }
     }
 

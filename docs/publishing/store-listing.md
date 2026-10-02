@@ -66,7 +66,7 @@ Deploy Hosting first; see the README. The pages come from the in-app text.
 |---|---|---|---|---|
 | Name (Personal info) | Yes | No* | App functionality | Required |
 | Email address (Personal info) | Yes | No | Account management | Required |
-| Phone number (Personal info) | Yes | No* | App functionality, account management | Required |
+| Phone number (Personal info) | Yes | No | App functionality, account management (owner and administrators only) | Required |
 | Approximate and precise location (Location) | Yes | No | App functionality | Required (area); current location optional |
 | Health info: blood group (Health and fitness) | Yes | No | App functionality | Required |
 | Photos: ID proof, profile photo, community post photos (Photos and videos) | Yes | No | App functionality | Optional |
@@ -76,10 +76,10 @@ Deploy Hosting first; see the README. The pages come from the in-app text.
 | Device or other IDs (push token, Firebase app-instance ID — **not** the Advertising ID) | Yes | No | Analytics, app functionality (push) | Required |
 
 **Other answers**
-- \*"Shared" in Play's sense means transfer to a third party. Showing a matched user your name and number is a user-initiated disclosure *within* the service, not "sharing". Google treats service providers (Firebase) as not sharing.
+- \*"Shared" in Play's sense means transfer to a third party. Showing a matched user your name is a user-initiated disclosure *within* the service. Phone numbers are not copied onto new requests or shown to other users. Firebase, Cloudflare and Resend act as service providers.
 - **Encrypted in transit:** Yes.
 - **Users can request deletion:** Yes, in the app (Settings › Delete my account) and on the web page above.
-- **Audio from calls:** not collected. Calls are peer-to-peer and never recorded or stored.
+- **Audio from calls:** never recorded or stored. WebRTC audio travels directly between phones or through an encrypted Cloudflare TURN relay when needed.
 - **Health apps declaration:** required. Category: *Blood and organ donation*. The app doesn't use Health Connect.
 - **Advertising ID:** not collected. The AD_ID permission is removed from the manifest and Analytics ad-ID collection is off — answer "No" to "Does your app use advertising ID?".
 - **Foreground service declaration (Play Console › App content):** type **Phone call** (`FOREGROUND_SERVICE_PHONE_CALL` + `MICROPHONE`), used only while an in-app voice call is ringing or live between a matched donor and requester. Attach a short screen recording of an incoming call.

@@ -25,10 +25,12 @@ import {
   writeBatch,
   deleteField,
   getCountFromServer,
+  getDoc,
   serverTimestamp,
   type DocumentData,
 } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
+import { deleteMedia, deleteIdProof } from '../lib/edge';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -562,6 +564,7 @@ export function useAdminActions() {
     run(async () => {
       const batch = writeBatch(db);
       if (isVerified) {
+        await deleteIdProof(donorId);
         // Checked IDs aren't kept — same rule as the app's adminVerifyDonor.
         batch.delete(doc(db, 'donors', donorId, 'private', 'id_proof'));
         batch.update(doc(db, 'donors', donorId), {
@@ -619,7 +622,9 @@ export function useAdminActions() {
    */
   const deleteDonor = (donorId: string, name?: string) =>
     run(async () => {
+      await deleteIdProof(donorId);
       const batch = writeBatch(db);
+      batch.delete(doc(db, 'donors', donorId, 'private', 'id_proof'));
       batch.delete(doc(db, 'donors_public', donorId));
       batch.delete(doc(db, 'donors', donorId));
       await batch.commit();
@@ -831,7 +836,10 @@ export function useAdminActions() {
 
   const deleteStory = (id: string, author?: string) =>
     run(async () => {
-      await deleteDoc(doc(db, 'community_stories', id));
+      const ref = doc(db, 'community_stories', id);
+      const path = (await getDoc(ref)).data()?.image_path;
+      if (typeof path === 'string') await deleteMedia(path);
+      await deleteDoc(ref);
       await logAudit('remove_story', { uid: id, name: author });
     });
 

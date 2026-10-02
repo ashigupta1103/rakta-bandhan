@@ -11,6 +11,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
+import { fetchIdProof } from '../lib/edge';
 
 const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
@@ -34,6 +35,9 @@ function DonorRow({ donor, onVerify, onToggle, onBan, onDelete, busy }: {
   onDelete: (id: string, name: string) => void;
   busy: boolean;
 }) {
+  const [proof, setProof] = useState<string | null>(null);
+  const [proofError, setProofError] = useState('');
+  const [proofLoading, setProofLoading] = useState(false);
   return (
     <TableRow>
       <TableCell>
@@ -70,6 +74,20 @@ function DonorRow({ donor, onVerify, onToggle, onBan, onDelete, busy }: {
       </TableCell>
       <TableCell>
         <div className="flex items-center gap-1.5 flex-wrap">
+          {(donor.has_id_proof || donor.id_proof_base64) && <Button size="sm" variant="secondary" disabled={proofLoading} onClick={async () => {
+            if (proof) { setProof(null); return; }
+            setProofLoading(true);
+            setProofError('');
+            try {
+              const image = await fetchIdProof(donor.id);
+              setProof(image);
+              if (!image) setProofError('No ID photo on file.');
+            } catch (error) {
+              setProofError(error instanceof Error ? error.message : 'Could not load the ID photo.');
+            } finally { setProofLoading(false); }
+          }}>{proof ? 'Hide ID photo' : 'View ID photo'}</Button>}
+          {proof && <img src={proof} alt="Submitted ID document" className="max-w-64 max-h-64 object-contain" />}
+          {proofError && <span className="text-xs text-destructive">{proofError}</span>}
           <Button size="sm" variant="secondary" disabled={busy} onClick={() => {
             if (!donor.is_verified && !window.confirm(VERIFY_CHECKLIST)) return;
             onVerify(donor.id, !donor.is_verified, donor.name);

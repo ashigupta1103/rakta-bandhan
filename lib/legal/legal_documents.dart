@@ -34,7 +34,7 @@ const privacyPolicy = LegalDocument(
   intro:
       'Rakta Bandhan is a humanitarian initiative that connects people who urgently need blood with willing donors nearby. Rakta Bandhan respects your privacy and is committed to protecting the information you provide. To do its job it handles sensitive things — your phone number, where you are and your blood group. This policy explains what we collect, who can see it, and how to get it back or deleted.',
   summary: [
-    'Your phone number and email are never shown in donor lists or on the map. Your phone number is shared with one person only: the person you are matched with on a request.',
+    'Your phone number and email are never shown to other users. Matched people reach each other through in-app messages and calls.',
     'Other users see your neighbourhood (for example “Adyar, Chennai”, about 1 km), never your address.',
     'Location is used only while you use the app — never tracked in the background.',
     'Chat and calls happen inside the app. Calls are not recorded.',
@@ -54,7 +54,7 @@ const privacyPolicy = LegalDocument(
       '- The area you register from: a location label you choose and its map coordinates.',
       '- Whether you are available to donate, and the date of your last donation recorded in the app.',
       '- Optionally, a photo of an ID document, if you submit one for verification.',
-      '- Optionally, a profile photo. It is stored privately and only you can see it — it is not shown to other users.',
+      '- Optionally, a profile photo. Its link is kept in your private profile and the app shows it only to you. Anyone you give the photo link to can open it.',
       'Requests — when you ask for blood: the blood group and number of units needed, how urgent it is, the location (usually a hospital) and its coordinates, and the request’s status over time.',
       'Conversations — when you are matched: the messages you send in the in-app chat, any location you choose to share in it (the hospital, or your position at that moment — never tracked continuously), when you last read the conversation (shown to the other person as “Seen”), and a record of in-app calls (who called whom, when, how long, and whether it was answered). The audio of calls is never recorded or stored.',
       'Community posts — if you share an experience: the text, the topic, and optionally one photo, your blood group and your neighbourhood if you choose to show them.',
@@ -65,7 +65,7 @@ const privacyPolicy = LegalDocument(
     LegalSection('use', 'How we use it', [
       '- To match requests with compatible donors nearby — using blood group, approximate location and availability — and to notify suitable donors about a blood requirement.',
       '- To connect donors with the requesting party or hospital, and to communicate important service-related notifications.',
-      '- To let a matched requester and donor reach each other, through in-app chat and calls or by phone.',
+      '- To let a matched requester and donor reach each other through in-app chat and calls, without sharing phone numbers.',
       '- To verify donors, when an administrator reviews a submitted ID.',
       '- To enforce the donation cooldown (90 days after a donation recorded in the app) and to expire requests that go unanswered for 6 hours.',
       '- To keep people safe and prevent misuse or fraudulent activity: reviewing reports, and suspending accounts that misuse the service.',
@@ -76,16 +76,17 @@ const privacyPolicy = LegalDocument(
     LegalSection('visible', 'What other people can see', [
       'Any signed-in user can see, for donors who are available: first and last name as registered, blood group, verification status, their neighbourhood name, and a location rounded to about 1 km. This is how requesters find donors on the map.',
       'Any signed-in user can see open requests: the blood group and units needed, urgency, and the request’s location.',
-      'Only after a match — when a donor accepts a request — the two people involved can see each other’s name and phone number, message each other in the app, and call each other in the app. Nobody else can see that conversation. Tapping a shared location opens it in your maps app (for example Google Maps), which then handles it under its own privacy terms.',
-      'Because in-app call audio travels directly between the two phones, each phone learns the other’s network (IP) address for the duration of the call. This is how internet calling works; it does not reveal your phone number.',
-      'Community posts are visible to every signed-in user, under your registered name.',
+      'Only after a match — when a donor accepts a request — the two people involved can see each other’s name, message each other in the app, and call each other in the app. Phone numbers stay in private profiles, accessible only to the owner and administrators. Nobody else can see that conversation. Tapping a shared location opens it in your maps app (for example Google Maps), which then handles it under its own privacy terms.',
+      'In-app call audio travels directly between the two phones, or through an encrypted Cloudflare TURN relay when needed. A direct connection can reveal the other phone’s network (IP) address for the duration of the call; it does not reveal a phone number. The relay sees network addresses but cannot read the encrypted audio.',
+      'Community posts are visible to every signed-in user, under your registered name. Anyone with a community photo’s link can open the photo.',
       'We share information with hospitals, blood banks or service partners only to the extent necessary to facilitate a blood request or operate the platform, and as the law allows. We will not sell personal information to third parties.',
     ]),
     LegalSection('admins', 'What our administrators can see', [
       'A small team of Rakta Bandhan administrators can see donor profiles including phone numbers, submitted ID photos, requests, and safety reports. They can read the chat on a request to review a report of abuse. Administrators cannot listen to calls — there is no recording to listen to. Every verification, ban and administrative change is written to an audit log.',
     ]),
     LegalSection('processors', 'Services we rely on', [
-      '- Google Firebase (Google LLC) — sign-in, the database that stores everything above, photo storage for community posts and profile photos, server functions that send notifications and sign-in codes, Firebase Cloud Messaging (push notifications) and analytics. Data is stored on Google Cloud servers, which may be located outside India.',
+      '- Google Firebase (Google LLC) — sign-in, the database that stores profiles, requests and messages, server functions that send notifications and sign-in codes once enabled, Firebase Cloud Messaging (push notifications) and analytics. Legacy ID photos may remain in the database until verified or deleted. Data is stored on Google Cloud servers, which may be located outside India.',
+      '- Cloudflare — Workers handle photo uploads, downloads and deletions; R2 stores community, profile and ID photos. Private ID-photo downloads require your sign-in or an administrator’s sign-in. Cloudflare Realtime TURN relays encrypted call audio when a direct connection is unavailable. Cloudflare sees the network addresses of these requests. Data may be processed outside India.',
       '- Our email-delivery provider (Resend) — delivers the sign-in code email. It sees your email address and the message.',
       '- OpenStreetMap — when you search for an address, the text you type is sent to the OpenStreetMap Foundation’s Nominatim service. When you use your current location to fill in an address, your coordinates are sent to that service to look up the street name. Map images are loaded from OpenStreetMap’s tile servers, which see your IP address and the area of the map you are viewing.',
       '- Google’s public STUN servers — used for a moment at the start of each in-app call to help the two phones find each other. They see your IP address, not the call.',
@@ -97,7 +98,7 @@ const privacyPolicy = LegalDocument(
       '- Requests, chat messages and call records are kept as part of the request’s history so both people have a record of what happened.',
       '- Community posts stay until you or an administrator delete them; deleting a post deletes its photo.',
       '- A profile photo stays until you remove or replace it in My Page.',
-      '- When you delete your account, we delete your sign-in account, your profile, your public listing, any ID photo, your profile photo, and every chat message you sent. Requests you raised are cancelled if still open, and your name and phone number are removed from them. If you were matched as a donor on an open request, that request is released back to other donors. A record that a donation happened is kept without anything that identifies you.',
+      '- When you delete your account, we delete your sign-in account, your profile, your public listing, any ID photo, your profile photo, and every chat message you sent. Requests you raised are cancelled if still open, and your name is removed from them. Legacy phone fields, if present, are removed rather than copied. If you were matched as a donor on an open request, that request is released back to other donors. A record that a donation happened is kept without your name or phone number.',
       '- Analytics data is kept for the retention period set in Firebase Analytics: [ORGANIZATION TO PROVIDE — confirm the configured period].',
     ]),
     LegalSection('rights', 'Your rights', [
