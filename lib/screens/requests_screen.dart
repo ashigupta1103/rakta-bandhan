@@ -183,6 +183,7 @@ class _RequestsScreenState extends State<RequestsScreen> {
     return Scaffold(
       backgroundColor: AppColors.warmPageBackground,
       appBar: AppHeader(
+        showDivider: false,
         title: 'Requests',
         primaryAction: const MessagesButton(),
         onNotificationTap: () => _open(const NotificationsScreen()),
@@ -212,6 +213,7 @@ class _RequestsScreenState extends State<RequestsScreen> {
   }
 
   Widget _tabRow(int yoursCount) => RbTabBar(
+        showDivider: false,
         tabs: [('Near you', 0), ('Yours', yoursCount)],
         selected: _tab.index,
         onChanged: (i) => setState(() => _tab = _Tab.values[i]),

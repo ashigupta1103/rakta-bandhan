@@ -74,7 +74,10 @@ class RbTabBar extends StatelessWidget {
   final int selected;
   final ValueChanged<int> onChanged;
 
-  const RbTabBar({super.key, required this.tabs, required this.selected, required this.onChanged});
+  /// The full-width hairline under the tabs; the active indicator stays either way.
+  final bool showDivider;
+
+  const RbTabBar({super.key, required this.tabs, required this.selected, required this.onChanged, this.showDivider = true});
 
   @override
   Widget build(BuildContext context) {
@@ -83,7 +86,7 @@ class RbTabBar extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: const BoxDecoration(color: AppColors.warmGround, border: Border(bottom: BorderSide(color: AppColors.warmBorder))),
+      decoration: BoxDecoration(color: AppColors.warmGround, border: showDivider ? const Border(bottom: BorderSide(color: AppColors.warmBorder)) : null),
       child: Row(
         children: [for (var i = 0; i < tabs.length; i++) Expanded(child: _tab(i))],
       ),

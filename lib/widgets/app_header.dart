@@ -22,6 +22,8 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
   /// Replaces the notifications button (the Messages inbox on Requests), so
   /// a header never carries more than two actions.
   final Widget? primaryAction;
+  /// The hairline under the header. Off where a tab bar sits directly below.
+  final bool showDivider;
 
   const AppHeader({
     super.key,
@@ -30,6 +32,7 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
     this.hasUnreadNotifications = false,
     this.onMoreTap,
     this.primaryAction,
+    this.showDivider = true,
   });
 
   // 20px vertical padding (10+10) plus a bare IconButton's Material default
@@ -67,7 +70,7 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
               ],
             ),
           ),
-          Container(height: 1, color: AppColors.warmBorder),
+          Container(height: 1, color: showDivider ? AppColors.warmBorder : Colors.transparent),
         ],
       ),
     );

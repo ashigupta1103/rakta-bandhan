@@ -334,7 +334,7 @@ class _CertificateScreenState extends State<CertificateScreen> {
                       ),
                     ),
                     const SizedBox(height: 10),
-                    const Text('Platform by Elmatics', style: TextStyle(fontSize: 10, color: AppColors.mutedInk)),
+                    const Text('Platform by Almmatix', style: TextStyle(fontSize: 10, color: AppColors.mutedInk)),
                   ],
                 ),
               ),
