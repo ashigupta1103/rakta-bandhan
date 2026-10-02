@@ -45,7 +45,7 @@ Checked live from outside, without signing in: `/health` returns `{"ok":true}`; 
 
 Not verified: uploads, private-photo access and relay credentials for a real signed-in user and matched request. They need a real sign-in on a phone.
 
-The deployed Worker predates the `email_verified_required` switch (accounts with an unproven email can upload only after `edge/` is redeployed: `npx wrangler login`, then `npx wrangler deploy` in `edge/`).
+The Worker was redeployed by the owner on 2026-10-02 (version `69ec0db3-6648-4529-b86e-8ba9b0512d22`) so that accounts with an unproven email can upload (until `config/features.email_verified_required` is set); the TURN secrets survived the redeploy.
 
 ## Owner next steps
 
