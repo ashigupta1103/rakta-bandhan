@@ -236,10 +236,10 @@ class Backend {
   //  - kEmailCodeLive: passwordless. A 6-digit code goes to the user's email
   //    (requestLoginCode) and verifyLoginCode trades it for a Firebase custom
   //    token — functions/src/login.ts, needs the Blaze plan.
-  //  - otherwise (free plan): email + password, with the address confirmed
-  //    by the verification email Firebase sends itself.
-  // Firestore rules and the edge Worker treat both as a verified account
-  // (isVerifiedUser in firestore.rules).
+  //  - otherwise (free plan): email + password; the "check your email" step
+  //    after sign-up is a labelled simulation (EmailVerifyScreen).
+  // Firestore rules and the edge Worker accept both until the owner sets
+  // config/features.email_verified_required (isVerifiedUser in firestore.rules).
 
   FirebaseFunctions get _functions => FirebaseFunctions.instanceFor(region: kFunctionsRegion);
 
@@ -266,13 +266,11 @@ class Backend {
     return cred.user!;
   }
 
-  /// Creates the account and sends the verification email. A failed send
-  /// doesn't fail the sign-up: the verify screen has "Resend".
+  /// Creates the account. No verification email is sent: until an email
+  /// sender exists the "check your email" step is a simulation
+  /// (EmailVerifyScreen) and the rules accept unproven addresses.
   Future<User> signUpWithEmail(String email, String password) async {
     final cred = await _auth.createUserWithEmailAndPassword(email: email.trim(), password: password);
-    try {
-      await cred.user!.sendEmailVerification();
-    } catch (_) {}
     _logEvent('sign_up', {'method': 'email'});
     return cred.user!;
   }
@@ -284,22 +282,6 @@ class Backend {
   }
 
   Future<void> sendPasswordReset(String email) => _auth.sendPasswordResetEmail(email: email.trim());
-
-  Future<void> resendVerificationEmail() async => _auth.currentUser?.sendEmailVerification();
-
-  /// Re-reads the account from Firebase. After the user taps the link in
-  /// the email, `emailVerified` only flips once the account is reloaded,
-  /// and the ID token that Firestore rules (and the edge Worker) see only
-  /// carries the new claim once it's force-refreshed — both happen here.
-  Future<bool> refreshEmailVerified() async {
-    final user = _auth.currentUser;
-    if (user == null) return false;
-    await user.reload();
-    final fresh = _auth.currentUser;
-    if (fresh == null || !fresh.emailVerified) return false;
-    await fresh.getIdToken(true);
-    return true;
-  }
 
   /// Firebase wants a recent sign-in before deleting an account, so the
   /// password is asked for again (free-plan sign-in only).

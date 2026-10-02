@@ -7,6 +7,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/loading_button.dart';
 import '../widgets/rb_icon.dart';
+import 'email_verify_screen.dart';
 import 'entry_route.dart';
 import 'legal_reader_screen.dart';
 import 'login_code_screen.dart';
@@ -36,9 +37,9 @@ String friendlyAuthError(Object e) {
 
 /// Sign in. With [kEmailCodeLive] there is no password: enter your email
 /// and we send a 6-digit code (LoginCodeScreen). Until then (free Firebase
-/// plan) it is email + password, and a new account confirms its address
-/// from the verification email Firebase sends (VerifyEmailScreen). Either
-/// way a new account then completes registration.
+/// plan) it is email + password, and a new account passes through a labelled
+/// simulation of the email check (EmailVerifyScreen). Either way a new
+/// account then completes registration.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -94,15 +95,14 @@ class _LoginScreenState extends State<LoginScreen> {
         Navigator.push(context, MaterialPageRoute(builder: (_) => LoginCodeScreen(email: email, resendAfterSeconds: resendAfter)));
         return;
       }
+      final Widget next;
       if (_creating) {
         await Backend.instance.signUpWithEmail(email, password);
+        next = EmailVerifyScreen(email: email);
       } else {
-        final user = await Backend.instance.signInWithEmail(email, password);
-        // Someone who never confirmed their address lands on the "check your
-        // inbox" screen next; make sure there is a fresh link waiting.
-        if (!user.emailVerified) await Backend.instance.resendVerificationEmail().catchError((_) {});
+        await Backend.instance.signInWithEmail(email, password);
+        next = await signedInDestination();
       }
-      final next = await signedInDestination();
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => next), (route) => false);
     } catch (e) {
@@ -252,7 +252,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: Text(
                           kEmailCodeLive
                               ? 'No password. We email a 6-digit code each time.'
-                              : 'A new account confirms its email once, with a link we send.',
+                              : 'Email confirmation is a simulation for now — no email is sent.',
                           textAlign: TextAlign.center,
                           style: const TextStyle(fontSize: 12.5, color: AppColors.ink2),
                         ),

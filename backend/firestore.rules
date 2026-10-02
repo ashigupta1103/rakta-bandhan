@@ -27,15 +27,31 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == uid;
     }
 
-    // Accounts must have proved they own their email or phone before they
-    // can create anything: signed in with an emailed code (custom-token
-    // claim `login`, minted by functions/src/login.ts), a verified email,
-    // or a phone number. Stops throwaway sign-ups.
+    // Proof that the person owns their email or phone: signed in with an
+    // emailed code (custom-token claim `login`, minted by
+    // functions/src/login.ts), a verified email, or a phone number.
+    function emailProven() {
+      return request.auth.token.get('login', '') == 'email_otp'
+        || request.auth.token.get('email_verified', false) == true
+        || request.auth.token.get('phone_number', null) != null;
+    }
+
+    // Until a real email sender exists (the Blaze plan), sign-up can only
+    // simulate that proof, so it is not demanded. The owner switches it on
+    // with config/features.email_verified_required = true once the emailed
+    // code is live; the edge Worker reads the same switch.
+    function emailProofRequired() {
+      let features = /databases/$(database)/documents/config/features;
+      return exists(features) && get(features).data.get('email_verified_required', false) == true;
+    }
+
+    // Who may create anything: anyone proven, or - while proof is not
+    // required - any signed-in account that is not anonymous.
     function isVerifiedUser() {
       return isSignedIn()
-        && (request.auth.token.get('login', '') == 'email_otp'
-            || request.auth.token.get('email_verified', false) == true
-            || request.auth.token.get('phone_number', null) != null);
+        && (emailProven()
+            || (request.auth.token.get('firebase', {}).get('sign_in_provider', '') != 'anonymous'
+                && !emailProofRequired()));
     }
 
     // The post-donation rest period can't be shortened, removed, or ignored

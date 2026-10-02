@@ -6,6 +6,7 @@ import { resetKeyCache } from '../build/auth.js';
 import { parseIceServers, STUN_ONLY } from '../build/ice.js';
 import { parseMediaPath, sniffImage } from '../build/media.js';
 import {
+  FIRESTORE_URL,
   FakeR2,
   JPEG,
   PNG,
@@ -121,9 +122,32 @@ describe('uploading photos', () => {
     assert.equal(res.status, 201);
   });
 
-  test('someone else\'s folder, and unverified accounts, are refused', async () => {
+  test('someone else\'s folder is refused', async () => {
     assert.equal((await put('/media/community/u2/post_abc123.jpg', JPEG)).status, 403);
+    assert.equal(r2.keys().length, 0);
+  });
+
+  // Until a real email sender exists, sign-up only simulates the email check.
+  test('an account with an unproven email may upload while proof is not required', async () => {
+    const res = await put(path, JPEG, { claims: { email_verified: false } });
+    assert.equal(res.status, 201);
+  });
+
+  test('once the owner requires email proof, unverified accounts are refused and verified ones still work', async () => {
+    net.restore();
+    net = routeFetch([
+      jwksRoute(signer.jwks),
+      firestoreRoute({ 'config/features': { email_verified_required: { booleanValue: true } } }),
+    ]);
     assert.equal((await put(path, JPEG, { claims: { email_verified: false } })).status, 403);
+    assert.equal(r2.keys().length, 0);
+    assert.equal((await put(path, JPEG)).status, 201);
+  });
+
+  test('if the switch cannot be read, an unproven account is not let through', async () => {
+    net.restore();
+    net = routeFetch([jwksRoute(signer.jwks), [FIRESTORE_URL, () => new Response('{}', { status: 500 })]]);
+    assert.equal((await put(path, JPEG, { claims: { email_verified: false } })).status, 502);
     assert.equal(r2.keys().length, 0);
   });
 

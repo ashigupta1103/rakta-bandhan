@@ -1,6 +1,6 @@
 // Photos on R2, behind the Worker.
 //
-//   PUT    /media/{kind}/{uid}/{name}   upload (owner, signed in with a verified account)
+//   PUT    /media/{kind}/{uid}/{name}   upload (owner; a verified account once config/features.email_verified_required is on)
 //   GET    /media/{kind}/{uid}/{name}   download
 //   DELETE /media/{kind}/{uid}/{name}   remove (owner; an admin for community and id_proofs)
 //
@@ -13,7 +13,7 @@
 //                   can fetch it, every time, with their sign-in.
 
 import { Caller, requireCaller } from './auth.js';
-import { isAdmin } from './firestore.js';
+import { flag, getDocument, isAdmin } from './firestore.js';
 import { Env, HttpError } from './types.js';
 
 export const MAX_BYTES = 2 * 1024 * 1024;
@@ -89,10 +89,21 @@ function publicBase(request: Request, env: Env): string {
   return (env.PUBLIC_BASE_URL ?? new URL(request.url).origin).replace(/\/$/, '');
 }
 
+/**
+ * Until a real email sender exists, sign-up can only simulate proving an
+ * email, so unconfirmed accounts may upload. The owner turns the check back on
+ * with config/features.email_verified_required = true: the same switch the
+ * Firestore rules read (any signed-in person may read that doc).
+ */
+async function emailProofRequired(env: Env, caller: Caller): Promise<boolean> {
+  const doc = await getDocument(env, caller, 'config', 'features');
+  return doc.status === 200 && flag(doc.fields, 'email_verified_required') === true;
+}
+
 async function upload(request: Request, env: Env, p: MediaPath): Promise<Response> {
   const caller = await requireCaller(request, env);
   if (caller.uid !== p.uid) throw new HttpError(403, 'You can only upload to your own folder.');
-  if (!caller.verified) throw new HttpError(403, 'Confirm your email first.');
+  if (!caller.verified && (await emailProofRequired(env, caller))) throw new HttpError(403, 'Confirm your email first.');
 
   const bytes = await readLimited(request, MAX_BYTES);
   const real = sniffImage(bytes);

@@ -33,6 +33,8 @@ let env;
 const verified = (uid) => env.authenticatedContext(uid, { email: `${uid}@example.com`, email_verified: true }).firestore();
 const codeLogin = (uid) => env.authenticatedContext(uid, { login: 'email_otp' }).firestore();
 const unverified = (uid) => env.authenticatedContext(uid, { email: `${uid}@example.com`, email_verified: false }).firestore();
+const anonymous = (uid) => env.authenticatedContext(uid, { firebase: { sign_in_provider: 'anonymous' } }).firestore();
+const requireEmailProof = () => seed((db) => setDoc(doc(db, 'config/features'), { email_verified_required: true }));
 const storageAs = (uid, verifiedEmail = true) =>
   env.authenticatedContext(uid, { email: `${uid}@example.com`, email_verified: verifiedEmail }).storage();
 
@@ -105,8 +107,28 @@ beforeEach(async () => {
 });
 
 describe('sign-up and verified accounts', () => {
-  test('an unverified account cannot create a donor profile', async () => {
+  // Until a real email sender exists the email check is only simulated, so
+  // by default an account that never proved its address may create things.
+  test('by default an account with an unproven email can create a donor profile', async () => {
+    await assertSucceeds(register(unverified('u1'), 'u1'));
+  });
+
+  test('once email proof is required, an unverified account cannot create a donor profile', async () => {
+    await requireEmailProof();
+    await assertFails(register(unverified('u1'), 'u1'));
     await assertFails(setDoc(doc(unverified('u1'), 'donors/u1'), donorDoc()));
+  });
+
+  test('anonymous accounts never count, whether or not proof is required', async () => {
+    await assertFails(register(anonymous('u1'), 'u1'));
+    await requireEmailProof();
+    await assertFails(register(anonymous('u1'), 'u1'));
+  });
+
+  test('when proof is required, verified and emailed-code accounts still work', async () => {
+    await requireEmailProof();
+    await assertSucceeds(register(verified('u1'), 'u1'));
+    await assertSucceeds(register(codeLogin('u2'), 'u2', 'donor_two'));
   });
 
   test('a verified account can create its own donor profile', async () => {
@@ -127,8 +149,14 @@ describe('sign-up and verified accounts', () => {
     await assertFails(setDoc(doc(verified('u1'), 'donors/u1'), donorDoc({ is_verified: true })));
   });
 
-  test('an unverified account cannot raise a request', async () => {
+  test('by default an unproven-email account can raise a request', async () => {
+    await assertSucceeds(addDoc(collection(unverified('requester'), 'requests'), openRequest()));
+  });
+
+  test('once email proof is required, an unverified account cannot raise a request', async () => {
+    await requireEmailProof();
     await assertFails(addDoc(collection(unverified('requester'), 'requests'), openRequest()));
+    await assertSucceeds(addDoc(collection(verified('requester'), 'requests'), openRequest()));
   });
 
   test('a verified account can raise a request', async () => {
@@ -676,6 +704,7 @@ describe('private support conversations', () => {
     await assertFails(setDoc(doc(verified('u1'), 'support_submissions/missing'), summary('missing')));
     await assertFails(setDoc(doc(verified('u1'), 'support_submissions/s1'), summary('s1', 'u1', { status: 'resolved' })));
     await assertFails(setDoc(doc(verified('u1'), 'support_submissions/s1'), summary('s1', 'u1', { admin_note: 'Fake' })));
+    await requireEmailProof();
     await assertFails(setDoc(doc(unverified('u1'), 'support_submissions/s1'), summary('s1')));
   });
 

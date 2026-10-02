@@ -9,7 +9,7 @@ Source: `feat/prelaunch` at `fda233cfc6b427b383f93f3044bb5198a513dd3e`. Upstream
 | Full `bash tool/preflight.sh` | Passed |
 | Flutter analyzer | No issues |
 | Flutter tests | 62 pass; the login tests also pass with `--dart-define=EMAIL_CODE_LIVE=true` (12 pass) |
-| Real app on an Android emulator (Firebase auth + Firestore emulators, this repo's rules) | Donor journey passes: sign up → confirm email → register → phone-check simulation → accept a request → in-app call → both confirm → rest period + record → certificate → Find → Community. The requester, account and community/support journeys in `integration_test/` were not completed (unverified). |
+| Real app on an Android emulator (Firebase auth + Firestore emulators, this repo's rules) | Donor journey passes: sign up → simulated email check → register → phone-check simulation → accept a request → in-app call → both confirm → rest period + record → certificate → Find → Community. The requester, account and community/support journeys in `integration_test/` were not completed (unverified). |
 | Functions unit tests | 27 pass |
 | Functions emulator smoke | Login/review, accounts, jobs, support and 410-record migration/search/cursor checks pass |
 | Edge tests and dry-run bundle | 23 pass; bundle succeeds |
@@ -26,11 +26,11 @@ Local path: `X:\BloodBankkk\build\RaktaBandhan.apk` (a copy of `build\app\output
 - Build: `flutter build apk --release` (`EDGE_URL` defaults to the live Worker)
 - Package: `com.raktabandhan.app`, version `1.0.0` (code 1).
 - Minimum Android API: 24. Target API: 36.
-- Size: 111,972,894 bytes (106.8 MiB).
+- Size: 111,956,510 bytes (106.8 MiB).
 - Signature: APK v2 verification passes.
-- SHA-256: `9a6ac1c4c2089887b17b72d93cb81d851f6822685669f4c2f68dfbf0770c20d9`.
+- SHA-256: `32c4deac019dbe697602f89e88a552d6997d52bad8efd3c1b93ae2430ef8a2b3`.
 - Permissions audited: no `AD_ID`, `USE_FULL_SCREEN_INTENT`, `CALL_PHONE`, call-log or camera foreground-service permission. The compiled app contains no demo or sample strings; its one simulation is labelled "Simulation".
-- Sign-in is email + password with Firebase's verification email (free plan). It needs Email/Password switched on in the Firebase console, and the rules and indexes in this repo deployed to the live project: see [Spark now](SPARK_NOW.md). The phone-number check after registration is a labelled simulation (code `246810`).
+- Sign-in is email + password (free plan); the email check after sign-up is a labelled simulation (code `123456`). It needs Email/Password switched on in the Firebase console, and the rules and indexes in this repo deployed to the live project: see [Spark now](SPARK_NOW.md). The phone-number check after registration is a labelled simulation (code `246810`).
 
 Use the normal Flutter release command after tests. On this SDK, skipping package setup with `--no-pub` left a generated integration-test plugin entry and failed Android compilation; the normal command regenerated the release plugin setup and built successfully. Generated registrant noise was restored before committing.
 

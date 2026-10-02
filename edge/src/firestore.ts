@@ -6,7 +6,7 @@
 import type { Caller } from './auth.js';
 import { Env, HttpError } from './types.js';
 
-type FirestoreValue = { stringValue?: string };
+type FirestoreValue = { stringValue?: string; booleanValue?: boolean };
 export type Fields = Record<string, FirestoreValue>;
 
 export interface Doc {
@@ -31,6 +31,7 @@ export async function getDocument(env: Env, caller: Caller, collection: string, 
 }
 
 export const text = (fields: Fields | undefined, key: string): string | undefined => fields?.[key]?.stringValue;
+export const flag = (fields: Fields | undefined, key: string): boolean | undefined => fields?.[key]?.booleanValue;
 
 /**
  * Admin = a doc at admins/{uid}. The rules let anyone read their *own* admin

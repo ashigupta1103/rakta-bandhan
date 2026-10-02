@@ -8,7 +8,7 @@ Status: the Cloudflare Worker is deployed (2026-10-02), see [build status](BUILD
 
 | Area | How |
 |---|---|
-| Sign-up and sign-in | Email + password. A new account confirms its address from the verification email Firebase sends (free, 1,000 a day on Spark). "Forgot password" sends Firebase's reset email. |
+| Sign-up and sign-in | Email + password. "Forgot password" sends Firebase's reset email (free). The email check after sign-up is simulated, see below. |
 | Profiles and usernames | Firestore, with the atomic username claim (`usernames/{name}`) and the private/public donor pair. |
 | Requests and matching | Open requests are found by geohash, a donor accepts in a transaction, one active match per donor, two-sided confirmation, 90-day rest. Expiry and reactivation run lazily in the app. |
 | Chat and in-app calls | Firestore carries messages and the call handshake; the Cloudflare Worker supplies TURN relay credentials. |
@@ -20,7 +20,10 @@ Status: the Cloudflare Worker is deployed (2026-10-02), see [build status](BUILD
 
 ## What is simulated
 
-**The phone-number check** after registration. No SMS, WhatsApp or Truecaller provider is connected, so the screen says "Simulation", sends nothing, accepts the code `246810` and verifies nothing (only a server can set `phone_verified_for`). The phone gate in the rules stays off (`phone_required=false`).
+Both steps say "Simulation", send nothing, verify nothing, and have "Skip for now".
+
+- **The email check** after sign-up (code `123456`). No email sender is connected, so an address is never proven. Until then the rules and the photo Worker accept unproven accounts. After Blaze, set `config/features.email_verified_required = true` to require proof again.
+- **The phone-number check** after registration (code `246810`). No SMS, WhatsApp or Truecaller provider is connected; only a server can set `phone_verified_for`. The phone gate in the rules stays off (`phone_required=false`).
 
 ## What needs Blaze (or another outside service)
 

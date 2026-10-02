@@ -136,20 +136,8 @@ String? fsString(Map<String, dynamic>? doc, String field) => doc?['fields']?[fie
 
 // ------------------------------------------------------------------- sign-up
 
-/// "Taps" the verification link Firebase would have emailed [email]: the
-/// Auth emulator lists every action link it generated.
-Future<void> clickVerificationLink(String email) async {
-  final r = await _retry(() => http.get(Uri.parse('http://$host:9099/emulator/v1/projects/$project/oobCodes')));
-  final codes = (jsonDecode(r.body)['oobCodes'] as List? ?? const []).cast<Map<String, dynamic>>();
-  final mine = codes.where((c) => c['email'] == email && c['requestType'] == 'VERIFY_EMAIL');
-  if (mine.isEmpty) throw TestFailure('no verification email was sent to $email');
-  final link = Uri.parse(mine.last['oobLink'] as String).replace(host: host);
-  final res = await _retry(() => http.get(link));
-  if (res.statusCode >= 400) throw TestFailure('verification link failed: ${res.statusCode} ${res.body}');
-}
-
-/// Free-plan sign-in, start to finish: create an account, confirm the email,
-/// register a profile, pass the (simulated) phone check and the consent
+/// Free-plan sign-in, start to finish: create an account, pass the (simulated)
+/// email check, register a profile, pass the (simulated) phone check and the consent
 /// screen. Ends on the main screen; returns the new account's uid.
 Future<String> signUpAndRegister(
   WidgetTester t, {
@@ -164,12 +152,12 @@ Future<String> signUpAndRegister(
   await t.enterText(find.byType(TextField).at(0), email);
   await t.enterText(find.byType(TextField).at(1), 'Passw0rd!e2e');
   await tapWhenReady(t, find.widgetWithText(ElevatedButton, 'Create account'));
-  await waitFor(t, find.text('Check your inbox'), why: 'verify email screen');
-  await snap(t, '02_verify_email');
-  await clickVerificationLink(email);
-  await waitFor(t, find.text('Full name'), why: 'registration after verification', timeout: const Duration(seconds: 60));
+  // The email check is a labelled simulation (code 123456); nothing is sent.
+  await waitFor(t, find.text('Check your email'), why: 'email check');
+  await snap(t, '02_email_check');
+  await t.enterText(find.byType(TextField).first, '123456');
+  await waitFor(t, find.text('Full name'), why: 'registration after the email check', timeout: const Duration(seconds: 60));
   expect(FirebaseAuth.instance.currentUser?.email, email);
-  expect(FirebaseAuth.instance.currentUser?.emailVerified, isTrue);
 
   // Register near Chennai Central (the host fixes the GPS; fall back to the
   // map pin if the fix is slow).

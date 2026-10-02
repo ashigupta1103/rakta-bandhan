@@ -12,7 +12,7 @@ export interface Caller {
   /** The raw ID token, forwarded to Firestore so the rules decide. */
   token: string;
   claims: Record<string, unknown>;
-  /** Signed in with an emailed code, or a verified email: the same bar storage.rules used. */
+  /** Signed in with an emailed code, or a verified email. Only demanded once the owner requires email proof (see media.ts). */
   verified: boolean;
 }
 
