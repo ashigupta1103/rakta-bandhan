@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/backend.dart';
 import '../theme/app_colors.dart';
+import '../widgets/startup_ad_screen.dart';
 import 'login_screen.dart';
 import 'main_navigation_screen.dart';
 import 'registration_screen.dart';
@@ -81,7 +82,8 @@ class _SplashScreenState extends State<SplashScreen>
       context,
       PageRouteBuilder(
         transitionDuration: const Duration(milliseconds: 400),
-        pageBuilder: (routeContext, primaryAnimation, secondaryAnimation) => next,
+        // Startup ad slot (max 3s) sits between the splash and the destination.
+        pageBuilder: (routeContext, primaryAnimation, secondaryAnimation) => StartupAdScreen(next: next),
         transitionsBuilder: (routeContext, animation, secondaryAnimation, child) =>
             FadeTransition(opacity: animation, child: child),
       ),
