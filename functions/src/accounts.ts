@@ -46,6 +46,16 @@ export const onDonorDeleted = onDocumentDeleted('donors/{uid}', async (event) =>
     });
   }
   await db.recursiveDelete(db.doc(`donors/${uid}`));
+  await db.doc(`donors_public/${uid}`).delete();
+  for (const [collection, field] of [['support_submissions', 'reporter_uid'], ['support_replies', 'to_uid']]) {
+    for (;;) {
+      const page = await db.collection(collection).where(field, '==', uid).limit(200).get();
+      if (page.empty) break;
+      const batch = db.batch();
+      for (const doc of page.docs) batch.delete(doc.ref);
+      await batch.commit();
+    }
+  }
   try {
     await auth.deleteUser(uid);
   } catch (e) {

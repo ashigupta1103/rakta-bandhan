@@ -644,6 +644,65 @@ describe('admin-only areas', () => {
   });
 });
 
+describe('private support conversations', () => {
+  const summary = (id, uid = 'u1', extra = {}) => ({
+    source_collection: 'issue_reports', source_id: id, reporter_uid: uid,
+    title: 'Need help', body: 'Please help with my account', status: 'new', created_at: serverTimestamp(), ...extra,
+  });
+  const reply = (extra = {}) => ({
+    source_collection: 'issue_reports', source_id: 's1', to_uid: 'u1',
+    body: 'Here is how to proceed.', created_by: 'boss', created_at: serverTimestamp(), ...extra,
+  });
+  const inbox = () => seed(async (db) => {
+    await setDoc(doc(db, 'admins/boss'), { role: 'admin' });
+    await setDoc(doc(db, 'issue_reports/s1'), { reporter_uid: 'u1', admin_note: 'Private moderation note' });
+  });
+
+  test('submission and safe author copy commit together; internal inbox stays private', async () => {
+    const db = verified('u1');
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'issue_reports/s1'), { reporter_uid: 'u1', details: 'Help' });
+    batch.set(doc(db, 'support_submissions/s1'), summary('s1'));
+    await assertSucceeds(batch.commit());
+    await assertSucceeds(getDoc(doc(db, 'support_submissions/s1')));
+    await assertFails(getDoc(doc(db, 'issue_reports/s1')));
+    await assertFails(getDoc(doc(verified('u2'), 'support_submissions/s1')));
+    await assertFails(getDocs(collection(verified('u2'), 'support_submissions')));
+  });
+
+  test('members cannot forge ownership, status, notes or a nonexistent source', async () => {
+    await inbox();
+    await assertFails(setDoc(doc(verified('u2'), 'support_submissions/s1'), summary('s1', 'u2')));
+    await assertFails(setDoc(doc(verified('u1'), 'support_submissions/missing'), summary('missing')));
+    await assertFails(setDoc(doc(verified('u1'), 'support_submissions/s1'), summary('s1', 'u1', { status: 'resolved' })));
+    await assertFails(setDoc(doc(verified('u1'), 'support_submissions/s1'), summary('s1', 'u1', { admin_note: 'Fake' })));
+    await assertFails(setDoc(doc(unverified('u1'), 'support_submissions/s1'), summary('s1')));
+  });
+
+  test('only an admin can reply to the actual author, with bounded immutable text', async () => {
+    await inbox();
+    await assertFails(setDoc(doc(verified('u1'), 'support_replies/r1'), reply({ created_by: 'u1' })));
+    await assertFails(setDoc(doc(verified('boss'), 'support_replies/r1'), reply({ to_uid: 'u2' })));
+    await assertFails(setDoc(doc(verified('boss'), 'support_replies/r1'), reply({ body: 'x'.repeat(2001) })));
+    await assertFails(setDoc(doc(verified('boss'), 'support_replies/r1'), reply({ source_id: 'missing' })));
+    await assertSucceeds(setDoc(doc(verified('boss'), 'support_replies/r1'), reply()));
+    await assertSucceeds(getDoc(doc(verified('u1'), 'support_replies/r1')));
+    await assertFails(getDoc(doc(verified('u2'), 'support_replies/r1')));
+    await assertFails(updateDoc(doc(verified('u1'), 'support_replies/r1'), { body: 'Forged' }));
+    await assertFails(updateDoc(doc(verified('boss'), 'support_replies/r1'), { body: 'Replacement' }));
+    await assertSucceeds(deleteDoc(doc(verified('u1'), 'support_replies/r1')));
+  });
+
+  test('members cannot change triage but may remove their safe copy on deletion', async () => {
+    await inbox();
+    await seed((db) => setDoc(doc(db, 'support_submissions/s1'), summary('s1')));
+    await assertFails(updateDoc(doc(verified('u1'), 'support_submissions/s1'), { status: 'resolved' }));
+    await assertSucceeds(updateDoc(doc(verified('boss'), 'support_submissions/s1'), { status: 'resolved' }));
+    await assertFails(deleteDoc(doc(verified('u2'), 'support_submissions/s1')));
+    await assertSucceeds(deleteDoc(doc(verified('u1'), 'support_submissions/s1')));
+  });
+});
+
 describe('storage: community photos', () => {
   const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 0, 0, 0]);
 

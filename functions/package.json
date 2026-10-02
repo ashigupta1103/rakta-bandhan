@@ -11,7 +11,7 @@
     "test": "npm run build && node --test lib/test/*.test.js",
     "serve": "npm run build && firebase emulators:start --only functions,firestore",
     "deploy": "firebase deploy --only functions",
-    "smoke": "firebase emulators:exec --config ../firebase.json --project demo-rakta-bandhan --only functions,firestore,storage,auth \"node integration/smoke.mjs && node integration/login-smoke.mjs && node integration/seed-smoke.mjs && node integration/accounts-smoke.mjs && node integration/jobs-smoke.mjs\""
+    "smoke": "firebase emulators:exec --config ../firebase.json --project demo-rakta-bandhan --only functions,firestore,storage,auth \"node integration/smoke.mjs && node integration/login-smoke.mjs && node integration/seed-smoke.mjs && node integration/accounts-smoke.mjs && node integration/jobs-smoke.mjs && node integration/support-smoke.mjs\""
   },
   "dependencies": {
     "firebase-admin": "^14.5.0",

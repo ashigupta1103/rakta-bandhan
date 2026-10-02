@@ -72,13 +72,14 @@ Deploy Hosting first; see the README. The pages come from the in-app text.
 | Health info: blood group (Health and fitness) | Yes | No | App functionality | Required |
 | Photos: ID proof, profile photo, community post photos (Photos and videos) | Yes | No | App functionality | Optional |
 | Other in-app messages (Messages) | Yes | No | App functionality | Optional |
-| Other user-generated content: community posts (App activity) | Yes | No | App functionality | Optional |
+| Other user-generated content: community posts, safety/support/partnership submissions and replies (App activity) | Yes | No | App functionality | Optional |
 | App interactions (App activity) | Yes | No | Analytics | Required |
 | Device or other IDs (push token, Firebase app-instance ID — **not** the Advertising ID) | Yes | No | Analytics, app functionality (push) | Required |
 
 **Other answers**
 - \*"Shared" in Play's sense means transfer to a third party. Showing a matched user your name is a user-initiated disclosure *within* the service. Phone numbers are not copied onto new requests or shown to other users. Firebase, Cloudflare and Resend act as service providers.
 - **Encrypted in transit:** Yes.
+- **App integrity:** configured Firebase App Check uses Play Integrity, Apple DeviceCheck or web reCAPTCHA. Registration and enforcement require owner setup.
 - **Users can request deletion:** Yes, in the app (Settings › Delete my account) and on the web page above.
 - **Audio from calls:** never recorded or stored. WebRTC audio travels directly between phones or through an encrypted Cloudflare TURN relay when needed.
 - **Health apps declaration:** required. Category: *Blood and organ donation*. The app doesn't use Health Connect.
@@ -107,7 +108,7 @@ Tracking: **No** (no IDFA, no data brokers, no cross-app tracking).
 | Health (blood group) | Yes | No | App Functionality |
 | Precise Location | Yes | No | App Functionality |
 | Photos or Videos (ID proof, profile photo, community posts — optional) | Yes | No | App Functionality |
-| Other User Content (messages, community posts) | Yes | No | App Functionality |
+| Other User Content (messages, community posts, support submissions and replies) | Yes | No | App Functionality |
 | Product Interaction | No | No | Analytics |
 | Device ID | No | No | Analytics, App Functionality |
 

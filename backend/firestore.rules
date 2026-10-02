@@ -491,6 +491,39 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
+    function supportOwner(source, id) {
+      let data = getAfter(/databases/$(database)/documents/$(source)/$(id)).data;
+      return data.get('reporter_uid', data.get('requester_uid', null));
+    }
+
+    // Safe author copy: no internal note or moderation details from the inbox.
+    match /support_submissions/{id} {
+      allow read: if isSignedIn() && (resource.data.reporter_uid == request.auth.uid || isAdmin());
+      allow create: if isAdmin() || (isVerifiedUser()
+        && request.resource.data.keys().hasOnly(['source_collection', 'source_id', 'reporter_uid', 'title', 'body', 'status', 'created_at'])
+        && request.resource.data.source_collection in ['reports', 'issue_reports', 'partnership_inquiries']
+        && request.resource.data.source_id == id && request.resource.data.reporter_uid == request.auth.uid
+        && supportOwner(request.resource.data.source_collection, id) == request.auth.uid
+        && request.resource.data.title is string && request.resource.data.title.size() <= 120
+        && request.resource.data.body is string && request.resource.data.body.size() <= 2000
+        && request.resource.data.status == 'new' && request.resource.data.created_at == request.time);
+      allow update: if isAdmin();
+      allow delete: if isAdmin() || isOwner(resource.data.reporter_uid);
+    }
+
+    match /support_replies/{id} {
+      allow read: if isSignedIn() && (resource.data.to_uid == request.auth.uid || isAdmin());
+      allow create: if isAdmin()
+        && request.resource.data.keys().hasOnly(['source_collection', 'source_id', 'to_uid', 'body', 'created_by', 'created_at'])
+        && request.resource.data.source_collection in ['reports', 'issue_reports', 'partnership_inquiries']
+        && request.resource.data.source_id is string
+        && supportOwner(request.resource.data.source_collection, request.resource.data.source_id) == request.resource.data.to_uid
+        && request.resource.data.body is string && request.resource.data.body.size() > 0 && request.resource.data.body.size() <= 2000
+        && request.resource.data.created_by == request.auth.uid && request.resource.data.created_at == request.time;
+      allow update: if false;
+      allow delete: if isAdmin() || isOwner(resource.data.to_uid);
+    }
+
     // community_stories/{id} — "Share an experience". Readable by any
     // signed-in user (that's the point), written only under the author's
     // own uid; authors can edit text, topic and their own photo. Admins moderate:

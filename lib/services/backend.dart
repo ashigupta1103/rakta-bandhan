@@ -16,6 +16,7 @@ import 'geo_config.dart';
 import 'edge.dart';
 import 'photos.dart';
 import 'usernames.dart';
+import 'support_service.dart';
 
 /// Recipient blood group -> donor groups that can give to it.
 const bloodCompatibility = <String, List<String>>{
@@ -1258,6 +1259,7 @@ class Backend {
       'handled_at': FieldValue.serverTimestamp(),
     });
     await _logAdminAction('issue_$status', id);
+    await SupportService.mirrorStatus(id, status);
   }
 
   Future<void> adminDeleteIssueReport(String id) async {
@@ -1273,6 +1275,7 @@ class Backend {
       'handled_at': FieldValue.serverTimestamp(),
     });
     await _logAdminAction('inquiry_$status', id);
+    await SupportService.mirrorStatus(id, status);
   }
 
   Future<void> adminDeletePartnershipInquiry(String id) async {
@@ -1291,6 +1294,7 @@ class Backend {
       'handled_at': FieldValue.serverTimestamp(),
     });
     await _logAdminAction('report_$status', id);
+    await SupportService.mirrorStatus(id, status);
   }
 
   /// Reversible moderation: the Community feed filters hidden stories out
@@ -1463,7 +1467,7 @@ class Backend {
 
   /// Report a community post for review (Apple guideline 1.2 — user
   /// content must be reportable). Admins see it in the reports inbox.
-  Future<void> reportStory(String storyId, {required String reason}) => _db.collection('reports').add({
+  Future<void> reportStory(String storyId, {required String reason}) => SupportService.submit('reports', {
         'reporter_uid': _uid,
         'reason': reason,
         'kind': 'story',
@@ -1488,7 +1492,7 @@ class Backend {
   /// "Report an issue" (Help & support). One-way — admins read it in the
   /// console, nothing writes back to the reporter.
   Future<void> submitIssueReport({required String reason, String? details}) =>
-      _db.collection('issue_reports').add({
+      SupportService.submit('issue_reports', {
         'reporter_uid': _uid,
         'reason': reason,
         'details': details?.trim() ?? '',
@@ -1504,7 +1508,7 @@ class Backend {
     required String interest,
     String? message,
   }) =>
-      _db.collection('partnership_inquiries').add({
+      SupportService.submit('partnership_inquiries', {
         'requester_uid': _uid,
         'org_name': orgName.trim(),
         'contact_name': contactName.trim(),

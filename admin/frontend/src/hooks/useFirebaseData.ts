@@ -31,12 +31,15 @@ import {
 } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
 import { deleteMedia, deleteIdProof } from '../lib/edge';
+import { donorsQuery } from '../lib/adminQueries';
+import { usePagedCollection } from './usePagedCollection';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface Donor extends DocumentData {
   id: string;
   name: string;
+  username?: string;
   phone: string;
   blood_group: string;
   is_verified: boolean;
@@ -193,73 +196,35 @@ export interface DashboardStats {
 // ─── Real-time collection hooks ───────────────────────────────────────────────
 
 /** Live donor list (all donors, newest first) */
-export function useDonors(bloodGroupFilter?: string, verifiedOnly?: boolean) {
-  const [donors, setDonors] = useState<Donor[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const q = query(collection(db, 'donors'), orderBy('created_at', 'desc'), limit(200));
-
-    const unsub = onSnapshot(q, (snapshot) => {
-      let docs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as Donor));
-      if (bloodGroupFilter) docs = docs.filter((d) => d.blood_group === bloodGroupFilter);
-      if (verifiedOnly) docs = docs.filter((d) => d.is_verified);
-      setDonors(docs);
-      setLoading(false);
-    });
-
-    return () => unsub();
-  }, [bloodGroupFilter, verifiedOnly]);
-
-  return { donors, loading };
+export function useDonors(bloodGroupFilter?: string, verifiedOnly?: boolean, search = '', pending = false) {
+  const base = useMemo(() => donorsQuery(bloodGroupFilter, verifiedOnly, search, pending), [bloodGroupFilter, verifiedOnly, search, pending]);
+  const { items, ...page } = usePagedCollection<Donor>(base);
+  return { donors: items, ...page };
 }
 
 /** Live blood requests (newest first) */
 export function useRequests(statusFilter?: string) {
-  const [requests, setRequests] = useState<BloodRequest[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const q = query(collection(db, 'requests'), orderBy('created_at', 'desc'), limit(200));
-
-    const unsub = onSnapshot(q, (snapshot) => {
-      let docs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as BloodRequest));
-      if (statusFilter && statusFilter !== 'all') docs = docs.filter((r) => r.status === statusFilter);
-      setRequests(docs);
-      setLoading(false);
-    });
-
-    return () => unsub();
-  }, [statusFilter]);
-
-  return { requests, loading };
+  const base = useMemo(() => query(collection(db, 'requests'),
+    ...(statusFilter && statusFilter !== 'all' ? [where('status', '==', statusFilter)] : []), orderBy('created_at', 'desc')), [statusFilter]);
+  const { items, ...page } = usePagedCollection<BloodRequest>(base);
+  return { requests: items, ...page };
 }
 
 /** Live hospital list */
 export function useHospitals() {
-  const [hospitals, setHospitals] = useState<Hospital[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const q = query(collection(db, 'hospitals'), orderBy('created_at', 'desc'));
-    const unsub = onSnapshot(q, (snapshot) => {
-      setHospitals(snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as Hospital)));
-      setLoading(false);
-    });
-    return () => unsub();
-  }, []);
-
-  return { hospitals, loading };
+  const base = useMemo(() => query(collection(db, 'hospitals'), orderBy('created_at', 'desc')), []);
+  const { items, ...page } = usePagedCollection<Hospital>(base);
+  return { hospitals: items, ...page };
 }
 
 /**
  * Live "donation history" — derived from fulfilled requests rather than
  * the dormant /donation_history collection (that was written by the
- * Blaze-only onDonationConfirmed.js). Donors self-report on the app, so
+ * completion flow). Donors self-report on the app, so
  * a fulfilled request *is* the donation record on Spark.
  */
 export function useDonationHistory() {
-  const { requests, loading } = useRequests('fulfilled');
+  const { requests, ...page } = useRequests('fulfilled');
   const donations = useMemo(
     () =>
       [...requests].sort((a, b) => {
@@ -269,7 +234,7 @@ export function useDonationHistory() {
       }),
     [requests]
   );
-  return { donations, loading };
+  return { donations, ...page };
 }
 
 /**
@@ -390,13 +355,30 @@ export function useDashboardStats() {
   const { donors, loading: donorsLoading } = useDonors();
   const { requests, loading: requestsLoading } = useRequests();
   const { hospitals, loading: hospitalsLoading } = useHospitals();
-  const loading = donorsLoading || requestsLoading || hospitalsLoading;
+  const [totals, setTotals] = useState<Record<string, number> | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    let active = true;
+    const start = new Date(); start.setDate(1); start.setHours(0, 0, 0, 0);
+    const donorsBase = collection(db, 'donors'), requestsBase = collection(db, 'requests'), hospitalsBase = collection(db, 'hospitals');
+    const counts = {
+      totalDonors: query(donorsBase), verifiedDonors: query(donorsBase, where('is_verified', '==', true)),
+      availableDonors: query(donorsBase, where('is_available', '==', true), where('is_banned', '==', false)),
+      bannedUsers: query(donorsBase, where('is_banned', '==', true)), totalRequests: query(requestsBase),
+      openRequests: query(requestsBase, where('status', '==', 'open')), matchedRequests: query(requestsBase, where('status', '==', 'matched')),
+      fulfilledRequests: query(requestsBase, where('status', '==', 'fulfilled')), expiredRequests: query(requestsBase, where('status', '==', 'expired')),
+      cancelledRequests: query(requestsBase, where('status', '==', 'cancelled')), totalHospitals: query(hospitalsBase),
+      verifiedHospitals: query(hospitalsBase, where('verified', '==', true)),
+      donationsThisMonth: query(requestsBase, where('status', '==', 'fulfilled'), where('fulfilled_at', '>=', start)),
+    };
+    Promise.all(Object.entries(counts).map(async ([key, q]) => [key, (await getCountFromServer(q)).data().count] as const))
+      .then((entries) => { if (active) { setTotals(Object.fromEntries(entries)); setError(null); } })
+      .catch(() => { if (active) setError('Could not load totals. Check your access, connection and indexes.'); });
+    return () => { active = false; };
+  }, [donors, requests, hospitals]);
+  const loading = donorsLoading || requestsLoading || hospitalsLoading || (totals === null && error === null);
 
   const stats = useMemo<DashboardStats>(() => {
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-
-    const fulfilled = requests.filter((r) => r.status === 'fulfilled');
     const withResponseTime = requests.filter((r) => r.matched_at && r.created_at);
     const avgResponseTimeMinutes = withResponseTime.length
       ? Math.round(
@@ -408,36 +390,34 @@ export function useDashboardStats() {
         )
       : 0;
 
-    const totalRequests = requests.length;
+    const totalRequests = totals?.totalRequests ?? 0;
     const fulfillmentRate = totalRequests
-      ? Math.round((fulfilled.length / totalRequests) * 100)
+      ? Math.round(((totals?.fulfilledRequests ?? 0) / totalRequests) * 100)
       : 0;
 
     return {
-      totalDonors: donors.length,
-      verifiedDonors: donors.filter((d) => d.is_verified).length,
-      availableDonors: donors.filter((d) => d.is_available && !d.is_banned).length,
-      bannedUsers: donors.filter((d) => d.is_banned).length,
+      totalDonors: totals?.totalDonors ?? 0,
+      verifiedDonors: totals?.verifiedDonors ?? 0,
+      availableDonors: totals?.availableDonors ?? 0,
+      bannedUsers: totals?.bannedUsers ?? 0,
       totalRequests,
-      openRequests: requests.filter((r) => r.status === 'open').length,
-      matchedRequests: requests.filter((r) => r.status === 'matched').length,
-      fulfilledRequests: fulfilled.length,
-      expiredRequests: requests.filter((r) => r.status === 'expired').length,
-      cancelledRequests: requests.filter((r) => r.status === 'cancelled').length,
-      totalHospitals: hospitals.length,
-      verifiedHospitals: hospitals.filter((h) => h.verified).length,
-      totalDonations: fulfilled.length,
-      donationsThisMonth: fulfilled.filter(
-        (r) => (r.fulfilled_at?.toDate().getTime() ?? 0) >= startOfMonth.getTime()
-      ).length,
+      openRequests: totals?.openRequests ?? 0,
+      matchedRequests: totals?.matchedRequests ?? 0,
+      fulfilledRequests: totals?.fulfilledRequests ?? 0,
+      expiredRequests: totals?.expiredRequests ?? 0,
+      cancelledRequests: totals?.cancelledRequests ?? 0,
+      totalHospitals: totals?.totalHospitals ?? 0,
+      verifiedHospitals: totals?.verifiedHospitals ?? 0,
+      totalDonations: totals?.fulfilledRequests ?? 0,
+      donationsThisMonth: totals?.donationsThisMonth ?? 0,
       fulfillmentRate,
       avgResponseTimeMinutes,
       recentRequests: requests.slice(0, 6),
       recentDonors: donors.slice(0, 6),
     };
-  }, [donors, requests, hospitals]);
+  }, [donors, requests, totals]);
 
-  return { stats, loading, error: null as string | null };
+  return { stats, loading, error };
 }
 
 // ─── Client-computed analytics (no Cloud Function) ────────────────────────────
@@ -705,8 +685,32 @@ export function useAdminActions() {
   // ── Inbox triage (issue_reports / partnership_inquiries) ────────────────
   //
   // Both collections are create-only for the submitter and admin-updatable
-  // per firestore.rules, so triage is a plain field write. There is no reply
-  // channel — `admin_note` is internal, and the submitter never reads it.
+  // per firestore.rules. Safe status/reply copies are visible to the author;
+  // `admin_note` remains internal and never enters the author copy.
+
+  const mirrorStatus = async (id: string, status: InboxStatus) => {
+    const ref = doc(db, 'support_submissions', id);
+    if ((await getDoc(ref)).exists()) await updateDoc(ref, { status });
+  };
+
+  const replyToSubmission = (source: string, id: string, body: string) => run(async () => {
+    if (!body.trim() || body.trim().length > 2000) throw new Error('Write a reply of 1–2000 characters.');
+    const data = (await getDoc(doc(db, source, id))).data();
+    const owner = data?.reporter_uid ?? data?.requester_uid;
+    if (typeof owner !== 'string' || !owner) throw new Error('This submission is no longer available.');
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'support_submissions', id), {
+      source_collection: source, source_id: id, reporter_uid: owner,
+      title: String(data?.reason ?? data?.org_name ?? 'Support request').slice(0, 120),
+      body: String(data?.details ?? data?.message ?? '').slice(0, 2000),
+      status: data?.status === 'resolved' ? 'resolved' : data?.status === 'in_progress' ? 'in_progress' : 'new',
+      created_at: data?.created_at ?? serverTimestamp(),
+    });
+    batch.set(doc(collection(db, 'support_replies')), { source_collection: source, source_id: id, to_uid: owner,
+      body: body.trim(), created_by: auth.currentUser?.uid, created_at: serverTimestamp() });
+    await batch.commit();
+    await logAudit('support_reply', { uid: id });
+  });
 
   const setIssueStatus = (id: string, status: InboxStatus, note?: string) =>
     run(async () => {
@@ -717,6 +721,7 @@ export function useAdminActions() {
         handled_at: serverTimestamp(),
       });
       await logAudit(`issue_${status}`, { uid: id });
+      await mirrorStatus(id, status);
     });
 
   const deleteIssueReport = (id: string) =>
@@ -734,6 +739,7 @@ export function useAdminActions() {
         handled_at: serverTimestamp(),
       });
       await logAudit(`inquiry_${status}`, { uid: id });
+      await mirrorStatus(id, status);
     });
 
   const deleteInquiry = (id: string) =>
@@ -756,6 +762,7 @@ export function useAdminActions() {
         handled_at: serverTimestamp(),
       });
       await logAudit(`report_${status}`, { uid: id });
+      await mirrorStatus(id, status);
     });
 
   // ── App content (announcements, testimonials, impact, story moderation) ──
@@ -862,6 +869,7 @@ export function useAdminActions() {
     setInquiryStatus,
     deleteInquiry,
     setReportStatus,
+    replyToSubmission,
     saveAnnouncement,
     deleteAnnouncement,
     saveTestimonial,

@@ -12,6 +12,7 @@
 // Reviewers sign in with these emails and the fixed REVIEW_CODE (see login.ts).
 
 import { createRequire } from 'node:module';
+import { createHash } from 'node:crypto';
 import { initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
@@ -70,11 +71,20 @@ async function userFor(email, displayName) {
 /** Writes donors/{uid} and donors_public/{uid} the way Backend.registerDonor does. */
 async function writeProfile(user, p) {
   const donorRef = db.doc(`donors/${user.uid}`);
-  const existed = (await donorRef.get()).exists;
-  const created = existed ? {} : { created_at: FieldValue.serverTimestamp() };
-  await donorRef.set(
+  await db.runTransaction(async (tx) => {
+  const before = await tx.get(donorRef);
+  const username = before.get('username') || `review_${createHash('sha256').update(user.uid).digest('hex').slice(0, 12)}`;
+  const claimRef = db.doc(`usernames/${username}`);
+  const claim = await tx.get(claimRef);
+  if (claim.exists && claim.get('uid') !== user.uid) throw new Error('Review username already owned by another account');
+  if (!claim.exists) tx.set(claimRef, { uid: user.uid, created_at: FieldValue.serverTimestamp() });
+  const created = before.exists ? {} : { created_at: FieldValue.serverTimestamp() };
+  tx.set(donorRef,
     {
       name: p.name,
+      name_lower: p.name.trim().toLowerCase(),
+      username,
+      username_changed_at: before.get('username_changed_at') ?? FieldValue.serverTimestamp(),
       phone: p.phone,
       email: user.email,
       blood_group: p.bloodGroup,
@@ -90,9 +100,10 @@ async function writeProfile(user, p) {
     },
     { merge: true },
   );
-  await db.doc(`donors_public/${user.uid}`).set(
+  tx.set(db.doc(`donors_public/${user.uid}`),
     {
       name: p.name,
+      username,
       blood_group: p.bloodGroup,
       geohash: encodeGeohash(coarse(p.lat), coarse(p.lng), 6),
       lat: coarse(p.lat),
@@ -104,6 +115,7 @@ async function writeProfile(user, p) {
     },
     { merge: true },
   );
+  });
 }
 
 const a = await userFor(emailA, 'Review Requester');

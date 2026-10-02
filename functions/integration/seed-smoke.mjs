@@ -26,11 +26,16 @@ assert.equal(bPrivate.is_available, true);
 assert.equal(bPrivate.is_verified, true);
 assert.equal(bPrivate.is_banned, false);
 assert.equal(bPrivate.active_request_id, null);
+assert.match(bPrivate.username, /^[a-z][a-z0-9_]{2,19}$/);
+assert.equal(bPrivate.name_lower, 'review donor');
+assert.equal((await db.doc(`usernames/${bPrivate.username}`).get()).get('uid'), b.uid);
+const usernameChangedAt = bPrivate.username_changed_at.toMillis();
 assert.equal(a.emailVerified && b.emailVerified, true);
 
 const bPublic = (await db.doc(`donors_public/${b.uid}`).get()).data();
 assert.equal('phone' in bPublic, false, 'the public listing never carries a phone number');
 assert.equal(bPublic.is_verified, true);
+assert.equal(bPublic.username, bPrivate.username);
 // B is within a kilometre of A's point (A is at Chennai Central by default).
 assert.ok(Math.abs(bPublic.lat - 13.0827) < 0.01 && Math.abs(bPublic.lng - 80.2707) < 0.01);
 
@@ -40,6 +45,7 @@ assert.equal(aPrivate.is_verified, false);
 seed();
 assert.equal((await auth.getUserByEmail('review-b@example.com')).uid, b.uid, 'a second run reuses the account');
 assert.equal((await db.doc(`donors/${b.uid}`).get()).data().created_at.toMillis(), createdAt, 'a second run keeps created_at');
+assert.equal((await db.doc(`donors/${b.uid}`).get()).get('username_changed_at').toMillis(), usernameChangedAt, 'a second run preserves the username cooldown');
 console.log('✔ seed-review-accounts: creates verified requester and donor accounts, and is idempotent');
 
 // Refuses to touch a real project without being told twice.

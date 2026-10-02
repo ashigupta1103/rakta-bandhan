@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../services/admin_service.dart';
 import '../services/backend.dart';
+import '../services/support_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/filter_chip_row.dart';
@@ -33,6 +36,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   String _donorSearch = '';
+  Timer? _searchDebounce;
   DonorVerificationStatus? _donorFilter;
   String? _requestFilter;
   String _hospitalSearch = '';
@@ -44,6 +48,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
+    _service.stop();
     _broadcastController.dispose();
     super.dispose();
   }
@@ -137,12 +143,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   // ---------------------------------------------------------------- Dashboard
 
   Widget _buildDashboard() {
-    final donors = _service.donors;
     final requests = _service.requests;
-    final pendingCount = donors.where((d) => d.status == DonorVerificationStatus.pending).length;
-    final openCount = requests.where((r) => r.status == 'open').length;
-    final fulfilledCount = requests.where((r) => r.status == 'fulfilled').length;
-    final fulfilmentRate = requests.isEmpty ? 0 : ((fulfilledCount / requests.length) * 100).round();
+    final totals = _service.totals;
+    final pendingCount = totals?['pending'];
+    final openCount = totals?['open'];
+    final fulfilmentRate = totals == null ? null : totals['requests'] == 0 ? 0 : ((totals['fulfilled']! / totals['requests']!) * 100).round();
     final needsAttention = requests.where((r) => r.status == 'open' && r.urgency == 'critical').toList();
 
     return ListView(
@@ -161,20 +166,22 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           crossAxisSpacing: 10,
           childAspectRatio: 1.5,
           children: [
-            _statCard(LucideIcons.users, AppColors.textMuted, '${donors.length}', 'Registered donors'),
-            _statCard(LucideIcons.droplet, AppColors.primary, '$openCount', 'Open requests'),
-            _statCard(LucideIcons.clock, AppColors.warmAmberText, '$pendingCount', 'Pending verifications'),
-            _statCard(LucideIcons.checkCircle, AppColors.warmGreenText, '$fulfilmentRate%', 'Fulfilled (all-time)'),
+            _statCard(LucideIcons.users, AppColors.textMuted, '${totals?['donors'] ?? '…'}', 'Registered donors'),
+            _statCard(LucideIcons.droplet, AppColors.primary, '${openCount ?? '…'}', 'Open requests'),
+            _statCard(LucideIcons.clock, AppColors.warmAmberText, '${pendingCount ?? '…'}', 'Pending verifications'),
+            _statCard(LucideIcons.checkCircle, AppColors.warmGreenText, fulfilmentRate == null ? '…' : '$fulfilmentRate%', 'Fulfilled (all-time)'),
           ],
         ),
         const SizedBox(height: 16),
+        if (_service.totalsError != null) Text(_service.totalsError!, style: const TextStyle(color: AppColors.primary)),
+        TextButton(onPressed: _service.refreshTotals, child: const Text('Refresh totals')),
         Container(
           padding: const EdgeInsets.all(15),
           decoration: BoxDecoration(color: Colors.white, border: Border.all(color: AppColors.cardBorderWarm), borderRadius: BorderRadius.circular(16)),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Fulfilment, last 7 days', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
+              const Text('Fulfilment, last 7 days in loaded requests', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
               const SizedBox(height: 12),
               SizedBox(
                 height: 46,
@@ -264,11 +271,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   // -------------------------------------------------------------------- Donors
 
+  void _setDonorFilter(DonorVerificationStatus? status) {
+    _searchDebounce?.cancel();
+    setState(() => _donorFilter = status);
+    _service.filterDonors(search: _donorSearch, status: status);
+  }
+
+  void _setRequestFilter(String? status) {
+    setState(() => _requestFilter = status);
+    _service.filterRequests(status);
+  }
+
   Widget _buildDonors() {
-    final filtered = _service.donors
-        .where((d) => _donorFilter == null || d.status == _donorFilter)
-        .where((d) => _donorSearch.trim().isEmpty || d.name.toLowerCase().contains(_donorSearch.toLowerCase()))
-        .toList();
+    final filtered = _service.donors;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -276,24 +291,29 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
           child: TextField(
-            onChanged: (v) => setState(() => _donorSearch = v),
-            decoration: const InputDecoration(hintText: 'Search donors by name', prefixIcon: Icon(LucideIcons.search, size: 16)),
+            onChanged: (v) {
+              _donorSearch = v; _searchDebounce?.cancel();
+              _searchDebounce = Timer(const Duration(milliseconds: 400), () => _service.filterDonors(search: v, status: _donorFilter));
+            },
+            decoration: const InputDecoration(hintText: 'Name, @username, phone or email', prefixIcon: Icon(LucideIcons.search, size: 16)),
           ),
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: FilterChipRow(
             chips: [
-              FilterChipItem(label: 'All', active: _donorFilter == null, onTap: () => setState(() => _donorFilter = null)),
-              FilterChipItem(label: 'Pending', active: _donorFilter == DonorVerificationStatus.pending, onTap: () => setState(() => _donorFilter = DonorVerificationStatus.pending)),
-              FilterChipItem(label: 'Verified', active: _donorFilter == DonorVerificationStatus.verified, onTap: () => setState(() => _donorFilter = DonorVerificationStatus.verified)),
-              FilterChipItem(label: 'Banned', active: _donorFilter == DonorVerificationStatus.banned, onTap: () => setState(() => _donorFilter = DonorVerificationStatus.banned)),
+              FilterChipItem(label: 'All', active: _donorFilter == null, onTap: () => _setDonorFilter(null)),
+              FilterChipItem(label: 'Pending', active: _donorFilter == DonorVerificationStatus.pending, onTap: () => _setDonorFilter(DonorVerificationStatus.pending)),
+              FilterChipItem(label: 'Verified', active: _donorFilter == DonorVerificationStatus.verified, onTap: () => _setDonorFilter(DonorVerificationStatus.verified)),
+              FilterChipItem(label: 'Banned', active: _donorFilter == DonorVerificationStatus.banned, onTap: () => _setDonorFilter(DonorVerificationStatus.banned)),
             ],
           ),
         ),
         const SizedBox(height: 10),
+        if (_service.donorError != null) Text(_service.donorError!, style: const TextStyle(color: AppColors.primary)),
+        Text('${filtered.length} loaded · ${_service.donorMatches ?? '…'} matching', textAlign: TextAlign.center),
         Expanded(
-          child: filtered.isEmpty
+          child: _service.donorsLoading ? const Center(child: CircularProgressIndicator()) : filtered.isEmpty
               ? const Center(child: Text('No donors match this filter.', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)))
               : ListView.separated(
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
@@ -302,6 +322,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   itemBuilder: (context, index) => _donorCard(filtered[index]),
                 ),
         ),
+        if (_service.donorsHasMore) TextButton(onPressed: _service.donorsLoadingMore ? null : _service.loadMoreDonors, child: Text(_service.donorsLoadingMore ? 'Loading…' : 'Load more')),
       ],
     );
   }
@@ -331,6 +352,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             ),
             const SizedBox(height: 6),
             Text(donor.phone, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+            if (donor.username.isNotEmpty) Text('@${donor.username}', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
             const Divider(height: 20, color: AppColors.cardBorderWarm),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -387,7 +409,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   // ------------------------------------------------------------------ Requests
 
   Widget _buildRequests() {
-    final filtered = _service.requests.where((r) => _requestFilter == null || r.status == _requestFilter).toList();
+    final filtered = _service.requests;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -396,15 +418,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 10),
           child: FilterChipRow(
             chips: [
-              FilterChipItem(label: 'All', active: _requestFilter == null, onTap: () => setState(() => _requestFilter = null)),
-              FilterChipItem(label: 'Open', active: _requestFilter == 'open', onTap: () => setState(() => _requestFilter = 'open')),
-              FilterChipItem(label: 'Matched', active: _requestFilter == 'matched', onTap: () => setState(() => _requestFilter = 'matched')),
-              FilterChipItem(label: 'Fulfilled', active: _requestFilter == 'fulfilled', onTap: () => setState(() => _requestFilter = 'fulfilled')),
+              FilterChipItem(label: 'All', active: _requestFilter == null, onTap: () => _setRequestFilter(null)),
+              FilterChipItem(label: 'Open', active: _requestFilter == 'open', onTap: () => _setRequestFilter('open')),
+              FilterChipItem(label: 'Matched', active: _requestFilter == 'matched', onTap: () => _setRequestFilter('matched')),
+              FilterChipItem(label: 'Fulfilled', active: _requestFilter == 'fulfilled', onTap: () => _setRequestFilter('fulfilled')),
             ],
           ),
         ),
         Expanded(
-          child: filtered.isEmpty
+          child: _service.requestsLoading ? const Center(child: CircularProgressIndicator()) : filtered.isEmpty
               ? const Center(child: Text('No requests match this filter.', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)))
               : ListView.separated(
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
@@ -413,6 +435,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   itemBuilder: (context, index) => _requestCard(filtered[index]),
                 ),
         ),
+        if (_service.requestError != null) Text(_service.requestError!, style: const TextStyle(color: AppColors.primary)),
+        if (_service.requestsHasMore) TextButton(onPressed: _service.requestsLoadingMore ? null : _service.loadMoreRequests, child: Text(_service.requestsLoadingMore ? 'Loading…' : 'Load more')),
       ],
     );
   }
@@ -576,6 +600,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         _inboxCard(
                           title: entry.reason,
                           subtitle: entry.subject,
+                          onReply: () => _replyTo('reports', entry.id),
                           body: entry.details,
                           meta: entry.time,
                           status: entry.status,
@@ -595,6 +620,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         _inboxCard(
                           title: entry.reason,
                           body: entry.details,
+                          onReply: () => _replyTo('issue_reports', entry.id),
                           meta: entry.time,
                           status: entry.status,
                           note: entry.adminNote,
@@ -617,6 +643,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       for (final entry in inquiries)
                         _inboxCard(
                           title: entry.orgName,
+                          onReply: () => _replyTo('partnership_inquiries', entry.id),
                           subtitle: '${entry.contactName} · ${entry.workEmail}',
                           highlight: entry.interest,
                           body: entry.message,
@@ -652,7 +679,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     final values = await openAdminEditor(
       context,
       title: 'Internal note',
-      note: 'Only admins can read this. The person who submitted never sees it — there is no reply channel.',
+      note: 'Only admins can read this internal note. Use Reply to send a message to the submitter.',
       fields: [AdminEditorField(key: 'note', label: 'Note', initial: current, lines: 3)],
     );
     if (values == null || !mounted) return;
@@ -669,6 +696,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     required String note,
     required void Function(InboxStatus) onStatus,
     required VoidCallback onNote,
+    required VoidCallback onReply,
     VoidCallback? onDelete,
   }) {
     final (bg, fg) = switch (status) {
@@ -727,6 +755,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           Row(
             children: [
               TextButton(onPressed: onNote, child: Text(note.isEmpty ? 'Add note' : 'Edit note')),
+              TextButton(onPressed: onReply, child: const Text('Reply')),
               const Spacer(),
               if (onDelete != null)
                 IconButton(
@@ -742,6 +771,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   // ------------------------------------------------------------------ Activity
+
+  Future<void> _replyTo(String source, String id) async {
+    final values = await openAdminEditor(context, title: 'Reply to submitter',
+      note: 'The reply appears in their My reports view. Internal notes remain private.',
+      fields: [const AdminEditorField(key: 'body', label: 'Reply', lines: 4)]);
+    if (values == null || !mounted) return;
+    await runAdminWrite(context, () => SupportService.reply(source, id, values['body'] ?? ''), done: 'Reply saved for the submitter.');
+  }
 
   Widget _buildActivity() {
     return ListView(

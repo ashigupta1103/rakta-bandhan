@@ -19,9 +19,13 @@ flutter analyze
 
 step "flutter test"
 flutter test
+flutter test --dart-define=DEMO_SIGNIN=true test/demo_signin_test.dart
 
 step "functions: unit tests"
 (cd functions && deps && npm test)
+step "functions: emulator smoke"
+(cd functions && if [ ! -f .secret.local ]; then printf 'SMTP_URL=emulator-no-mail\nREVIEW_CODE=246810\n' > .secret.local; fi
+  FUNCTIONS_DISCOVERY_TIMEOUT=120 npm run smoke)
 
 step "edge Worker: tests and bundle"
 (cd edge && deps && npm test && WRANGLER_SEND_METRICS=false npm run check >/dev/null)

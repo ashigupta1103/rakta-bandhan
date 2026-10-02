@@ -19,7 +19,7 @@ import { defineSecret, defineString } from 'firebase-functions/params';
 import * as logger from 'firebase-functions/logger';
 import { FieldValue } from 'firebase-admin/firestore';
 import { createHash } from 'node:crypto';
-import nodemailer from 'nodemailer';
+import { sendMail, SMTP_URL } from './mailer';
 
 import { auth, db, isEmulator, requireAppCheck } from './app';
 import {
@@ -42,8 +42,6 @@ import {
   sendRefusal,
 } from './otp';
 
-const SMTP_URL = defineSecret('SMTP_URL');
-const MAIL_FROM = defineString('MAIL_FROM', { default: 'Rakta Bandhan <no-reply@raktabandhan.org>' });
 // App-store review access: for the addresses listed in REVIEW_EMAILS the sign-in
 // code is the fixed REVIEW_CODE and no email is sent. Leave REVIEW_EMAILS empty
 // (the default) and the feature doesn't exist. See docs/launch/AFTER_BLAZE_UPGRADE.md.
@@ -55,14 +53,6 @@ const PEPPER = 'rakta-bandhan-login-v1';
 
 /** Custom claim on every token minted here; the rules accept it as "verified". */
 export const LOGIN_CLAIM = { login: 'email_otp' };
-
-function readSmtpUrl(): string {
-  try {
-    return SMTP_URL.value() ?? '';
-  } catch {
-    return '';
-  }
-}
 
 function reviewList(): string[] {
   try {
@@ -86,16 +76,7 @@ async function sendEmail(to: string, code: string): Promise<void> {
     logger.info(`[emulator] login code for ${to}: ${code}`);
     return;
   }
-  const smtp = readSmtpUrl();
-  if (!smtp) {
-    if (isEmulator) {
-      logger.info(`[emulator] login code for ${to}: ${code}`);
-      return;
-    }
-    throw new HttpsError('failed-precondition', 'Email sign-in isn’t set up yet. Please try again later.');
-  }
-  const { subject, text, html } = emailContent(code);
-  await nodemailer.createTransport(smtp).sendMail({ from: MAIL_FROM.value(), to, subject, text, html });
+  await sendMail(to, emailContent(code));
 }
 
 /** Per-IP hourly budget, so one client can't spray codes at many addresses. */
@@ -159,7 +140,7 @@ export const requestLoginCode = onCall({ secrets: [SMTP_URL, REVIEW_CODE] }, asy
     if (!reviewCode) await sendEmail(email, code);
   } catch (e) {
     if (e instanceof HttpsError) throw e;
-    logger.error('login email failed', { error: String(e) });
+    logger.error('login email failed', { code: (e as { code?: string }).code ?? 'email-delivery-failed' });
     throw new HttpsError('unavailable', 'We couldn’t send the email. Check the address and try again.');
   }
   return { sent: true, resendAfterS: Math.round(RESEND_GAP_MS / 1000) };

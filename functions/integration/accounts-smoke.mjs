@@ -35,6 +35,9 @@ const username = `donor_${Date.now()}`;
 await db.doc(`usernames/${username}`).set({ uid: user.uid });
 await donor.set({ name: 'Donor', username, email, is_banned: false, is_available: true });
 await db.doc(`donors/${user.uid}/private/id_proof`).set({ id_proof_base64: 'abc' });
+await db.doc(`donors_public/${user.uid}`).set({ name: 'Donor' });
+await db.doc(`support_submissions/${user.uid}`).set({ reporter_uid: user.uid, title: 'Help' });
+await db.doc(`support_replies/${user.uid}`).set({ to_uid: user.uid, body: 'Reply' });
 await sleep(1500);
 assert.equal((await auth.getUser(user.uid)).disabled, false, 'an ordinary update leaves the account alone');
 
@@ -63,6 +66,9 @@ await waitFor(async () => {
 }, 'sign-in account removed with the donor');
 await waitFor(async () => !(await db.doc(`donors/${user.uid}/private/id_proof`).get()).exists, 'ID photo doc removed with the donor');
 assert.equal((await db.doc(`usernames/${username}`).get()).exists, false, 'removal releases the donor username');
+await waitFor(async () => !(await db.doc(`support_replies/${user.uid}`).get()).exists, 'support replies removed');
+assert.equal((await db.doc(`support_submissions/${user.uid}`).get()).exists, false);
+assert.equal((await db.doc(`donors_public/${user.uid}`).get()).exists, false);
 console.log('✔ removing a donor removes the sign-in account and the subcollection left behind (the ID photo doc)');
 
 const oldUser = await auth.createUser({ email: `old-${Date.now()}@example.com` });

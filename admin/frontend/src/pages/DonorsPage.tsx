@@ -4,7 +4,7 @@
  * see hooks/useFirebaseData.ts for why (no admin* Cloud Functions on Spark).
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useDonors, useAdminActions, type Donor } from '../hooks/useFirebaseData';
 import { CheckCircle, AlertTriangle, Search, Filter, Trash2 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
@@ -47,6 +47,7 @@ function DonorRow({ donor, onVerify, onToggle, onBan, onDelete, busy }: {
           </div>
           <div>
             <p className="text-sm font-medium">{donor.name}</p>
+            {donor.username && <p className="text-xs text-muted-foreground">@{donor.username}</p>}
             <p className="text-xs text-muted-foreground">{donor.phone}</p>
           </div>
         </div>
@@ -128,14 +129,13 @@ function DonorRow({ donor, onVerify, onToggle, onBan, onDelete, busy }: {
 export default function DonorsPage() {
   const [bloodGroupFilter, setBloodGroupFilter] = useState('');
   const [search, setSearch] = useState('');
-  const { donors, loading } = useDonors(bloodGroupFilter || undefined);
+  const [queryText, setQueryText] = useState('');
+  const [pending, setPending] = useState(false);
+  useEffect(() => { const timer = setTimeout(() => setQueryText(search), 400); return () => clearTimeout(timer); }, [search]);
+  const { donors, loading, loadingMore, hasMore, loadMore, total, error } = useDonors(bloodGroupFilter || undefined, undefined, queryText, pending);
   const { actionLoading, actionError, verifyDonor, toggleAvailability, banUser, deleteDonor } = useAdminActions();
 
-  const filtered = donors.filter((d) =>
-    !search ||
-    d.name?.toLowerCase().includes(search.toLowerCase()) ||
-    d.phone?.includes(search)
-  );
+  const filtered = donors;
 
   return (
     <div className="p-6 space-y-5">
@@ -143,7 +143,7 @@ export default function DonorsPage() {
         <div>
           <h1 className="text-xl font-semibold">Donors</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {loading ? '…' : `${donors.length} donors registered`}
+            {total === null ? '…' : `${total} matching donors`}
           </p>
         </div>
       </div>
@@ -153,6 +153,7 @@ export default function DonorsPage() {
           {actionError}
         </div>
       )}
+      {error && <p className="text-sm text-destructive">{error}</p>}
 
       <div className="flex items-center gap-3 flex-wrap">
         <div className="relative">
@@ -160,7 +161,7 @@ export default function DonorsPage() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search name or phone…"
+            placeholder="Name, @username, phone or email"
             className="pl-9 pr-4 py-2 text-sm rounded-lg bg-background border border-input placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring w-56"
           />
         </div>
@@ -175,7 +176,8 @@ export default function DonorsPage() {
             {BLOOD_GROUPS.map((bg) => <option key={bg} value={bg}>{bg}</option>)}
           </select>
         </div>
-        <span className="text-xs text-muted-foreground">{filtered.length} results</span>
+        <Button size="sm" variant={pending ? 'default' : 'secondary'} onClick={() => setPending(!pending)}>Pending verification</Button>
+        <span className="text-xs text-muted-foreground">{filtered.length} loaded</span>
       </div>
 
       <Card className="overflow-hidden">
@@ -223,6 +225,7 @@ export default function DonorsPage() {
           </Table>
         </div>
       </Card>
+      {hasMore && <Button disabled={loadingMore} onClick={loadMore}>{loadingMore ? 'Loading…' : 'Load more'}</Button>}
     </div>
   );
 }

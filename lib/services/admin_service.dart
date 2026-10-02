@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'backend.dart';
+import 'admin_search.dart';
 
 enum DonorVerificationStatus { pending, verified, banned }
 
@@ -9,6 +12,7 @@ class AdminDonorEntry {
   final String name;
   final String bloodGroup;
   final String phone;
+  final String username;
   final DonorVerificationStatus status;
   final bool available;
   final String location;
@@ -19,6 +23,7 @@ class AdminDonorEntry {
     required this.name,
     required this.bloodGroup,
     required this.phone,
+    this.username = '',
     required this.status,
     required this.available,
     required this.location,
@@ -247,6 +252,19 @@ class AdminService extends ChangeNotifier {
 
   final _db = FirebaseFirestore.instance;
   bool _started = false;
+  final _subscriptions = <StreamSubscription<dynamic>>[];
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _donorSubscription;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _requestSubscription;
+  Query<Map<String, dynamic>>? _donorQuery;
+  Query<Map<String, dynamic>>? _requestQuery;
+  DocumentSnapshot<Map<String, dynamic>>? _donorCursor;
+  DocumentSnapshot<Map<String, dynamic>>? _requestCursor;
+  int _donorGeneration = 0, _requestGeneration = 0, _donorRevision = 0, _requestRevision = 0;
+  bool donorsLoading = false, donorsLoadingMore = false, donorsHasMore = false;
+  bool requestsLoading = false, requestsLoadingMore = false, requestsHasMore = false;
+  int? donorMatches, requestMatches;
+  String? donorError, requestError, totalsError;
+  Map<String, int>? totals;
 
   List<AdminDonorEntry> donors = [];
   List<AdminRequestEntry> requests = [];
@@ -286,60 +304,154 @@ class AdminService extends ChangeNotifier {
 
   List<QueryDocumentSnapshot<Map<String, dynamic>>> _requestDocs = [];
 
+  void filterDonors({String search = '', DonorVerificationStatus? status}) {
+    var q = _db.collection('donors') as Query<Map<String, dynamic>>;
+    if (status == DonorVerificationStatus.banned) q = q.where('is_banned', isEqualTo: true);
+    if (status == DonorVerificationStatus.pending || status == DonorVerificationStatus.verified) {
+      q = q.where('is_verified', isEqualTo: status == DonorVerificationStatus.verified).where('is_banned', isEqualTo: false);
+    }
+    if (search.trim().isNotEmpty) {
+      final part = adminDonorSearch(search);
+      q = part.prefix ? q.where(part.field, isGreaterThanOrEqualTo: part.value).where(part.field, isLessThanOrEqualTo: '${part.value}\uf8ff').orderBy(part.field)
+        : q.where(part.field, isEqualTo: part.value).orderBy('created_at', descending: true);
+    } else { q = q.orderBy('created_at', descending: true); }
+    _donorQuery = q;
+    final generation = ++_donorGeneration;
+    _donorSubscription?.cancel();
+    donors = []; donorsLoading = true; donorsHasMore = false; donorError = null; donorMatches = null;
+    notifyListeners();
+    _donorSubscription = q.limit(50).snapshots().listen((snap) {
+      if (generation != _donorGeneration) return;
+      _donorRevision++;
+      donors = snap.docs.map(_toDonorEntry).toList();
+      _donorCursor = snap.docs.isEmpty ? null : snap.docs.last;
+      donorsHasMore = snap.size == 50; donorsLoading = false; donorsLoadingMore = false;
+      notifyListeners();
+      q.count().get().then((aggregate) { if (generation == _donorGeneration) { donorMatches = aggregate.count; notifyListeners(); } })
+        .catchError((_) { if (generation == _donorGeneration) { donorError = 'Could not load totals.'; notifyListeners(); } });
+    }, onError: (_) { if (generation == _donorGeneration) { donorError = 'Could not load donors. Check access, connection and indexes.'; donorsLoading = false; notifyListeners(); } });
+  }
+
+  Future<void> loadMoreDonors() async {
+    if (!donorsHasMore || donorsLoadingMore || _donorCursor == null) return;
+    final generation = _donorGeneration, revision = _donorRevision;
+    donorsLoadingMore = true; notifyListeners();
+    try {
+      final snap = await _donorQuery!.startAfterDocument(_donorCursor!).limit(50).get();
+      if (generation != _donorGeneration || revision != _donorRevision) return;
+      final merged = {for (final donor in donors) donor.id: donor};
+      for (final d in snap.docs) { merged[d.id] = _toDonorEntry(d); }
+      donors = merged.values.toList();
+      _donorCursor = snap.docs.isEmpty ? null : snap.docs.last;
+      donorsHasMore = snap.size == 50;
+    } catch (_) { if (generation == _donorGeneration) donorError = 'Could not load more donors.'; }
+    finally { if (generation == _donorGeneration) { donorsLoadingMore = false; notifyListeners(); } }
+  }
+
+  void filterRequests(String? status) {
+    var q = _db.collection('requests') as Query<Map<String, dynamic>>;
+    if (status != null) q = q.where('status', isEqualTo: status);
+    q = q.orderBy('created_at', descending: true);
+    _requestQuery = q;
+    final generation = ++_requestGeneration;
+    _requestSubscription?.cancel();
+    requests = []; requestsLoading = true; requestsHasMore = false; requestError = null; requestMatches = null;
+    notifyListeners();
+    _requestSubscription = q.limit(50).snapshots().listen((snap) {
+      if (generation != _requestGeneration) return;
+      _requestRevision++;
+      _requestDocs = snap.docs; requests = snap.docs.map(_toRequestEntry).toList();
+      _requestCursor = snap.docs.isEmpty ? null : snap.docs.last;
+      requestsHasMore = snap.size == 50; requestsLoading = false; requestsLoadingMore = false;
+      notifyListeners();
+      q.count().get().then((aggregate) { if (generation == _requestGeneration) { requestMatches = aggregate.count; notifyListeners(); } })
+        .catchError((_) { if (generation == _requestGeneration) { requestError = 'Could not load totals.'; notifyListeners(); } });
+    }, onError: (_) { if (generation == _requestGeneration) { requestError = 'Could not load requests. Check access, connection and indexes.'; requestsLoading = false; notifyListeners(); } });
+  }
+
+  Future<void> loadMoreRequests() async {
+    if (!requestsHasMore || requestsLoadingMore || _requestCursor == null) return;
+    final generation = _requestGeneration, revision = _requestRevision;
+    requestsLoadingMore = true; notifyListeners();
+    try {
+      final snap = await _requestQuery!.startAfterDocument(_requestCursor!).limit(50).get();
+      if (generation != _requestGeneration || revision != _requestRevision) return;
+      final merged = {for (final entry in requests) entry.id: entry};
+      for (final d in snap.docs) { merged[d.id] = _toRequestEntry(d); }
+      requests = merged.values.toList();
+      _requestCursor = snap.docs.isEmpty ? null : snap.docs.last;
+      requestsHasMore = snap.size == 50;
+    } catch (_) { if (generation == _requestGeneration) requestError = 'Could not load more requests.'; }
+    finally { if (generation == _requestGeneration) { requestsLoadingMore = false; notifyListeners(); } }
+  }
+
+  Future<void> refreshTotals() async {
+    try {
+      final queries = <String, Query<Map<String, dynamic>>>{
+        'donors': _db.collection('donors'),
+        'pending': _db.collection('donors').where('is_verified', isEqualTo: false).where('is_banned', isEqualTo: false),
+        'requests': _db.collection('requests'),
+        'open': _db.collection('requests').where('status', isEqualTo: 'open'),
+        'fulfilled': _db.collection('requests').where('status', isEqualTo: 'fulfilled'),
+      };
+      final entries = await Future.wait(queries.entries.map((e) async => MapEntry(e.key, (await e.value.count().get()).count ?? 0)));
+      if (!_started) return;
+      totals = Map.fromEntries(entries); totalsError = null; notifyListeners();
+    } catch (_) { if (_started) { totalsError = 'Could not load totals. Check your connection.'; notifyListeners(); } }
+  }
+
+  void stop() {
+    _started = false; _donorGeneration++; _requestGeneration++;
+    _donorSubscription?.cancel(); _requestSubscription?.cancel();
+    for (final sub in _subscriptions) { sub.cancel(); }
+    _subscriptions.clear();
+    donors = []; requests = []; hospitals = []; auditLog = []; issueReports = []; reports = []; partnershipInquiries = []; stories = []; announcements = []; testimonials = [];
+    totals = null; _requestDocs = []; impactThisMonth = null;
+  }
+
   void init() {
     if (_started) return;
     _started = true;
 
-    // Newest 200 of each — a live listener on the whole collection re-read
-    // every donor (and, before the ID image moved out, every ID photo) on
-    // each admin session. Older records are reached via search.
-    _db.collection('donors').orderBy('created_at', descending: true).limit(200).snapshots().listen((snap) {
-      donors = snap.docs.map(_toDonorEntry).toList();
-      notifyListeners();
-    });
-    _db.collection('requests').orderBy('created_at', descending: true).limit(300).snapshots().listen((snap) {
-      _requestDocs = snap.docs;
-      requests = snap.docs.map(_toRequestEntry).toList();
-      notifyListeners();
-    });
-    _db.collection('hospitals').snapshots().listen((snap) {
+    filterDonors(); filterRequests(null); refreshTotals();
+    _subscriptions.add(_db.collection('hospitals').limit(100).snapshots().listen((snap) {
       hospitals = snap.docs.map((d) => AdminHospitalEntry(id: d.id, name: d.data()['name'] ?? '', address: d.data()['address'] ?? '')).toList();
       notifyListeners();
-    });
-    _db.collection('audit_log').orderBy('at', descending: true).limit(50).snapshots().listen((snap) {
+    }));
+    _subscriptions.add(_db.collection('audit_log').orderBy('at', descending: true).limit(50).snapshots().listen((snap) {
       auditLog = snap.docs.map(_toAuditEntry).toList();
       notifyListeners();
-    });
-    _db.collection('issue_reports').orderBy('created_at', descending: true).limit(100).snapshots().listen((snap) {
+    }));
+    _subscriptions.add(_db.collection('issue_reports').orderBy('created_at', descending: true).limit(100).snapshots().listen((snap) {
       issueReports = snap.docs.map(_toIssueReportEntry).toList();
       notifyListeners();
-    });
+    }));
     // Chat/call abuse reports (ChatService.report) — the one inbox the
     // branch that added in-app chat left for the admin console to pick up.
-    _db.collection('reports').orderBy('created_at', descending: true).limit(100).snapshots().listen((snap) {
+    _subscriptions.add(_db.collection('reports').orderBy('created_at', descending: true).limit(100).snapshots().listen((snap) {
       reports = snap.docs.map(_toReportEntry).toList();
       notifyListeners();
-    });
-    _db.collection('partnership_inquiries').orderBy('created_at', descending: true).limit(100).snapshots().listen((snap) {
+    }));
+    _subscriptions.add(_db.collection('partnership_inquiries').orderBy('created_at', descending: true).limit(100).snapshots().listen((snap) {
       partnershipInquiries = snap.docs.map(_toPartnershipEntry).toList();
       notifyListeners();
-    });
-    _db.collection('community_stories').orderBy('created_at', descending: true).limit(100).snapshots().listen((snap) {
+    }));
+    _subscriptions.add(_db.collection('community_stories').orderBy('created_at', descending: true).limit(100).snapshots().listen((snap) {
       stories = snap.docs.map(_toStoryEntry).toList();
       notifyListeners();
-    });
-    _db.collection('announcements').orderBy('created_at', descending: true).limit(100).snapshots().listen((snap) {
+    }));
+    _subscriptions.add(_db.collection('announcements').orderBy('created_at', descending: true).limit(100).snapshots().listen((snap) {
       announcements = snap.docs.map(_toAnnouncementEntry).toList();
       notifyListeners();
-    });
-    _db.collection('testimonials').orderBy('created_at', descending: true).limit(100).snapshots().listen((snap) {
+    }));
+    _subscriptions.add(_db.collection('testimonials').orderBy('created_at', descending: true).limit(100).snapshots().listen((snap) {
       testimonials = snap.docs.map(_toTestimonialEntry).toList();
       notifyListeners();
-    });
-    Backend.instance.impactThisMonthStream().listen((value) {
+    }));
+    _subscriptions.add(Backend.instance.impactThisMonthStream().listen((value) {
       impactThisMonth = value;
       notifyListeners();
-    });
+    }));
   }
 
   AdminAnnouncementEntry _toAnnouncementEntry(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
@@ -397,6 +509,7 @@ class AdminService extends ChangeNotifier {
       name: d['name'] as String? ?? 'Donor',
       bloodGroup: d['blood_group'] as String? ?? '',
       phone: d['phone'] as String? ?? '',
+      username: d['username'] as String? ?? '',
       status: status,
       available: d['is_available'] as bool? ?? false,
       location: (d['location_label'] as String?)?.isNotEmpty == true ? d['location_label'] as String : '—',

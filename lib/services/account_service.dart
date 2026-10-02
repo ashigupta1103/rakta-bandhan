@@ -30,6 +30,8 @@ class AccountService {
     final asRequester = await _db.collection('requests').where('requester_uid', isEqualTo: _uid).get();
     final asDonor = await _db.collection('requests').where('matched_donor_id', isEqualTo: _uid).get();
     final history = await _db.collection('donation_history').where('donor_id', isEqualTo: _uid).get();
+    final submissions = await _db.collection('support_submissions').where('reporter_uid', isEqualTo: _uid).get();
+    final replies = await _db.collection('support_replies').where('to_uid', isEqualTo: _uid).get();
 
     final export = {
       'exported_at': DateTime.now().toUtc().toIso8601String(),
@@ -38,6 +40,8 @@ class AccountService {
       'requests_you_raised': [for (final d in asRequester.docs) {'id': d.id, ...d.data()}],
       'requests_you_accepted': [for (final d in asDonor.docs) {'id': d.id, ...d.data()}],
       'donation_history': [for (final d in history.docs) {'id': d.id, ...d.data()}],
+      'support_submissions': [for (final d in submissions.docs) {...d.data(), 'id': d.id}],
+      'support_replies': [for (final d in replies.docs) {...d.data(), 'id': d.id}],
     };
     return JsonEncoder.withIndent('  ', (value) {
       if (value is Timestamp) return value.toDate().toUtc().toIso8601String();
@@ -86,6 +90,16 @@ class AccountService {
     await PushService.instance.unregisterDevice();
     await Backend.instance.deleteMyIdProof();
     await Backend.instance.removeProfilePhoto(keepProfileField: true).catchError((_) {});
+    // Delete in bounded pages while our own authentication still exists.
+    for (final entry in {'support_submissions': 'reporter_uid', 'support_replies': 'to_uid'}.entries) {
+      while (true) {
+        final page = await _db.collection(entry.key).where(entry.value, isEqualTo: _uid).limit(200).get();
+        if (page.docs.isEmpty) break;
+        final batch = _db.batch();
+        for (final doc in page.docs) { batch.delete(doc.reference); }
+        await batch.commit();
+      }
+    }
     final username = (await _db.collection('donors').doc(_uid).get()).data()?['username'] as String?;
     final removal = _db.batch();
     if (username != null) removal.delete(_db.collection('usernames').doc(username));

@@ -5,17 +5,10 @@ import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/filter_chip_row.dart';
 import '../widgets/rb_icon.dart';
+import 'my_reports_screen.dart';
 
-/// Help & support — an accordion FAQ using the same grouped-row component
-/// used everywhere else in the app. Every answer below is verified against
-/// backend.dart, not guessed: OTP sign-in vs. the admin-reviewed "Verified"
-/// badge are genuinely separate mechanisms (see registerDonor/OTP sign-in
-/// vs. adminVerifyDonor); phone visibility follows donors_public (never has
-/// a phone field) vs. the one-time reveal onto a matched request doc; the
-/// cooldown numbers come straight from markFulfilled/maybeReactivate; and
-/// community-name editing is honestly reported as not implemented — there
-/// is no such field anywhere in the data model. Support contact route and
-/// hours are undecided and not invented here.
+/// Help & support: FAQs, issue submission and the author's private replies.
+/// Official contact details and hours remain owner-provided.
 class HelpSupportScreen extends StatefulWidget {
   const HelpSupportScreen({super.key});
 
@@ -63,7 +56,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
     ),
     (
       'How do I contact support?',
-      'In-app support contact is not wired up yet — an official support email, phone number and hours are pending confirmation from the Rakta Bandhan team. This FAQ page is the current source of truth on how the app behaves.',
+      'Use Report an issue below, then open My reports to read the status and replies from the team. Email and push delivery are pending setup. Official support contact details and hours are pending confirmation.',
     ),
     (
       'What do I do if something looks incorrect?',
@@ -219,6 +212,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
+                    TextButton(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MyReportsScreen())), child: const Text('My reports & replies')),
                     InkWell(
                       borderRadius: BorderRadius.circular(12),
                       onTap: () => _openReportSheet(context),

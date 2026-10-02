@@ -9,6 +9,7 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
+import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
 
 // Same project/web app the Flutter build's firebase_options.dart uses
 // (DefaultFirebaseOptions.web) — one Firebase project, two clients.
@@ -23,6 +24,11 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
+if (siteKey) {
+  try { initializeAppCheck(app, { provider: new ReCaptchaV3Provider(siteKey), isTokenAutoRefreshEnabled: true }); }
+  catch { console.warn('App Check activation unavailable; startup continues.'); }
+}
 
 export const auth = getAuth(app);
 export const db = getFirestore(app);

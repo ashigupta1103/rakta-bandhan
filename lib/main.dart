@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
 import 'package:flutter/material.dart';
@@ -13,6 +15,9 @@ import 'screens/splash_screen.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  if (!kDemoSignIn && !(kDebugMode && const bool.fromEnvironment('USE_EMULATORS'))) {
+    unawaited(_activateAppCheck());
+  }
   // Local end-to-end testing against the Firebase emulators (debug only):
   //   flutter run --dart-define=USE_EMULATORS=true
   if (kDebugMode && const bool.fromEnvironment('USE_EMULATORS')) {
@@ -22,6 +27,18 @@ Future<void> main() async {
   // incoming-call screen's accept/decline events.
   await PushService.instance.init();
   runApp(const MyApp());
+}
+
+Future<void> _activateAppCheck() async {
+  const siteKey = String.fromEnvironment('RECAPTCHA_SITE_KEY');
+  if (kIsWeb && siteKey.isEmpty) return;
+  try {
+    await FirebaseAppCheck.instance.activate(
+      androidProvider: kDebugMode ? AndroidProvider.debug : AndroidProvider.playIntegrity,
+      appleProvider: kDebugMode ? AppleProvider.debug : AppleProvider.deviceCheck,
+      webProvider: kIsWeb ? ReCaptchaV3Provider(siteKey) : null,
+    );
+  } catch (_) { debugPrint('App Check activation unavailable; startup continues.'); }
 }
 
 class MyApp extends StatelessWidget {

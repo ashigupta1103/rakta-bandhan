@@ -487,3 +487,4 @@ export const onBroadcast = onDocumentCreated('broadcasts/{id}', async (event) =>
 
 export { requestLoginCode, verifyLoginCode, deleteMyAuthAccount } from './login';
 export { onDonorUpdated, onDonorDeleted } from './accounts';
+export { onReplyCreated } from './support';

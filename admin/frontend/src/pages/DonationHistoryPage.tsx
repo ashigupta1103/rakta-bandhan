@@ -11,6 +11,7 @@
 import { useDonationHistory } from '../hooks/useFirebaseData';
 import { History, CheckCircle } from 'lucide-react';
 import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 
 function timeStr(ts: { toDate: () => Date } | undefined): string {
@@ -19,17 +20,18 @@ function timeStr(ts: { toDate: () => Date } | undefined): string {
 }
 
 export default function DonationHistoryPage() {
-  const { donations, loading } = useDonationHistory();
+  const { donations, loading, error, total, hasMore, loadingMore, loadMore } = useDonationHistory();
 
   return (
     <div className="p-6 space-y-5">
       <div>
         <h1 className="text-xl font-semibold">Donation History</h1>
         <p className="text-sm text-muted-foreground mt-0.5">
-          {loading ? '…' : `${donations.length} donation(s) recorded (self-reported by donors)`}
+          {loading ? '…' : `${total ?? '…'} completed requests · ${donations.length} loaded (confirmed by both people)`}
         </p>
       </div>
 
+      {error && <p className="text-destructive text-sm">{error}</p>}
       <Card className="overflow-hidden">
         <div className="overflow-x-auto">
           <Table>
@@ -78,6 +80,7 @@ export default function DonationHistoryPage() {
           </Table>
         </div>
       </Card>
+      {hasMore && <Button variant="secondary" disabled={loadingMore} onClick={loadMore}>{loadingMore ? 'Loading…' : 'Load more'}</Button>}
     </div>
   );
 }

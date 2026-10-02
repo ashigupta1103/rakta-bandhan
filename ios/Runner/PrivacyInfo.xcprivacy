@@ -101,7 +101,7 @@
 			</array>
 		</dict>
 		<dict>
-			<!-- In-app chat messages, safety reports -->
+			<!-- In-app chat messages, safety/support/partnership submissions and admin replies -->
 			<key>NSPrivacyCollectedDataType</key>
 			<string>NSPrivacyCollectedDataTypeOtherUserContent</string>
 			<key>NSPrivacyCollectedDataTypeLinked</key>
@@ -127,7 +127,7 @@
 			</array>
 		</dict>
 		<dict>
-			<!-- Firebase app-instance ID; push token -->
+            <!-- Firebase app-instance ID, push token and configured App Check attestation -->
 			<key>NSPrivacyCollectedDataType</key>
 			<string>NSPrivacyCollectedDataTypeDeviceID</string>
 			<key>NSPrivacyCollectedDataTypeLinked</key>
