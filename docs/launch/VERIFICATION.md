@@ -1,6 +1,6 @@
 # Verification record, 2026-10-02
 
-Source: `feat/prelaunch` at `fda233cfc6b427b383f93f3044bb5198a513dd3e`. Upstream `origin/master` at `0e19c5d` is included. New UI layouts/assets were preserved; the owner approved wiring missing actions.
+Source: branch `feat/prelaunch`. Upstream `origin/master` at `0e19c5d` is included. New UI layouts/assets were preserved; the owner approved wiring missing actions.
 
 ## Local checks
 
