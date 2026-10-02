@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
-import '../demo/demo.dart';
 import '../services/backend.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
@@ -61,13 +60,6 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
     // Approved flow pre-fills location from GPS when available — start the
     // lookup immediately so it's usually resolved by the time the location
     // question is reached, without blocking the group/urgency questions.
-    if (Demo.on) {
-      // Client demo: a fixed demo hospital instead of GPS.
-      _locationController.text = Demo.hospital;
-      _selectedLat = Demo.lat;
-      _selectedLng = Demo.lng;
-      return;
-    }
     _useCurrentLocation(silent: true);
   }
 
@@ -168,11 +160,6 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
 
   Future<void> _handleSubmit() async {
     if (!_canSubmit || _isSubmitting) return;
-    if (Demo.on) {
-      Demo.instance.createRequest(group: _bloodGroup!, units: _units, urgency: _urgency!, label: _locationController.text.trim());
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => MatchingScreen(requestId: Demo.requestId, bloodGroup: _bloodGroup!, urgency: _urgency!)));
-      return;
-    }
     setState(() => _isSubmitting = true);
     try {
       double lat, lng;

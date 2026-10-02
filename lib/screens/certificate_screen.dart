@@ -7,7 +7,6 @@ import 'package:flutter/rendering.dart';
 import 'package:gal/gal.dart';
 import 'package:share_plus/share_plus.dart';
 
-import '../demo/demo.dart';
 import '../services/backend.dart';
 import '../services/donation_history_service.dart';
 import '../theme/app_colors.dart';
@@ -25,7 +24,11 @@ class CertificateScreen extends StatefulWidget {
   final DonationRecord record;
   final int donationNumber;
 
-  const CertificateScreen({super.key, required this.record, required this.donationNumber});
+  /// Skips the profile lookup — widget tests run without Firebase.
+  @visibleForTesting
+  final String? donorName;
+
+  const CertificateScreen({super.key, required this.record, required this.donationNumber, this.donorName});
 
   @override
   State<CertificateScreen> createState() => _CertificateScreenState();
@@ -34,6 +37,9 @@ class CertificateScreen extends StatefulWidget {
 class _CertificateScreenState extends State<CertificateScreen> {
   final _certificateKey = GlobalKey();
   bool _busy = false;
+  late final Future<String?> _name = widget.donorName != null
+      ? Future.value(widget.donorName)
+      : Backend.instance.myDonorDoc().then((d) => d.data()?['name'] as String?);
 
   DonationRecord get record => widget.record;
   int get donationNumber => widget.donationNumber;
@@ -160,10 +166,10 @@ class _CertificateScreenState extends State<CertificateScreen> {
                     child: AspectRatio(
                       aspectRatio: _cardSize.width / _cardSize.height,
                       child: FittedBox(
-                        child: FutureBuilder<Map<String, dynamic>?>(
-                          future: Demo.on ? Future.value(Demo.instance.myProfile) : Backend.instance.myDonorDoc().then((d) => d.data()),
+                        child: FutureBuilder<String?>(
+                          future: _name,
                           builder: (context, snapshot) {
-                            final name = snapshot.data?['name'] as String? ?? 'A Rakta Bandhan donor';
+                            final name = snapshot.data ?? 'A Rakta Bandhan donor';
                             return RepaintBoundary(key: _certificateKey, child: _certificateCard(name));
                           },
                         ),
@@ -293,13 +299,6 @@ class _CertificateScreenState extends State<CertificateScreen> {
                     const BloodGroupDroplet(label: '', size: 18, filled: true, color: AppColors.brandRed),
                     const SizedBox(height: 7),
                     Text('${_ordinal(donationNumber)} donation', style: const TextStyle(fontSize: 11.5, color: AppColors.ink2)),
-                    if (Demo.on) ...[
-                      const SizedBox(height: 6),
-                      const Text(
-                        'Demo certificate — sample data, not issued',
-                        style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: AppColors.goldDeep),
-                      ),
-                    ],
                     Container(height: 1, color: const Color(0xFFEFCE8C), margin: const EdgeInsets.fromLTRB(24, 16, 24, 12)),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 12),

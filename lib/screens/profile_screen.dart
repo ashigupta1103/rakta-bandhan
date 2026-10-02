@@ -3,7 +3,6 @@ import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import '../demo/demo.dart';
 import '../services/backend.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
@@ -21,6 +20,7 @@ import 'legal_reader_screen.dart';
 import 'notifications_screen.dart';
 import 'personal_information_screen.dart';
 import 'settings_screen.dart';
+import 'username_screen.dart';
 import '../widgets/rb_icon.dart';
 
 /// My Page — the donor's own identity and the one place availability is
@@ -35,7 +35,7 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  late final Future<String?> _publicArea = Demo.on ? Future.value(Demo.area) : Backend.instance.myPublicArea();
+  late final Future<String?> _publicArea = Backend.instance.myPublicArea();
   bool _photoBusy = false;
   bool _loggingOut = false;
   bool? _pendingAvailability;
@@ -43,7 +43,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
-    if (Demo.on) return;
     // A donation the requester completed while this app was closed: start
     // the recovery period now if the server hasn't already.
     Backend.instance.completeMyDonationIfConfirmed().catchError((_) => false);
@@ -71,11 +70,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   // ------------------------------------------------------------- photo
 
   Future<void> _changePhoto({required bool hasPhoto}) async {
-    if (Demo.on) {
-      // Honest unavailable state: nothing would be stored in a demo.
-      _showSnackBar('Photo upload isn’t available in the demo.');
-      return;
-    }
     final choice = await showModalBottomSheet<String>(
       context: context,
       backgroundColor: AppColors.warmGround,
@@ -154,11 +148,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _setAvailability(bool value) async {
     setState(() => _pendingAvailability = value);
     try {
-      if (Demo.on) {
-        Demo.instance.setAvailable(value);
-      } else {
-        await Backend.instance.setAvailability(value);
-      }
+      await Backend.instance.setAvailability(value);
       _showSnackBar(value ? 'You’re available to donate' : 'You’re marked as not available');
     } on DonorOnCooldownException catch (e) {
       _showSnackBar(e.toString());
@@ -181,7 +171,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       body: SafeArea(
         child: StreamBuilder<Map<String, dynamic>>(
-          stream: Demo.on ? Demo.instance.watch(() => Demo.instance.myProfile) : Backend.instance.myDonorDocStream().map((s) => s.data() ?? {}),
+          stream: Backend.instance.myDonorDocStream().map((s) => s.data() ?? {}),
           builder: (context, snapshot) {
             if (snapshot.hasError) {
               return _message(RbGlyph.offline, 'Couldn’t load your profile', 'Check your connection and try again.');
@@ -190,6 +180,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               return const Center(child: CircularProgressIndicator(strokeWidth: 2));
             }
             final data = snapshot.data!;
+            final username = data['username'] as String?;
             final name = (data['name'] as String? ?? '').trim();
             final bloodGroup = data['blood_group'] as String?;
             final isVerified = data['is_verified'] as bool? ?? false;
@@ -199,7 +190,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             final photoUrl = data['photo_url'] as String?;
 
             return FutureBuilder<int>(
-              future: Demo.on ? Future.value(Demo.instance.myDonations) : Backend.instance.myDonationCount(),
+              future: Backend.instance.myDonationCount(),
               builder: (context, donationSnap) {
                 final donationCount = donationSnap.data ?? 0;
                 return ListView(
@@ -237,6 +228,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       children: [
                         RbRow(icon: RbGlyph.certificate, bare: true, title: 'Donation history & certificates', onTap: () => _push(const DonationHistoryScreen())),
                         RbRow(icon: RbGlyph.person, bare: true, title: 'Personal information', onTap: () => _push(const PersonalInformationScreen())),
+                        RbRow(icon: RbGlyph.person, bare: true, title: username == null ? 'Choose a username' : '@$username', subtitle: 'Change once every 30 days', onTap: () async {
+                          await Navigator.push(context, MaterialPageRoute(builder: (_) => UsernameScreen(currentUsername: username, changedAt: (data['username_changed_at'] as Timestamp?)?.toDate())));
+                          if (mounted) setState(() {});
+                        }),
                         RbRow(icon: RbGlyph.phoneHeart, bare: true, title: 'Emergency contact', onTap: () => _push(const EmergencyContactScreen())),
                       ],
                     ),

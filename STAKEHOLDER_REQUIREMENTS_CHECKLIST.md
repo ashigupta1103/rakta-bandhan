@@ -1,6 +1,6 @@
 # Rakta Bandhan — Rotary Club Stakeholder Information Checklist
 
-This checklist identifies the information and assets required from the Rotary Club/Rakta Bandhan stakeholders before demo content can be replaced with approved production content. Any content currently shown in the app as DEMO, SAMPLE, or PLACEHOLDER is not official.
+This checklist identifies the information and assets required from the Rotary Club/Rakta Bandhan stakeholders before the app can show approved production content. The app no longer contains any demo, sample or placeholder content.
 
 ---
 
@@ -60,7 +60,7 @@ For each testimonial, request:
 - [ ] Whether medical or personal details may be published
 - [ ] Final approval from the responsible stakeholder
 
-> Current build: the Testimonials screen shows two testimonials explicitly labeled "Demo Donor 01" / "Demo Recipient 02" with a "DEMO" badge and an on-screen notice that they are sample layouts, not real testimonials, and must be replaced with approved content before launch (`lib/screens/testimonials_screen.dart`).
+> Current build: the Testimonials screen shows only testimonials an admin has published, otherwise an empty state (`lib/screens/testimonials_screen.dart`).
 
 ## 4. Team members and volunteers
 
@@ -95,7 +95,7 @@ For every partner:
 - [ ] Confidentiality restrictions
 - [ ] Legal approval, if required
 
-> Current build: the Corporate Partnerships screen shows two demo partner cards ("Demo Community Partner", "Demo Healthcare Supporter"), each labeled DEMO with an "Awaiting official partner information" notice — no real company name, logo or claim is present. The "Start a conversation" CTA already shows an honest message that no real contact/lead-capture flow exists yet, rather than pretending a message was sent.
+> Current build: the Corporate Partnerships screen shows no partner cards — no company name, logo or claim is present until real partners are approved. The enquiry form sends a real submission for the team.
 
 ## 6. Help and support
 
@@ -152,7 +152,7 @@ Request approved documents and wording for:
 - [ ] Approved community announcements
 - [ ] Permission to publish event photographs
 
-> Current build: the Community screen's Stories and What's New tabs each show demo-labeled preview cards (one demo story, two demo announcements) with fictional display names and no engagement numbers — purely frontend, nothing written to Firestore. Real posting still requires the public-handle/moderation model this section is asking about.
+> Current build: the Community screen's Stories and What's New tabs show only real posts and admin announcements (stories use the member's username).
 
 ## 9. Branding and assets
 
@@ -194,8 +194,8 @@ Request approved documents and wording for:
 | Organization name & About copy | | Section 1 | Pending | | | |
 | Rotary Club details & branding | | Section 2 | Pending | | | |
 | Team roster (incl. Adarsh / Sathish Kumar / Radhika) | | Section 2 note, Section 4 | Pending | | | Confirm whether existing first names are real or placeholder |
-| Testimonials (2 shown as demo) | | Section 3 | Pending | | | |
-| Corporate partners (2 shown as demo) | | Section 5 | Pending | | | |
+| Testimonials | | Section 3 | Pending | | | |
+| Corporate partners | | Section 5 | Pending | | | |
 | Support contact details | | Section 6 | Pending | | | |
 | Privacy Policy | | Section 7 | Pending | | | |
 | Terms of Use | | Section 7 | Pending | | | |

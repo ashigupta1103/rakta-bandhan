@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import 'backend.dart';
+import 'features.dart';
 import 'push_service.dart';
 import 'chat_service.dart';
 
@@ -30,6 +31,8 @@ class AccountService {
     final asRequester = await _db.collection('requests').where('requester_uid', isEqualTo: _uid).get();
     final asDonor = await _db.collection('requests').where('matched_donor_id', isEqualTo: _uid).get();
     final history = await _db.collection('donation_history').where('donor_id', isEqualTo: _uid).get();
+    final submissions = await _db.collection('support_submissions').where('reporter_uid', isEqualTo: _uid).get();
+    final replies = await _db.collection('support_replies').where('to_uid', isEqualTo: _uid).get();
 
     final export = {
       'exported_at': DateTime.now().toUtc().toIso8601String(),
@@ -38,6 +41,8 @@ class AccountService {
       'requests_you_raised': [for (final d in asRequester.docs) {'id': d.id, ...d.data()}],
       'requests_you_accepted': [for (final d in asDonor.docs) {'id': d.id, ...d.data()}],
       'donation_history': [for (final d in history.docs) {'id': d.id, ...d.data()}],
+      'support_submissions': [for (final d in submissions.docs) {...d.data(), 'id': d.id}],
+      'support_replies': [for (final d in replies.docs) {...d.data(), 'id': d.id}],
     };
     return JsonEncoder.withIndent('  ', (value) {
       if (value is Timestamp) return value.toDate().toUtc().toIso8601String();
@@ -59,9 +64,14 @@ class AccountService {
   /// - every chat message this user sent is deleted;
   /// - donation_history rows stay (they only hold the now-orphaned uid —
   ///   an anonymous count, not personal data).
-  Future<void> deleteMyAccount() async {
+  ///
+  /// With password sign-in Firebase wants a recent sign-in before it lets
+  /// the app delete the account, so [password] is checked first, before
+  /// anything is removed.
+  Future<void> deleteMyAccount({String? password}) async {
     final user = _auth.currentUser;
     if (user == null) return;
+    if (!kEmailCodeLive) await Backend.instance.reauthenticateWithPassword(password ?? '');
 
     final asRequester = await _db.collection('requests').where('requester_uid', isEqualTo: _uid).get();
     for (final doc in asRequester.docs) {
@@ -70,7 +80,7 @@ class AccountService {
         await doc.reference.update({'status': 'cancelled', 'cancelled_at': FieldValue.serverTimestamp()});
       }
       await ChatService.instance.deleteMyMessages(doc.id).catchError((_) {});
-      await doc.reference.update({'requester_name': 'Deleted user', 'requester_phone': '', 'requester_deleted': true, 'last_message': FieldValue.delete()});
+      await doc.reference.update({'requester_name': 'Deleted user', 'requester_username': FieldValue.delete(), 'requester_phone': FieldValue.delete(), 'requester_deleted': true, 'last_message': FieldValue.delete()});
     }
 
     final asDonor = await _db.collection('requests').where('matched_donor_id', isEqualTo: _uid).get();
@@ -79,18 +89,31 @@ class AccountService {
       if (doc.data()['status'] == 'matched') {
         await Backend.instance.releaseMatch(doc.id);
       } else {
-        await doc.reference.update({'matched_donor_name': 'Deleted user', 'matched_donor_phone': '', 'matched_donor_deleted': true, 'last_message': FieldValue.delete()});
+        await doc.reference.update({'matched_donor_name': 'Deleted user', 'matched_donor_username': FieldValue.delete(), 'matched_donor_phone': FieldValue.delete(), 'matched_donor_deleted': true, 'last_message': FieldValue.delete()});
       }
     }
 
     await PushService.instance.unregisterDevice();
     await Backend.instance.deleteMyIdProof();
     await Backend.instance.removeProfilePhoto(keepProfileField: true).catchError((_) {});
-    await _db.collection('donors_public').doc(_uid).delete();
-    await _db.collection('donors').doc(_uid).delete();
-    // The sign-in account goes last, server-side (deleteMyAuthAccount). If
-    // this step fails the user can simply retry: every step above is safe
-    // to repeat.
+    // Delete in bounded pages while our own authentication still exists.
+    for (final entry in {'support_submissions': 'reporter_uid', 'support_replies': 'to_uid'}.entries) {
+      while (true) {
+        final page = await _db.collection(entry.key).where(entry.value, isEqualTo: _uid).limit(200).get();
+        if (page.docs.isEmpty) break;
+        final batch = _db.batch();
+        for (final doc in page.docs) { batch.delete(doc.reference); }
+        await batch.commit();
+      }
+    }
+    final username = (await _db.collection('donors').doc(_uid).get()).data()?['username'] as String?;
+    final removal = _db.batch();
+    if (username != null) removal.delete(_db.collection('usernames').doc(username));
+    removal.delete(_db.collection('donors_public').doc(_uid));
+    removal.delete(_db.collection('donors').doc(_uid));
+    await removal.commit();
+    // The sign-in account goes last (deleteMyAuthAccount). If this step
+    // fails the user can simply retry: every step above is safe to repeat.
     await Backend.instance.deleteMyAuthAccount();
     await Backend.instance.signOut();
   }

@@ -2,7 +2,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
-import '../demo/demo.dart';
 import '../services/backend.dart';
 import '../services/phone_privacy.dart';
 import 'location_picker_screen.dart';
@@ -23,14 +22,7 @@ class PersonalInformationScreen extends StatefulWidget {
 }
 
 class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
-  /// Uploads and edits aren't simulated in a client demo.
-  bool _demoBlocked() {
-    if (!Demo.on) return false;
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('This isn’t saved in the demo.')));
-    return true;
-  }
-
-  late final Future<String?> _publicArea = Demo.on ? Future.value(Demo.area) : Backend.instance.myPublicArea();
+  late final Future<String?> _publicArea = Backend.instance.myPublicArea();
 
   static const _months = [
     'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
@@ -96,7 +88,6 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
       ),
     );
     if (picked == null || !mounted) return;
-    if (_demoBlocked()) return;
     setState(() => _uploading = true);
     try {
       await Backend.instance.uploadIdProof(picked);
@@ -140,7 +131,7 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
             ),
             Expanded(
               child: StreamBuilder<Map<String, dynamic>>(
-                stream: Demo.on ? Demo.instance.watch(() => Demo.instance.myProfile) : Backend.instance.myDonorDocStream().map((s) => s.data() ?? {}),
+                stream: Backend.instance.myDonorDocStream().map((s) => s.data() ?? {}),
                 builder: (context, snapshot) {
                   if (snapshot.hasError) {
                     return const Center(child: Text('Couldn’t load your details. Check your connection and try again.', textAlign: TextAlign.center, style: TextStyle(color: AppColors.textSecondary)));
@@ -349,7 +340,7 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
       initialLat: lat,
       initialLng: lng,
     );
-    if (picked == null || !mounted || _demoBlocked()) return;
+    if (picked == null || !mounted) return;
     final messenger = ScaffoldMessenger.of(context);
     try {
       await Backend.instance.updateMyLocation(lat: picked.lat, lng: picked.lng, label: picked.label);
@@ -447,11 +438,6 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
     });
     if (_nameError != null || _phoneError != null) return;
 
-    if (Demo.on) {
-      Navigator.pop(context, false);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Editing isn’t saved in the demo.')));
-      return;
-    }
     setState(() => _saving = true);
     try {
       await Backend.instance.updateProfile(name: name, phone: phone.isEmpty ? widget.currentPhone : phone);

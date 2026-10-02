@@ -1,9 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import '../demo/demo.dart';
 import '../services/backend.dart';
 import 'location_picker_screen.dart';
-import 'matching_screen.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../theme/app_theme.dart';
@@ -37,12 +35,6 @@ class DonorDetailsScreen extends StatefulWidget {
   /// "request" action.
   final bool matched;
 
-  /// Donations recorded through the app, when the caller can actually know
-  /// it. Other donors' history isn't readable under the rules, so real
-  /// screens pass null and no number is shown; the client demo passes its
-  /// persona's fixture.
-  final int? donationCount;
-
   const DonorDetailsScreen({
     super.key,
     required this.donorId,
@@ -53,7 +45,6 @@ class DonorDetailsScreen extends StatefulWidget {
     required this.distanceKm,
     required this.isAvailable,
     this.matched = false,
-    this.donationCount,
   });
 
   @override
@@ -64,11 +55,6 @@ class _DonorDetailsScreenState extends State<DonorDetailsScreen> {
   bool _isSending = false;
 
   Future<void> _sendRequest() async {
-    if (Demo.on) {
-      Demo.instance.createRequest(group: widget.bloodGroup, units: 1, urgency: 'urgent', label: Demo.hospital);
-      Navigator.push(context, MaterialPageRoute(builder: (_) => MatchingScreen(requestId: Demo.requestId, bloodGroup: widget.bloodGroup, urgency: 'urgent')));
-      return;
-    }
     setState(() => _isSending = true);
     try {
       // The request's location is where donors will travel — real GPS or
@@ -115,9 +101,7 @@ class _DonorDetailsScreenState extends State<DonorDetailsScreen> {
 
   /// The public listing: neighbourhood name and when it was last updated.
   /// Contact details are never read here.
-  late final Future<Map<String, dynamic>?> _public = Demo.isDemoId(widget.donorId)
-      ? Future.value({'area': Demo.area, 'updated_at': Timestamp.now()})
-      : FirebaseFirestore.instance.collection('donors_public').doc(widget.donorId).get().then((s) => s.data());
+  late final Future<Map<String, dynamic>?> _public = FirebaseFirestore.instance.collection('donors_public').doc(widget.donorId).get().then((s) => s.data());
 
   String _updatedLabel(Timestamp? updatedAt) {
     if (updatedAt == null) return '';
@@ -227,23 +211,8 @@ class _DonorDetailsScreenState extends State<DonorDetailsScreen> {
                     Text(km == null ? '—' : (km < 10 ? km.toStringAsFixed(1) : '${km.round()}'), style: AppTextStyles.display(fontSize: 24, color: AppColors.ink, height: 1.2)),
                     km == null ? 'Distance unknown' : 'km away',
                   ),
-                  if (widget.donationCount != null) ...[
-                    const SizedBox(width: 10),
-                    _statTile(
-                      Text('${widget.donationCount}', style: AppTextStyles.display(fontSize: 24, color: AppColors.ink, height: 1.2)),
-                      widget.donationCount == 1 ? 'donation' : 'donations',
-                    ),
-                  ],
                 ],
               ),
-              if (widget.donationCount != null && widget.donationCount! > 0) ...[
-                const SizedBox(height: 14),
-                Text(
-                  '$firstName has donated ${widget.donationCount == 1 ? 'once' : '${widget.donationCount} times'} through Rakta Bandhan.',
-                  textAlign: TextAlign.center,
-                  style: AppTextStyles.display(fontSize: 16, color: AppColors.ink2, height: 1.4),
-                ),
-              ],
               const RbSectionLabel('About this donor'),
               RbListGroup(
                 children: [

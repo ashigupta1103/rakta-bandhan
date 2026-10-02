@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import '../demo/demo.dart';
-import '../demo/demo_notifications.dart';
 import '../services/notifications_service.dart';
 import '../services/urgent_alert_service.dart';
 import '../theme/app_colors.dart';
@@ -8,7 +6,6 @@ import '../theme/app_text_styles.dart';
 import '../widgets/blood_group_droplet.dart';
 import '../widgets/rb_ui.dart';
 import 'match_contact_screen.dart';
-import 'request_detail_screen.dart';
 import 'tracking_screen.dart';
 import '../widgets/rb_icon.dart';
 
@@ -20,7 +17,7 @@ class NotificationsScreen extends StatefulWidget {
 }
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
-  final NotificationsService _service = Demo.on ? DemoNotificationsService() : FirestoreNotificationsService();
+  final NotificationsService _service = FirestoreNotificationsService();
   int _retryToken = 0;
 
   @override
@@ -140,17 +137,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   void _openRequest(AppNotification n) {
     final sep = n.id.lastIndexOf('_');
     if (sep <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('This is sample data in preview mode.')));
       return;
     }
     final requestId = n.id.substring(0, sep);
     // A cancellation is the donor-side event; everything else in the feed
     // is about the requester's own request.
-    final Widget screen = Demo.on && Demo.instance.role == DemoRole.donor
-        ? RequestDetailScreen(requestId: requestId)
-        : n.kind == NotificationKind.cancellation
-            ? MatchContactScreen(requestId: requestId)
-            : TrackingScreen(requestId: requestId);
+    final Widget screen = n.kind == NotificationKind.cancellation
+        ? MatchContactScreen(requestId: requestId)
+        : TrackingScreen(requestId: requestId);
     Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
   }
 

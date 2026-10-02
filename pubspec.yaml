@@ -38,6 +38,7 @@ dependencies:
   firebase_core: ^3.6.0
   cloud_firestore: ^5.4.4
   firebase_auth: ^5.3.1
+  firebase_app_check: ^0.3.2+10
   # Passwordless sign-in: the app calls requestLoginCode / verifyLoginCode
   # (functions/src/login.ts). Pinned to the firebase_core 3.x train.
   cloud_functions: ^5.6.2
@@ -54,6 +55,7 @@ dependencies:
   latlong2: ^0.9.1
   country_flags: ^3.1.0
   image_picker: ^1.2.3
+  image: ^4.10.1
   firebase_analytics: ^11.6.0
   # Push-permission prompt + device token today; the Blaze push functions
   # deliver to this token later. Pinned to the firebase_core 3.x train.
@@ -67,8 +69,6 @@ dependencies:
   # Native incoming-call screen + ringtone when the app is closed (Android
   # ConnectionService UI; CallKit on iOS once PushKit is added).
   flutter_callkit_incoming: ^3.1.6
-  # Community post photos. Pinned to the firebase_core 3.x train.
-  firebase_storage: ^12.4.10
   # Donation certificate: share it, or save it to the photo gallery.
   share_plus: ^12.0.1
   gal: ^2.3.3

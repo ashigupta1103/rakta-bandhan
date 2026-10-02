@@ -31,6 +31,23 @@ export function normalizeIndianMobile(raw: unknown): string | null {
   return /^[6-9]\d{9}$/.test(digits) ? `+91${digits}` : null;
 }
 
+/** The REVIEW_EMAILS setting: a comma list of addresses, normalised; anything that isn't an email is dropped. */
+export function parseReviewEmails(raw: unknown): string[] {
+  if (typeof raw !== 'string') return [];
+  return raw.split(',').map((e) => normalizeEmail(e)).filter((e): e is string => e !== null);
+}
+
+/**
+ * The fixed sign-in code app-store reviewers use (they can't read an email),
+ * when it applies to this address: it is on the allow-list and the configured
+ * code is 6 digits. Null otherwise, including when either setting is missing,
+ * so with nothing configured the feature doesn't exist.
+ */
+export function reviewCodeFor(email: string, allowList: string[], configured: unknown): string | null {
+  if (!allowList.includes(email)) return null;
+  return typeof configured === 'string' && /^\d{6}$/.test(configured) ? configured : null;
+}
+
 export function generateCode(): string {
   return String(randomInt(0, 10 ** CODE_LENGTH)).padStart(CODE_LENGTH, '0');
 }

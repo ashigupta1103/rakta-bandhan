@@ -45,7 +45,7 @@ function timeAgo(ts: { toDate: () => Date } | undefined): string {
 
 export default function RequestsPage() {
   const [statusFilter, setStatusFilter] = useState('all');
-  const { requests, loading } = useRequests(statusFilter);
+  const { requests, loading, loadingMore, hasMore, loadMore, total, error } = useRequests(statusFilter);
   const { deleteRequest } = useAdminActions();
 
   const openCount = requests.filter((r) => r.status === 'open').length;
@@ -57,7 +57,7 @@ export default function RequestsPage() {
         <div>
           <h1 className="text-xl font-semibold">Blood Requests</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {loading ? '…' : `${requests.length} total · ${openCount} open · ${criticalCount} critical`}
+            {loading ? '…' : `${total ?? '…'} matching · ${requests.length} loaded · ${openCount} open and ${criticalCount} critical on this page`}
           </p>
         </div>
 
@@ -158,6 +158,8 @@ export default function RequestsPage() {
           </Table>
         </div>
       </Card>
+      {error && <p className="text-sm text-destructive">{error}</p>}
+      {hasMore && <Button disabled={loadingMore} onClick={loadMore}>{loadingMore ? 'Loading…' : 'Load more'}</Button>}
     </div>
   );
 }

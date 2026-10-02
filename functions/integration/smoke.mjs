@@ -21,13 +21,14 @@ async function waitFor(fn, label, timeoutMs = 20000) {
   throw new Error(`timed out waiting for: ${label}`);
 }
 
-// 1. Broadcast → onBroadcast runs and stamps a status (failed here: no FCM credentials).
+// 1. Broadcast → onBroadcast stamps a status without contacting FCM locally.
 const b = await db.collection('broadcasts').add({ title: 'Test', body: 'Hello', blood_group: 'O+', created_at: FieldValue.serverTimestamp(), status: 'queued' });
 const stamped = await waitFor(async () => {
   const d = (await b.get()).data();
   return d.status !== 'queued' ? d : null;
 }, 'broadcast status');
 assert.equal(stamped.topic, 'bg_Opos');
+assert.equal(stamped.status, 'skipped', 'local checks must not send real pushes');
 console.log('✔ onBroadcast fired → status', stamped.status, 'topic', stamped.topic);
 
 // 2. A donor with a (dead) token near a new request → onRequestCreated fans
@@ -73,11 +74,29 @@ assert.equal(history.size, 1, 'exactly one donation record');
 assert.equal(history.docs[0].id, req.id);
 console.log('✔ completion applied the donor cooldown once, at completion');
 
-// 4. Deleting a post → onStoryDeleted tolerates a photo that doesn't exist.
-const story = await db.collection('community_stories').add({ author_uid: 'u1', body: 'x', image_path: 'community/u1/missing.jpg' });
-await story.delete();
-await sleep(3000);
-console.log('✔ onStoryDeleted ran');
+// 4. The Impact counter moves server-side only once config/features.server_jobs is on
+//    (the free plan has no functions, so until then the app keeps it itself).
+const impact = db.doc('public_stats/impact');
+assert.equal((await impact.get()).exists, false, 'the earlier completion left the counter alone: server jobs were off');
+await db.doc('config/features').set({ server_jobs: true });
+const completed = async () => {
+  const r = await db.collection('requests').add({
+    requester_uid: 'r1', blood_group: 'O+', units_needed: 1, urgency: 'normal', location_label: 'Apollo Hospital', status: 'matched',
+    matched_donor_id: 'nobody', donor_confirmed_at: Timestamp.now(), requester_confirmed_at: Timestamp.now(),
+    created_at: Timestamp.now(), expires_at: Timestamp.fromMillis(Date.now() + 3600e3),
+  });
+  await r.update({ status: 'fulfilled', fulfilled_at: Timestamp.now() });
+};
+await completed();
+let counted = await waitFor(async () => (await impact.get()).data(), 'impact counter created');
+assert.equal(counted.donations_this_month, 1);
+assert.match(counted.month_key, /^\d{4}-\d{2}$/);
+await completed();
+counted = await waitFor(async () => {
+  const d = (await impact.get()).data();
+  return d.donations_this_month === 2 ? d : null;
+}, 'impact counter incremented');
+console.log('✔ onRequestUpdated moves the Impact counter, once per completed donation, when server jobs are on');
 
 console.log('\nAll function smoke checks passed.');
 process.exit(0);

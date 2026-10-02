@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../demo/demo.dart';
 import '../services/backend.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
@@ -29,7 +28,7 @@ class DonationConfirmScreen extends StatelessWidget {
         ),
         child: SafeArea(
           child: FutureBuilder<int>(
-            future: Demo.on ? Future.value(Demo.instance.myDonations) : Backend.instance.myDonationCount(),
+            future: Backend.instance.myDonationCount(),
             builder: (context, snapshot) {
               final count = snapshot.data ?? 0;
               return Column(

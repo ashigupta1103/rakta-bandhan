@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 import '../services/backend.dart';
 import '../theme/app_colors.dart';
 import '../widgets/startup_ad_screen.dart';
+import 'entry_route.dart';
 import 'login_screen.dart';
-import 'main_navigation_screen.dart';
-import 'registration_screen.dart';
 
 /// Branded launch — a deliberate brand reveal, not a loading screen.
 ///
@@ -22,11 +21,8 @@ import 'registration_screen.dart';
 /// sits in the image cache *before* the reveal Column is even built — the
 /// animation only ever plays over pixels that are already there.
 ///
-/// Routing precedence — the ring-carousel onboarding step is retired (not
-/// in the approved entry flow: Splash -> Login -> OTP -> Registration, per
-/// design_updated/Rakta Bandhan Redesign.dc.html's "Entry" section). The
-/// screen and its OnboardingService are left in place, still reachable from
-/// Preview Gallery for inspection, just no longer routed to for real users:
+/// Routing precedence — the approved entry flow is Splash -> Login -> OTP
+/// -> Registration (design_updated/Rakta Bandhan Redesign.dc.html, "Entry"):
 ///   has donor profile -> MainNavigationScreen
 ///   no profile         -> LoginScreen
 class SplashScreen extends StatefulWidget {
@@ -90,19 +86,10 @@ class _SplashScreenState extends State<SplashScreen>
     );
   }
 
-  /// signed out               -> LoginScreen
-  /// signed in, no profile    -> RegistrationScreen
-  /// signed in with a profile -> MainNavigationScreen
+  /// signed out -> LoginScreen; signed in -> see [signedInDestination].
   Future<Widget> _resolveDestination() async {
-    final user = Backend.instance.currentUser;
-    if (user == null) return const LoginScreen();
-    try {
-      return await Backend.instance.hasProfile() ? const MainNavigationScreen() : const RegistrationScreen();
-    } catch (_) {
-      // Offline at launch: Firestore's cache usually answers; if it can't,
-      // open the app rather than strand the user on the splash.
-      return const MainNavigationScreen();
-    }
+    if (Backend.instance.currentUser == null) return const LoginScreen();
+    return signedInDestination();
   }
 
   @override

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../screens/call_screen.dart';
 import '../screens/chat_screen.dart';
-import '../demo/demo.dart';
 import '../services/backend.dart';
 import '../theme/app_colors.dart';
 import 'rb_icon.dart';
@@ -24,7 +23,7 @@ class ContactActions extends StatelessWidget {
   });
 
   Future<void> _call(BuildContext context) async {
-    final me = Demo.isDemoId(requestId) ? {'name': Demo.instance.myName} : (await Backend.instance.myDonorDoc()).data();
+    final me = (await Backend.instance.myDonorDoc()).data();
     if (!context.mounted) return;
     await startCallFlow(
       context,

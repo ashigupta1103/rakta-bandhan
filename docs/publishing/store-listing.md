@@ -11,7 +11,7 @@ If app behaviour changes, update all four together.
 
 **App name:** Rakta Bandhan
 **Subtitle (iOS, 30 characters):** Find blood donors near you
-**Short description (Play, 80 characters):** Reach willing blood donors nearby in minutes. Chat and call without sharing numbers.
+**Short description (Play, 80 characters):** Reach blood donors nearby in minutes. Chat and call without sharing numbers.
 
 **Full description**
 
@@ -65,21 +65,24 @@ Deploy Hosting first; see the README. The pages come from the in-app text.
 | Data type (Play category) | Collected | Shared | Purpose | Optional? |
 |---|---|---|---|---|
 | Name (Personal info) | Yes | No* | App functionality | Required |
+| User IDs (username and account UID) | Yes | No* | App functionality, account management | Required |
 | Email address (Personal info) | Yes | No | Account management | Required |
-| Phone number (Personal info) | Yes | No* | App functionality, account management | Required |
+| Phone number (Personal info) | Yes | No | App functionality, account management (owner and administrators only) | Required |
 | Approximate and precise location (Location) | Yes | No | App functionality | Required (area); current location optional |
 | Health info: blood group (Health and fitness) | Yes | No | App functionality | Required |
 | Photos: ID proof, profile photo, community post photos (Photos and videos) | Yes | No | App functionality | Optional |
 | Other in-app messages (Messages) | Yes | No | App functionality | Optional |
-| Other user-generated content: community posts (App activity) | Yes | No | App functionality | Optional |
+| Other user-generated content: community posts, safety/support/partnership submissions and replies (App activity) | Yes | No | App functionality | Optional |
 | App interactions (App activity) | Yes | No | Analytics | Required |
 | Device or other IDs (push token, Firebase app-instance ID — **not** the Advertising ID) | Yes | No | Analytics, app functionality (push) | Required |
 
 **Other answers**
-- \*"Shared" in Play's sense means transfer to a third party. Showing a matched user your name and number is a user-initiated disclosure *within* the service, not "sharing". Google treats service providers (Firebase) as not sharing.
+- \*"Shared" in Play's sense means transfer to a third party. Showing a matched user your name is a user-initiated disclosure *within* the service. Phone numbers are not copied onto new requests or shown to other users. Firebase, Cloudflare and Resend act as service providers.
 - **Encrypted in transit:** Yes.
+- **App integrity:** configured Firebase App Check uses Play Integrity, Apple DeviceCheck or web reCAPTCHA. Registration and enforcement require owner setup.
+- **Photo metadata:** uploaded JPEGs have embedded EXIF removed; optional community area tags follow the user's choice.
 - **Users can request deletion:** Yes, in the app (Settings › Delete my account) and on the web page above.
-- **Audio from calls:** not collected. Calls are peer-to-peer and never recorded or stored.
+- **Audio from calls:** never recorded or stored. WebRTC audio travels directly between phones or through an encrypted Cloudflare TURN relay when needed.
 - **Health apps declaration:** required. Category: *Blood and organ donation*. The app doesn't use Health Connect.
 - **Advertising ID:** not collected. The AD_ID permission is removed from the manifest and Analytics ad-ID collection is off — answer "No" to "Does your app use advertising ID?".
 - **Foreground service declaration (Play Console › App content):** type **Phone call** (`FOREGROUND_SERVICE_PHONE_CALL` + `MICROPHONE`), used only while an in-app voice call is ringing or live between a matched donor and requester. Attach a short screen recording of an incoming call.
@@ -100,12 +103,13 @@ Tracking: **No** (no IDFA, no data brokers, no cross-app tracking).
 | Data type | Linked to user | Used for tracking | Purposes |
 |---|---|---|---|
 | Name | Yes | No | App Functionality |
+| User ID (username and account UID) | Yes | No | App Functionality |
 | Email Address | Yes | No | App Functionality |
 | Phone Number | Yes | No | App Functionality |
 | Health (blood group) | Yes | No | App Functionality |
 | Precise Location | Yes | No | App Functionality |
 | Photos or Videos (ID proof, profile photo, community posts — optional) | Yes | No | App Functionality |
-| Other User Content (messages, community posts) | Yes | No | App Functionality |
+| Other User Content (messages, community posts, support submissions and replies) | Yes | No | App Functionality |
 | Product Interaction | No | No | Analytics |
 | Device ID | No | No | Analytics, App Functionality |
 
@@ -117,14 +121,16 @@ Tracking: **No** (no IDFA, no data brokers, no cross-app tracking).
 
 ## App Review notes (paste into App Store Connect › App Review Information)
 
-> **Sign-in:** use the review accounts below (email + password, already verified). New accounts confirm their email with a link Firebase sends.
-> - Account A (requester): `review-a@<your-domain>` / `<password>`
-> - Account B (donor): `review-b@<your-domain>` / `<password>`
-> *(Create both in the app before submitting, verify their emails, and register B as an O+ donor near A's location.)*
+> **Sign-in:** use the review email and password below (the free-plan build signs in with email + password).
+> - Account A (requester): `<REVIEW_EMAIL_A>` / `<REVIEW_PASSWORD_A>`
+> - Account B (donor): `<REVIEW_EMAIL_B>` / `<REVIEW_PASSWORD_B>`
+> *(Create both beforehand: sign up in the app (enter the simulated email code `123456`, or tap Skip), register each as a donor (B as an available O+ donor near A's location) and verify B in the admin console.)*
 >
-> **To see matching, chat and calling**, use two devices or simulators signed in with two different numbers:
-> 1. On device A, Request tab › "Need blood yourself?" › pick a blood group, urgency and location.
-> 2. On device B, register with a compatible blood group near the same location. The request appears on the Request tab. Tap "View request" › Accept.
+> **If the build uses the emailed code instead** (after the Blaze upgrade, built with `EMAIL_CODE_LIVE=true`): the app has no passwords. Enter one of the review emails and, on the 6-digit code screen, the review code `<REVIEW_CODE>` (no email is sent for these two addresses). Both accounts are then created beforehand with `functions/scripts/seed-review-accounts.mjs`.
+>
+> **To see matching, chat and calling**, use two devices or simulators, one signed in as A and one as B:
+> 1. On device A, Request tab › "Need blood yourself?" › pick a blood group B can donate to (O+, A+, B+ or AB+), urgency and location.
+> 2. On device B (already registered), the request appears on the Request tab. Tap "View request" › Accept.
 > 3. Both devices are now matched. Tap Message to chat, or the phone icon for an in-app voice call.
 >
 > **Account deletion:** My Page › Settings › Delete my account.

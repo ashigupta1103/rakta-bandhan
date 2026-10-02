@@ -7,7 +7,7 @@ library;
 /// development to use the public OpenStreetMap Nominatim server — its
 /// usage policy allows ~1 request/second and no production autocomplete,
 /// so a key is required before launch.
-const kLocationIqKey = '';
+const kLocationIqKey = String.fromEnvironment('LOCATIONIQ_KEY');
 
 /// Results restricted to India — "Apollo Hospital" should never resolve to
 /// a match abroad.

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../demo/demo.dart';
 import '../services/backend.dart';
 import '../services/donation_history_service.dart';
 import '../theme/app_colors.dart';
@@ -35,10 +34,6 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
   }
 
   Future<(int, List<DonationRecord>)> _load() async {
-    if (Demo.on) {
-      final records = Demo.instance.donationRecords;
-      return (records.length, records);
-    }
     final count = await Backend.instance.myDonationCount();
     final history = await _service.fetchHistory();
     return (count, history);

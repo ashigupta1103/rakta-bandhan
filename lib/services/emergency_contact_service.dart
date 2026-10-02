@@ -23,8 +23,8 @@ class EmergencyContact {
 /// update-profile method exists. The backend developer should add an
 /// `emergency_contact` map to `donors/{uid}` plus:
 ///
-///   Future<EmergencyContact?> getEmergencyContact();
-///   Future<void> setEmergencyContact(EmergencyContact contact);
+///   `Future<EmergencyContact?> getEmergencyContact();`
+///   `Future<void> setEmergencyContact(EmergencyContact contact);`
 ///
 /// then swap the implementation below. Stored device-locally until then —
 /// the screen states this to the user rather than implying it is synced.

@@ -89,6 +89,32 @@ const burned = await callable('verifyLoginCode', { email, code: code3 });
 assert.equal(burned.error?.status, 'RESOURCE_EXHAUSTED', 'after 5 wrong tries even the right code is refused');
 console.log('✔ five wrong tries burn the code');
 
+// Store-review access (.env.demo-rakta-bandhan lists review-a/b and the code 246810).
+const reviewA = 'review-a@example.com';
+assert.equal((await callable('requestLoginCode', { email: reviewA })).result?.sent, true);
+const reviewWrong = await callable('verifyLoginCode', { email: reviewA, code: '000000' });
+assert.equal(reviewWrong.error?.status, 'PERMISSION_DENIED', 'a wrong code still counts against a review address');
+const reviewOk = await callable('verifyLoginCode', { email: reviewA, code: '246810' });
+assert.ok(reviewOk.result?.token, JSON.stringify(reviewOk));
+const reviewer = await signInWithCustomToken(reviewOk.result.token);
+assert.equal(reviewer.claims.email, reviewA);
+// The fixed code is useless for any address that isn't on the list.
+const stranger = `smoke-stranger-${Date.now()}@example.com`;
+await callable('requestLoginCode', { email: stranger });
+const strangerTry = await callable('verifyLoginCode', { email: stranger, code: '246810' });
+assert.equal(strangerTry.error?.status, 'PERMISSION_DENIED', 'review code must not open an unlisted address');
+// ...and never opens an admin account, even a listed one.
+const reviewB = 'review-b@example.com';
+await callable('requestLoginCode', { email: reviewB });
+const adminUid = (await signInWithCustomToken((await callable('verifyLoginCode', { email: reviewB, code: '246810' })).result.token)).claims.user_id;
+await db.doc(`admins/${adminUid}`).set({ role: 'admin' });
+await codeRef(reviewB).update({ last_sent_ms: 0 });
+await callable('requestLoginCode', { email: reviewB });
+const adminTry = await callable('verifyLoginCode', { email: reviewB, code: '246810' });
+assert.equal(adminTry.error?.status, 'PERMISSION_DENIED');
+assert.match(adminTry.error?.message, /review/);
+console.log('✔ review access: the fixed code signs a listed address in (no email), is counted when wrong, and never opens unlisted or admin accounts');
+
 const anon = await callable('deleteMyAuthAccount', {});
 assert.equal(anon.error?.status, 'UNAUTHENTICATED');
 const del = await callable('deleteMyAuthAccount', {}, second.idToken);
@@ -99,6 +125,9 @@ const lookup = await fetch(`${AUTH}/accounts:lookup?key=demo`, {
   body: JSON.stringify({ localId: [first.claims.user_id] }),
 }).then((x) => x.json());
 assert.ok(!lookup.users || lookup.users.length === 0, 'the account must be gone');
+// The donor-doc trigger may already have removed the account: deleting twice must still succeed.
+const delAgain = await callable('deleteMyAuthAccount', {}, second.idToken);
+assert.equal(delAgain.result?.deleted, true, JSON.stringify(delAgain));
 console.log('✔ deleteMyAuthAccount removes the caller’s account and refuses anonymous calls');
 
 console.log('\nAll sign-in smoke checks passed.');

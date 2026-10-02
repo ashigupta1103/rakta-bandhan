@@ -18,6 +18,7 @@ abstract final class PushType {
   static const request = 'request';
   static const urgentRequest = 'urgent_request';
   static const broadcast = 'broadcast';
+  static const supportReply = 'support_reply';
 }
 
 /// What a notification tap should open. Screens are resolved by the

@@ -13,7 +13,7 @@
  * on record regardless of outcome), so that section has no delete button.
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   useIssueReports,
   usePartnershipInquiries,
@@ -28,6 +28,27 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '../lib/utils';
+import { collection, onSnapshot, orderBy, query, where, limit } from 'firebase/firestore';
+import { db } from '../lib/firebase';
+
+function ReplyBox({ source, id }: { source: string; id: string }) {
+  const [body, setBody] = useState('');
+  const [sent, setSent] = useState(false);
+  const [replies, setReplies] = useState<string[]>([]);
+  const { replyToSubmission, actionLoading, actionError } = useAdminActions();
+  useEffect(() => onSnapshot(query(collection(db, 'support_replies'), where('source_collection', '==', source), where('source_id', '==', id), orderBy('created_at', 'asc'), limit(50)),
+    (snapshot) => setReplies(snapshot.docs.map((d) => String(d.data().body ?? ''))), () => setReplies([])), [source, id]);
+  return <div className="space-y-2 border-t border-border pt-3">
+    {replies.map((reply, index) => <p key={index} className="text-sm whitespace-pre-wrap">Support: {reply}</p>)}
+    <textarea aria-label="Reply to submitter" placeholder="Reply visible to the submitter" maxLength={2000} value={body}
+      onChange={(e) => { setBody(e.target.value); setSent(false); }} className="w-full rounded-md border border-input bg-background p-2 text-sm" />
+    <Button size="sm" disabled={actionLoading || !body.trim()} onClick={async () => {
+      try { await replyToSubmission(source, id, body); setBody(''); setSent(true); } catch { /* hook displays the error */ }
+    }}>Save reply</Button>
+    {sent && <p className="text-sm text-muted-foreground">Reply saved in the submitter's My reports view.</p>}
+    {actionError && <p className="text-sm text-destructive">{actionError}</p>}
+  </div>;
+}
 
 const STATUS_VARIANT: Record<InboxStatus, 'destructive' | 'warning' | 'success'> = {
   new: 'destructive',
@@ -191,6 +212,7 @@ export default function InboxPage() {
                     <StickyNote className="w-3.5 h-3.5" /> {report.admin_note ? 'Edit note' : 'Add note'}
                   </Button>
                 </div>
+                <ReplyBox source="reports" id={report.id} />
               </Card>
             );
           })}
@@ -260,6 +282,7 @@ export default function InboxPage() {
                     <Trash2 className="w-3.5 h-3.5" />
                   </Button>
                 </div>
+                <ReplyBox source="issue_reports" id={report.id} />
               </Card>
             );
           })}
@@ -333,6 +356,7 @@ export default function InboxPage() {
                     <Trash2 className="w-3.5 h-3.5" />
                   </Button>
                 </div>
+                <ReplyBox source="partnership_inquiries" id={inquiry.id} />
               </Card>
             );
           })}
@@ -340,8 +364,7 @@ export default function InboxPage() {
       )}
 
       <p className="text-xs text-muted-foreground">
-        Notes and statuses are internal — nothing is sent back to the person who submitted. Outbound email or SMS
-        needs a server, which this project's free Firebase plan doesn't run.
+        Notes stay internal. Replies and public triage status appear in the submitter's My reports view. Email and push delivery are pending Blaze setup.
       </p>
     </div>
   );

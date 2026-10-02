@@ -124,7 +124,7 @@ class AdminDonorDetailScreen extends StatelessWidget {
                       final deleted = await confirmAdminDelete(
                         context,
                         what: '${donor.name}\'s profile',
-                        detail: 'This removes their profile from Firestore. Their sign-in stays active — use Ban to actually lock them out.',
+                        detail: 'This removes their profile. Once the backend is deployed, it also removes their sign-in account and ID proof.',
                         onConfirm: () => service.deleteDonor(donor.id),
                       );
                       if (deleted && context.mounted) Navigator.pop(context);

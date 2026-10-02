@@ -3,7 +3,6 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../demo/demo.dart';
 import '../services/backend.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
@@ -16,8 +15,7 @@ import '../widgets/rb_icon.dart';
 /// costs ~150–300 KB of storage instead of a 4–6 MB camera original.
 class CreateExperienceScreen extends StatefulWidget {
   /// Set when editing the user's own story: the form opens pre-filled with
-  /// its text and topic. Saving works in the client demo; for published
-  /// stories the backend update is still to be connected.
+  /// its text and topic. Saves use the author's authenticated backend path.
   final String? editStoryId;
   final String initialBody;
   final String? initialTopic;
@@ -99,22 +97,17 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
     }
     if (_editing) {
       final messenger = ScaffoldMessenger.of(context);
-      if (Demo.isDemoId(widget.editStoryId)) {
-        Demo.instance.updateStory(widget.editStoryId!, body: body, topic: _topic);
+      setState(() => _submitting = true);
+      try {
+        await Backend.instance.updateCommunityStory(widget.editStoryId!, body: body, topic: _topic, photo: _photo);
+        if (!mounted) return;
         Navigator.pop(context);
         messenger.showSnackBar(const SnackBar(content: Text('Story updated.')));
-        return;
+      } catch (_) {
+        if (!mounted) return;
+        setState(() => _submitting = false);
+        messenger.showSnackBar(const SnackBar(content: Text('Could not save your changes. Please try again.')));
       }
-      // Saving an edit to a published story needs a backend update that
-      // isn't connected yet (backend team). Say so — never fake a save.
-      messenger.showSnackBar(const SnackBar(content: Text('Saving edits isn’t available yet. Your story hasn’t changed.')));
-      return;
-    }
-    if (Demo.on) {
-      // Kept in the demo's own feed only — never posted.
-      Demo.instance.addStory(body, _topic, photo: _photoBytes);
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Demo · added to the demo feed on this device. Nothing was posted or uploaded.')));
       return;
     }
     setState(() => _submitting = true);
@@ -170,7 +163,7 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
                         children: [
                           const TextSpan(text: 'You post as '),
                           TextSpan(
-                            text: 'your registered name',
+                            text: 'your first name and @username',
                             style: TextStyle(color: AppColors.goldDeep, fontWeight: FontWeight.w700),
                           ),
                           const TextSpan(text: '. Your phone number and exact address are never shown.'),
@@ -267,10 +260,6 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
                             ),
                           ),
                         ),
-                      if (Demo.on) ...[
-                        const SizedBox(height: 8),
-                        const Text('Demo · a photo you pick stays on this device for the demo feed. Nothing is uploaded.', style: TextStyle(fontSize: 12, color: AppColors.goldDeep, height: 1.4)),
-                      ],
                     ],
                     const SizedBox(height: 22),
                     const Text(
