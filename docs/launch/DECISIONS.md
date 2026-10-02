@@ -7,4 +7,5 @@
 - Push delivery remains pending Blaze. In-app Firestore notifications still work; demo notifications are simulated.
 - Do not copy phone numbers onto requests. Private donor profiles remain accessible to the owner and administrators.
 - Future PR base: `master`. Owner performs all deployments. Agent does not push or deploy.
+- Exception, 2026-10-02: the owner told the agent to complete the Cloudflare setup itself, so the agent deployed the Worker and set its TURN secrets. This covers only that Cloudflare work. Firebase deployments, pushes and pull requests remain owner-run unless the owner says otherwise.
 - Owner performs real-device and external-service testing. Local analysis, compile checks and small regression tests remain development checks.

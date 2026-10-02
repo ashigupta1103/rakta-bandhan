@@ -32,11 +32,19 @@ The real production acceptance in the original handoff remains pending owner pro
 
 Final check logs and APKs are local, ignored artifacts in `build/checks/` and `build/`. Re-run `bash tool/preflight.sh` for reproducible checks. In Windows use Git Bash, not an unconfigured WSL installation.
 
+## Cloudflare Worker deployment, 2026-10-02
+
+Deployed by the coding agent after the owner told it to finish the Cloudflare setup itself. Worker `rakta-bandhan-edge` is live at `https://rakta-bandhan-edge.rakta-bandhan-edge.workers.dev`. It was deployed as version `5c81c77b-c465-4f0e-afab-9e42532a34f5`; each of the two `secret put` commands then published a newer version. Account `361246d2…`; `MEDIA` is bound to the private `bloodbank` bucket; `TURN_KEY_ID` and `TURN_API_TOKEN` are stored as Worker secrets (names confirmed with `wrangler secret list`; the values were never written to a file or committed). Wrangler registered the account's `workers.dev` subdomain as `rakta-bandhan-edge` automatically. It can be renamed in the Cloudflare dashboard, but every build that embeds the URL would then need updating.
+
+Checked live from outside, without signing in: `/health` returns `{"ok":true}`; `/ice`, ID-photo reads and uploads without a valid token return 401; a missing public photo returns 404 (the R2 binding works); an unsigned "emulator" token is refused with 401, so emulator mode is off in production; a token with an unknown signing key returns 401 and not 503 (the Worker can fetch Google's signing keys); CORS allows the Hosting origin and no other. The TURN key was also validated directly against Cloudflare (HTTP 201 with relay credentials).
+
+Not verified: uploads, private-photo access and relay credentials for a real signed-in user and matched request. They need real Firebase sign-in (Blaze and a verified email sender). The demo APK does not use this Worker.
+
 ## Owner next steps
 
 1. Install `build/RaktaBandhan-demo.apk` and do the device testing you requested.
 2. Purchase a domain and create Cloudflare/Resend accounts. Follow [external connections](EXTERNAL_CONNECTIONS.md).
-3. Provision/deploy R2 and TURN as described in [Spark now](SPARK_NOW.md).
+3. R2 and TURN are deployed (see above). **Rotate the TURN key:** its token was pasted into a chat. Create a second TURN Server key, run `npx wrangler secret put TURN_KEY_ID` and `npx wrangler secret put TURN_API_TOKEN` yourself at the prompts, then delete the first key. Also revoke the two SFU application tokens that were shared earlier.
 4. When ready, upgrade Firebase to Blaze and follow [after Blaze](AFTER_BLAZE_UPGRADE.md) and [the deploy runbook](DEPLOY_RUNBOOK.md).
 5. Configure signing, App Check, legal contacts and store accounts. Enable real delivery only after owner verification.
 

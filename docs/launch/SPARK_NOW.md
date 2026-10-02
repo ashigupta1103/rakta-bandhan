@@ -2,9 +2,11 @@
 
 Current owner choice: **demo sign-in until Blaze**, no Firebase service-account key on Cloudflare. See [decisions](DECISIONS.md).
 
+Status: the Worker is deployed (2026-10-02), see [build status](BUILD_STATUS.md).
+
 The Worker handles photos and TURN only. It does not provide real sign-in, push delivery, privileged admin Auth actions or cron jobs. Firebase rules and client transactions enforce data invariants; lazy expiry/reactivation remains available.
 
-See the [complete Windows Cloudflare walkthrough](CLOUDFLARE_SETUP.md) for account creation, R2 subscription/bucket, TURN keys, login prompts and Worker verification. Resend remains pending. Owner-only setup (the agent does not run these commands):
+See the [complete Windows Cloudflare walkthrough](CLOUDFLARE_SETUP.md) for account creation, R2 subscription/bucket, TURN keys, login prompts and Worker verification. Resend remains pending. Setup commands (already run on 2026-10-02; kept for a fresh account):
 
 ```sh
 cd edge
@@ -13,7 +15,6 @@ npx wrangler login
 npx wrangler deploy
 npx wrangler secret put TURN_KEY_ID
 npx wrangler secret put TURN_API_TOKEN
-npx wrangler deploy
 ```
 
 Create the TURN key in Cloudflare Realtime. Set `ALLOWED_ORIGINS` to the exact admin/web origins before deploying. Do not set `AUTH_EMULATOR` or emulator host variables in production. No D1 database, Resend key or Firebase key is needed by this Worker.
