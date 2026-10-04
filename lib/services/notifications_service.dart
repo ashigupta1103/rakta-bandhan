@@ -62,22 +62,42 @@ class FirestoreNotificationsService implements NotificationsService {
     return '${diff.inDays} day(s) ago';
   }
 
-  (AppNotification, DateTime)? _fromRequesterDoc(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
-    final data = doc.data();
+  (AppNotification, DateTime)? _fromRequesterDoc(QueryDocumentSnapshot<Map<String, dynamic>> doc) => requesterEntry(doc.id, doc.data(), _timeAgo);
+
+  /// What the requester's feed shows for one of their requests (pure, so it
+  /// can be tested without Firestore).
+  @visibleForTesting
+  static (AppNotification, DateTime)? requesterEntry(String docId, Map<String, dynamic> data, String Function(DateTime) timeAgo) {
     final status = data['status'] as String?;
     final bloodGroup = data['blood_group'] as String? ?? '';
     final location = data['location_label'] as String? ?? '';
     switch (status) {
       case 'matched':
+        // The donor says they've donated and the requester hasn't confirmed
+        // yet: tell the requester (no donor details beyond "a donor").
+        final donorDoneAt = (data['donor_confirmed_at'] as Timestamp?)?.toDate();
+        if (donorDoneAt != null && data['requester_confirmed_at'] == null) {
+          return (
+            AppNotification(
+              id: '${docId}_donor_confirmed',
+              kind: NotificationKind.donationConfirmed,
+              title: 'Donation confirmed',
+              body: 'A donor has confirmed the donation for your blood request.',
+              time: timeAgo(donorDoneAt),
+              requestId: docId,
+            ),
+            donorDoneAt,
+          );
+        }
         final at = (data['matched_at'] as Timestamp?)?.toDate() ?? DateTime.now();
         return (
           AppNotification(
-            id: '${doc.id}_matched',
+            id: '${docId}_matched',
             kind: NotificationKind.match,
             title: '${data['matched_donor_name'] ?? 'A donor'} accepted your request',
             body: '$bloodGroup · $location',
-            time: _timeAgo(at),
-            requestId: doc.id,
+            time: timeAgo(at),
+            requestId: docId,
           ),
           at,
         );
@@ -85,12 +105,12 @@ class FirestoreNotificationsService implements NotificationsService {
         final at = (data['fulfilled_at'] as Timestamp?)?.toDate() ?? DateTime.now();
         return (
           AppNotification(
-            id: '${doc.id}_fulfilled',
+            id: '${docId}_fulfilled',
             kind: NotificationKind.donationConfirmed,
             title: 'Thanks for donating!',
             body: '${data['matched_donor_name'] ?? 'Your donor'} confirmed the donation.',
-            time: _timeAgo(at),
-            requestId: doc.id,
+            time: timeAgo(at),
+            requestId: docId,
           ),
           at,
         );
@@ -98,12 +118,12 @@ class FirestoreNotificationsService implements NotificationsService {
         final at = (data['expired_at'] as Timestamp?)?.toDate() ?? DateTime.now();
         return (
           AppNotification(
-            id: '${doc.id}_expired',
+            id: '${docId}_expired',
             kind: NotificationKind.expiration,
             title: 'Request expired',
             body: 'No donor found in time for your $bloodGroup request.',
-            time: _timeAgo(at),
-            requestId: doc.id,
+            time: timeAgo(at),
+            requestId: docId,
           ),
           at,
         );

@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import '../services/backend.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
-import '../widgets/state_card.dart';
 import '../widgets/rb_icon.dart';
 
 /// Testimonials — curated and verified by Rakta Bandhan, distinct from the
@@ -39,44 +38,37 @@ class TestimonialsScreen extends StatelessWidget {
             ),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(20, 6, 20, 24),
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Stories we\'ve been given permission to tell', style: AppTextStyles.display(fontSize: 25, color: AppColors.ink, height: 1.25)),
-                    const SizedBox(height: 8),
-                    const Text('Curated and verified by Rakta Bandhan. Member stories live in Community.', style: TextStyle(fontSize: 13, color: AppColors.ink2)),
-                    if (Firebase.apps.isNotEmpty) ...[
-                      const SizedBox(height: 14),
-                      const _ShareTestimonialButton(),
-                      const SizedBox(height: 6),
-                      const Text(
-                        'For people who have donated or received blood through Rakta Bandhan. Our team reviews every testimonial before it appears.',
-                        style: TextStyle(fontSize: 12.5, color: AppColors.ink2, height: 1.4),
-                      ),
-                    ],
-                    const SizedBox(height: 20),
+                    const Text(
+                      'Words from people who have donated or received blood through Rakta Bandhan. Our team reads each one before it appears.',
+                      style: TextStyle(fontSize: 14, color: AppColors.ink2, height: 1.45),
+                    ),
                     // No Firebase app (widget tests, or an init failure) means
                     // no stream to build — fall back rather than throw on
                     // FirebaseFirestore.instance.
+                    if (Firebase.apps.isNotEmpty) ...[
+                      const SizedBox(height: 14),
+                      const _ShareTestimonialButton(),
+                    ],
+                    const SizedBox(height: 18),
                     if (Firebase.apps.isEmpty)
-                      _productionEmptyState()
+                      _emptyState()
                     else
                       StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                         stream: Backend.instance.testimonialsStream(),
                         builder: (context, snapshot) {
                           if (!snapshot.hasData && !snapshot.hasError) {
-                            return const SizedBox(height: 160, child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary)));
+                            return const SizedBox(height: 80, child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary)));
                           }
                           final docs = snapshot.data?.docs ?? const [];
-                          if (docs.isEmpty) return _productionEmptyState();
+                          if (docs.isEmpty) return _emptyState();
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              for (final doc in docs) ...[
-                                _publishedCard(doc.data()),
-                                const SizedBox(height: 12),
-                              ],
+                              for (final doc in docs) _publishedCard(doc.data()),
                             ],
                           );
                         },
@@ -91,16 +83,36 @@ class TestimonialsScreen extends StatelessWidget {
     );
   }
 
+  /// A real testimonial, set as a quotation: opening and closing marks, the
+  /// words, then the public @username. Never the registered name.
   Widget _publishedCard(Map<String, dynamic> data) {
     final created = (data['created_at'] as Timestamp?)?.toDate();
-    return _quoteCard(
-      quote: '"${data['quote'] as String? ?? ''}"',
-      name: data['name'] as String? ?? '',
-      subtitle: (data['role'] as String?)?.trim().isNotEmpty == true ? data['role'] as String : 'Rakta Bandhan community',
-      timeAgo: created == null ? '' : _timeAgo(created),
-      avatarIcon: RbGlyph.quote,
+    final username = (data['username'] as String?)?.trim();
+    final role = (data['role'] as String?)?.trim();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 26),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _mark('“'),
+          Text(data['quote'] as String? ?? '', style: AppTextStyles.display(fontSize: 18, color: AppColors.ink, height: 1.5)),
+          Align(alignment: Alignment.centerRight, child: _mark('”')),
+          const SizedBox(height: 2),
+          Text(
+            '— ${username != null && username.isNotEmpty ? '@$username' : 'Rakta Bandhan community'}',
+            style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm),
+          ),
+          if ((role != null && role.isNotEmpty) || created != null)
+            Text(
+              [if (role != null && role.isNotEmpty) role, if (created != null) _timeAgo(created)].join(' · '),
+              style: const TextStyle(fontSize: 12, color: AppColors.ink2),
+            ),
+        ],
+      ),
     );
   }
+
+  static Widget _mark(String glyph) => Text(glyph, style: AppTextStyles.display(fontSize: 44, color: AppColors.red300, height: 0.9));
 
   static String _timeAgo(DateTime time) {
     final diff = DateTime.now().difference(time);
@@ -110,44 +122,20 @@ class TestimonialsScreen extends StatelessWidget {
     return months < 12 ? '${months}mo ago' : '${(months / 12).floor()}y ago';
   }
 
-  Widget _productionEmptyState() {
-    return Padding(
-      padding: const EdgeInsets.only(top: 20),
-      child: StateCard.empty(
-        title: 'Approved testimonials will appear here',
-        icon: RbGlyph.quote,
-      ),
-    );
-  }
-
-  Widget _quoteCard({required String quote, required String name, required String subtitle, required String timeAgo, required RbGlyph avatarIcon}) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(color: Colors.white, border: Border.all(color: AppColors.warmBorder), borderRadius: BorderRadius.circular(20)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(quote, style: AppTextStyles.display(fontSize: 17, color: AppColors.ink, height: 1.55)),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Container(width: 34, height: 34, decoration: const BoxDecoration(color: AppColors.goldTint, shape: BoxShape.circle), alignment: Alignment.center, child: RbIcon(avatarIcon, size: 15, color: AppColors.goldDeep)),
-              const SizedBox(width: 11),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(name, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
-                    Text(subtitle, style: const TextStyle(fontSize: 11.5, color: AppColors.ink2)),
-                  ],
-                ),
-              ),
-              Text(timeAgo, style: const TextStyle(fontSize: 10.5, color: AppColors.disabledTint)),
-            ],
-          ),
-        ],
-      ),
+  /// Editorial empty state: the quotation marks are the visual.
+  Widget _emptyState() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _mark('“'),
+        Text('No testimonials yet', style: AppTextStyles.display(fontSize: 21, color: AppColors.ink)),
+        const SizedBox(height: 6),
+        const Text(
+          'Your story could be the first one shared with the community.',
+          style: TextStyle(fontSize: 14, height: 1.45, color: AppColors.ink2),
+        ),
+        Align(alignment: Alignment.centerRight, child: _mark('”')),
+      ],
     );
   }
 }
@@ -160,7 +148,15 @@ class _ShareTestimonialButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ElevatedButton.icon(
+    return OutlinedButton.icon(
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size(0, 40),
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        foregroundColor: AppColors.brandRed,
+        side: const BorderSide(color: AppColors.red300),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+      ),
       onPressed: () => showModalBottomSheet<void>(
         context: context,
         isScrollControlled: true,
@@ -215,7 +211,7 @@ class _TestimonialSheetState extends State<TestimonialSheet> {
   @override
   Widget build(BuildContext context) {
     final length = _quote.text.trim().length;
-    final ready = length >= 10 && length <= 600 && _consent && !_sending;
+    final ready = length >= 1 && length <= 600 && _consent && !_sending;
     Widget fieldLabel(String text) => Padding(
           padding: const EdgeInsets.only(bottom: 8),
           child: Text(text, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.ink)),
@@ -230,10 +226,10 @@ class _TestimonialSheetState extends State<TestimonialSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Your testimonial', style: AppTextStyles.display(fontSize: 22, color: AppColors.ink)),
+            Text('Your testimonial', style: AppTextStyles.display(fontSize: 20, color: AppColors.ink)),
             const SizedBox(height: 6),
             const Text(
-              'A few lines about what Rakta Bandhan meant to you. It is published under your registered name after review.',
+              'Share a few words about your experience. It is shown under your @username after our team has read it.',
               style: TextStyle(fontSize: 13.5, color: AppColors.ink2, height: 1.45),
             ),
             const SizedBox(height: 20),
@@ -245,7 +241,7 @@ class _TestimonialSheetState extends State<TestimonialSheet> {
               maxLength: 600,
               textCapitalization: TextCapitalization.sentences,
               onChanged: (_) => setState(() {}),
-              decoration: const InputDecoration(hintText: 'What happened, and how did it feel?'),
+              decoration: const InputDecoration(hintText: 'For example: Rakta Bandhan helped me find a donor.'),
             ),
             const SizedBox(height: 12),
             fieldLabel('About you'),
@@ -301,7 +297,7 @@ class _TestimonialSheetState extends State<TestimonialSheet> {
                       const Expanded(
                         child: Padding(
                           padding: EdgeInsets.only(top: 2),
-                          child: Text('I agree to Rakta Bandhan publishing this with my name.', style: TextStyle(fontSize: 13.5, color: AppColors.ink, height: 1.4)),
+                          child: Text('I agree to Rakta Bandhan publishing this with my @username.', style: TextStyle(fontSize: 13.5, color: AppColors.ink, height: 1.4)),
                         ),
                       ),
                     ],

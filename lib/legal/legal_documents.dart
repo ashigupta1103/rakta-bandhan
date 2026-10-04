@@ -82,7 +82,7 @@ const privacyPolicy = LegalDocument(
       'Any signed-in user can see open requests: the blood group and units needed, urgency, and the request’s location.',
       'Only after a match — when a donor accepts a request — the two people involved can see each other’s name, message each other in the app, and call each other in the app. Phone numbers stay in private profiles, accessible only to the owner and administrators. Nobody else can see that conversation. Tapping a shared location opens it in your maps app (for example Google Maps), which then handles it under its own privacy terms.',
       'In-app call audio travels directly between the two phones, or through an encrypted Cloudflare TURN relay when needed. A direct connection can reveal the other phone’s network (IP) address for the duration of the call; it does not reveal a phone number. The relay sees network addresses but cannot read the encrypted audio.',
-      'Community posts are visible to every signed-in user, under your first name and @username. Older posts may still show the registered name. Anyone with a community photo’s link can open the photo.',
+      'Community posts are visible to every signed-in user, under your @username only; the app never shows your registered name on a post. Anyone with a community photo’s link can open the photo.',
       'We share information with hospitals, blood banks or service partners only to the extent necessary to facilitate a blood request or operate the platform, and as the law allows. We will not sell personal information to third parties.',
     ]),
     LegalSection('admins', 'What our administrators can see', [

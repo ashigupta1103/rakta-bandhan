@@ -163,7 +163,7 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
                         children: [
                           const TextSpan(text: 'You post as '),
                           TextSpan(
-                            text: 'your first name and @username',
+                            text: 'your @username',
                             style: TextStyle(color: AppColors.goldDeep, fontWeight: FontWeight.w700),
                           ),
                           const TextSpan(text: '. Your phone number and exact address are never shown.'),

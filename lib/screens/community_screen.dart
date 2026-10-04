@@ -79,6 +79,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
       backgroundColor: AppColors.warmPageBackground,
       appBar: AppHeader(
         title: 'Community',
+        showDivider: false, // the tab bar below draws the one hairline
         onNotificationTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const NotificationsScreen())),
       ),
       body: Column(
@@ -111,19 +112,14 @@ class _CommunityScreenState extends State<CommunityScreen> {
       padding: kRbPagePadding,
       children: [
         _composer(),
-        const SizedBox(height: 10),
-        RbListGroup(
-          children: [
-            RbRow(
-              icon: RbGlyph.quote,
-              bare: true,
-              title: 'Testimonials',
-              subtitle: 'Read them, or add yours after a donation',
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TestimonialsScreen())),
-            ),
-          ],
+        const SizedBox(height: 8),
+        RbEntryRow(
+          icon: RbGlyph.quote,
+          title: 'Testimonials',
+          subtitle: 'Read them, or add yours after a donation',
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TestimonialsScreen())),
         ),
-        const RbSectionLabel('Latest stories'),
+        const RbSectionLabel('Latest stories', padding: EdgeInsets.fromLTRB(2, 18, 2, 8)),
         StreamBuilder<List<_Doc>>(
           stream: _stories,
           builder: (context, snapshot) {
@@ -164,44 +160,13 @@ class _CommunityScreenState extends State<CommunityScreen> {
     );
   }
 
-  /// Looks like the start of a post, so it reads as "write here", not as
-  /// another content card.
-  Widget _composer() {
-    return RbCard(
-      onTap: _openComposer,
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              const BrandGlyph(icon: RbGlyph.pen, tone: GlyphTone.gold, size: 40),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-                  decoration: BoxDecoration(color: AppColors.warmGround, borderRadius: BorderRadius.circular(999), border: Border.all(color: AppColors.warmBorder)),
-                  child: const Text('Share your donation story…', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, color: AppColors.mutedInk)),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          const Row(
-            children: [
-              SizedBox(width: 52),
-              RbIcon(RbGlyph.photo, size: 15, color: AppColors.ink2),
-              SizedBox(width: 6),
-              Text('Photo', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: AppColors.ink2)),
-              SizedBox(width: 16),
-              RbIcon(RbGlyph.shield, size: 15, color: AppColors.ink2),
-              SizedBox(width: 6),
-              Expanded(child: Text('Guidelines apply', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: AppColors.ink2))),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+  /// Looks like the start of a post: one slim row, not a card of its own.
+  Widget _composer() => RbEntryRow(
+        icon: RbGlyph.pen,
+        title: 'Share your donation story…',
+        trailing: const RbIcon(RbGlyph.photo, size: 18, color: AppColors.ink2),
+        onTap: _openComposer,
+      );
 
   /// A post: author row, the photo edge to edge (4:5 to 1.91:1, like
   /// Instagram's crop limits), then the text. Tap the photo for a
@@ -216,9 +181,10 @@ class _CommunityScreenState extends State<CommunityScreen> {
     final isMine = data['author_uid'] == Backend.instance.currentUser?.uid;
     // Own stories only (author_uid matches the signed-in user).
     final canEdit = isMine;
-    final author = data['author_name'] as String? ?? 'A donor';
-    final username = data['author_username'] as String?;
-    final name = username == null ? author : '${author.split(' ').first} @$username';
+    // Public identity is the username only — never the registered name.
+    final username = (data['author_username'] as String?)?.trim();
+    final hasUsername = username != null && username.isNotEmpty;
+    final name = hasUsername ? '@$username' : 'A donor';
     final meta = [
       if (location != null && location.isNotEmpty) location,
       if (created != null) _timeAgo(created),
@@ -241,7 +207,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                   child: Stack(
                     clipBehavior: Clip.none,
                     children: [
-                      RbAvatar(name: name, size: 40, gold: true),
+                      RbAvatar(name: hasUsername ? username : 'Donor', size: 40, gold: true),
                       if (bloodGroup != null)
                         Positioned(
                           right: -4,
@@ -276,7 +242,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                     if (canEdit) _menuItem('edit', RbGlyph.pen, 'Edit story'),
                     if (isMine) _menuItem('delete', RbGlyph.trash, 'Delete story', destructive: true),
                     if (!isMine) const PopupMenuItem(value: 'report', child: Text('Report post')),
-                    if (!isMine) PopupMenuItem(value: 'hide', child: Text('Hide posts from ${name.split(' ').first}')),
+                    if (!isMine) PopupMenuItem(value: 'hide', child: Text('Hide posts from $name')),
                   ],
                 ),
               ],

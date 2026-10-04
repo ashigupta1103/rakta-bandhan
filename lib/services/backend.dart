@@ -1238,6 +1238,7 @@ class Backend {
     await _db.collection('testimonial_submissions').add({
       'author_uid': _uid,
       'name': donor?['name'] ?? '',
+      'username': donor?['username'],
       'quote': quote.trim(),
       'role': role.trim(),
       'consent_to_publish': true,

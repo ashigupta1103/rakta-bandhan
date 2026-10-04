@@ -17,7 +17,7 @@ import 'rb_icon.dart';
 /// Page gutter used by every scrolling body.
 const EdgeInsets kRbPagePadding = EdgeInsets.fromLTRB(20, 16, 20, 28);
 
-/// Raised content card: white, radius 20, hairline border, soft warm shadow.
+/// Content card: white, radius 20, hairline border, barely-there shadow.
 class RbCard extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry padding;
@@ -37,11 +37,54 @@ class RbCard extends StatelessWidget {
         color: color,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppColors.warmBorder.withValues(alpha: 0.7)),
-        boxShadow: const [BoxShadow(color: AppColors.shadowCard, blurRadius: 18, offset: Offset(0, 6))],
+        boxShadow: const [BoxShadow(color: AppColors.shadowCard, blurRadius: 8, offset: Offset(0, 2))],
       ),
       child: child,
     );
     return onTap == null ? card : Pressable(onTap: onTap, child: card);
+  }
+}
+
+/// One compact tappable row on the page background-white: icon, title,
+/// optional second line, trailing widget (chevron by default). For entry
+/// points like "Share your story" or "Testimonials" that are an action, not
+/// content, so they don't need a full card.
+class RbEntryRow extends StatelessWidget {
+  final RbGlyph icon;
+  final String title;
+  final String? subtitle;
+  final Widget? trailing;
+  final VoidCallback onTap;
+
+  const RbEntryRow({super.key, required this.icon, required this.title, this.subtitle, this.trailing, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Pressable(
+      onTap: onTap,
+      semanticLabel: title,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.warmBorder)),
+        child: Row(
+          children: [
+            RbIcon(icon, size: 18, color: AppColors.brandRed),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14.5, fontWeight: subtitle == null ? FontWeight.w400 : FontWeight.w600, color: subtitle == null ? AppColors.ink2 : AppColors.ink)),
+                  if (subtitle != null) Text(subtitle!, style: const TextStyle(fontSize: 12.5, color: AppColors.ink2, height: 1.3)),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            trailing ?? const RbIcon(RbGlyph.chevron, size: 16, color: AppColors.chevronMuted),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -306,6 +349,7 @@ class RbStatePanel extends StatelessWidget {
   final GlyphTone tone;
   final String? actionLabel;
   final VoidCallback? onAction;
+  final RbGlyph actionIcon;
 
   const RbStatePanel({
     super.key,
@@ -315,6 +359,7 @@ class RbStatePanel extends StatelessWidget {
     this.tone = GlyphTone.neutral,
     this.actionLabel,
     this.onAction,
+    this.actionIcon = RbGlyph.retry,
   });
 
   factory RbStatePanel.error({required String title, required String message, required VoidCallback onRetry}) => RbStatePanel(
@@ -328,12 +373,14 @@ class RbStatePanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return RbCard(
-      padding: const EdgeInsets.fromLTRB(22, 26, 22, 22),
+    // Flat on the page (no card): an empty list should read as "nothing
+    // here yet", not as one more content box.
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
       child: Column(
         children: [
-          BrandGlyph(icon: icon, tone: tone, size: 50),
-          const SizedBox(height: 14),
+          BrandGlyph(icon: icon, tone: tone, size: 44),
+          const SizedBox(height: 12),
           Text(title, textAlign: TextAlign.center, style: AppTextStyles.display(fontSize: 19, color: AppColors.ink)),
           const SizedBox(height: 6),
           Text(message, textAlign: TextAlign.center, style: const TextStyle(fontSize: 13.5, color: AppColors.ink2, height: 1.45)),
@@ -346,7 +393,7 @@ class RbStatePanel extends StatelessWidget {
                 foregroundColor: AppColors.brandRed,
               ),
               onPressed: onAction,
-              icon: const RbIcon(RbGlyph.retry, size: 15),
+              icon: RbIcon(actionIcon, size: 15),
               label: Text(actionLabel!),
             ),
           ],
