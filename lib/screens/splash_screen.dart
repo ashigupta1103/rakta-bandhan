@@ -22,7 +22,7 @@ import 'login_screen.dart';
 /// animation only ever plays over pixels that are already there.
 ///
 /// Routing precedence — the approved entry flow is Splash -> Login -> OTP
-/// -> Registration (design_updated/Rakta Bandhan Redesign.dc.html, "Entry"):
+/// -> Registration (design/v3_updated/Rakta Bandhan Redesign.dc.html, "Entry"):
 ///   has donor profile -> MainNavigationScreen
 ///   no profile         -> LoginScreen
 class SplashScreen extends StatefulWidget {

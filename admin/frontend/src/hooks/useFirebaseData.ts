@@ -26,7 +26,10 @@ import {
   deleteField,
   getCountFromServer,
   getDoc,
+  getDocs,
+  runTransaction,
   serverTimestamp,
+  Timestamp,
   type DocumentData,
 } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
@@ -167,8 +170,22 @@ export interface Announcement extends DocumentData {
 export interface Testimonial extends DocumentData {
   id: string;
   quote: string;
+  /** Internal only: the app shows `username`, never the registered name. */
   name: string;
+  username?: string | null;
   role?: string;
+  created_at?: { toDate: () => Date };
+}
+
+/** A member's own testimonial, waiting in the private review queue. */
+export interface TestimonialSubmission extends DocumentData {
+  id: string;
+  author_uid: string;
+  name: string;
+  username?: string | null;
+  quote: string;
+  role?: string;
+  consent_to_publish?: boolean;
   created_at?: { toDate: () => Date };
 }
 
@@ -320,6 +337,96 @@ export function useTestimonials() {
   const { items, loading } = useCollection<Testimonial>('testimonials');
   return { testimonials: items, loading };
 }
+
+/** Members' own testimonials awaiting approval — private, admin read only. */
+export function useTestimonialSubmissions() {
+  const { items, loading } = useCollection<TestimonialSubmission>('testimonial_submissions');
+  return { submissions: items, loading };
+}
+
+/** The owner's switches in `config/features`; a missing flag means off. */
+export interface FeatureFlags {
+  email_verified_required?: boolean;
+  phone_required?: boolean;
+  server_jobs?: boolean;
+  updated_at?: { toDate: () => Date };
+  updated_by?: string;
+}
+
+export function useFeatureFlags() {
+  const [flags, setFlags] = useState<FeatureFlags>({});
+  const [loading, setLoading] = useState(true);
+  useEffect(
+    () =>
+      onSnapshot(
+        doc(db, 'config', 'features'),
+        (snap) => {
+          setFlags((snap.data() as FeatureFlags | undefined) ?? {});
+          setLoading(false);
+        },
+        () => setLoading(false)
+      ),
+    []
+  );
+  return { flags, loading };
+}
+
+/** The thread behind a chat report (admins may read any request's messages). */
+export async function fetchConversation(requestId: string) {
+  const snap = await getDocs(
+    query(collection(db, 'requests', requestId, 'messages'), orderBy('sent_at', 'asc'), limit(200))
+  );
+  return snap.docs.map((d) => ({ ...d.data(), id: d.id }) as DocumentData & { id: string });
+}
+
+/** The community post behind a post report; null once it has been deleted. */
+export async function fetchStory(storyId: string) {
+  const snap = await getDoc(doc(db, 'community_stories', storyId));
+  return snap.exists() ? ({ ...snap.data(), id: snap.id } as CommunityStory) : null;
+}
+
+/** Everything still waiting on an admin; drives the sidebar badges. */
+export function usePendingCounts() {
+  const { reports } = useIssueReports();
+  const { inquiries } = usePartnershipInquiries();
+  const { reports: abuse } = useAbuseReports();
+  const { submissions } = useTestimonialSubmissions();
+  const open = (items: { status?: string }[]) => items.filter((i) => i.status !== 'resolved').length;
+  return { inbox: open(reports) + open(inquiries) + open(abuse), testimonials: submissions.length };
+}
+
+const senderCache = new Map<string, Promise<string>>();
+
+/** "Name · @username" for a uid, read once per session from donors_public. */
+export function useSender(uid?: string) {
+  const [label, setLabel] = useState('');
+  useEffect(() => {
+    if (!uid) return;
+    let live = true;
+    if (!senderCache.has(uid)) {
+      senderCache.set(
+        uid,
+        getDoc(doc(db, 'donors_public', uid))
+          .then((snap) => {
+            const d = snap.data();
+            return d?.name ? `${d.name}${d.username ? ` · @${d.username}` : ''}` : 'Unknown member';
+          })
+          .catch(() => {
+            senderCache.delete(uid);
+            return 'Unknown member';
+          })
+      );
+    }
+    senderCache.get(uid)!.then((value) => live && setLabel(value));
+    return () => {
+      live = false;
+    };
+  }, [uid]);
+  return label;
+}
+
+/** "@Raj_K " -> "raj_k": the form the app stores and shows; empty means none. */
+const cleanUsername = (value?: string | null) => (value ?? '').trim().replace(/^@/, '').toLowerCase() || null;
 
 function currentMonthKey() {
   const now = new Date();
@@ -623,11 +730,19 @@ export function useAdminActions() {
   const createHospital = (fields: Record<string, unknown>) =>
     run(async () => {
       const ref = await addDoc(collection(db, 'hospitals'), {
-        ...fields,
+        ...Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined)),
         verified: false,
         created_at: serverTimestamp(),
       });
       await logAudit('CREATE_HOSPITAL', { uid: ref.id, name: fields.name as string });
+    });
+
+  /** Edits a hospital; a field passed as undefined (an emptied latitude) is removed. */
+  const updateHospital = (hospitalId: string, fields: Record<string, unknown>) =>
+    run(async () => {
+      const data = Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, v === undefined ? deleteField() : v]));
+      await updateDoc(doc(db, 'hospitals', hospitalId), data);
+      await logAudit('UPDATE_HOSPITAL', { uid: hospitalId, name: fields.name as string });
     });
 
   const toggleHospitalVerified = (hospitalId: string, verified: boolean, name?: string) =>
@@ -792,11 +907,12 @@ export function useAdminActions() {
       await logAudit('delete_announcement', { uid: id, name: title });
     });
 
-  const saveTestimonial = (fields: { id?: string; quote: string; name: string; role: string }) =>
+  const saveTestimonial = (fields: { id?: string; quote: string; name: string; username?: string; role: string }) =>
     run(async () => {
       const data = {
         quote: fields.quote.trim(),
         name: fields.name.trim(),
+        username: cleanUsername(fields.username),
         role: fields.role.trim(),
         updated_at: serverTimestamp(),
         author_uid: auth.currentUser?.uid || null,
@@ -814,6 +930,99 @@ export function useAdminActions() {
     run(async () => {
       await deleteDoc(doc(db, 'testimonials', id));
       await logAudit('delete_testimonial', { uid: id, name });
+    });
+
+  /**
+   * Closes a matched request as donated on a hospital's word, the admin-side
+   * twin of the app's two-sided confirmation: the request becomes fulfilled,
+   * the donor's 90-day rest starts, the history record is written, and the
+   * impact counter goes up by one (the one place an admin may bump it).
+   */
+  const confirmDonation = (requestId: string) =>
+    run(async () => {
+      const adminUid = auth.currentUser?.uid ?? null;
+      await runTransaction(db, async (tx) => {
+        const reqRef = doc(db, 'requests', requestId);
+        const req = (await tx.get(reqRef)).data();
+        if (!req) throw new Error('Request not found.');
+        if (req.status !== 'matched') throw new Error('Request is not currently matched.');
+        const donorId = req.matched_donor_id as string;
+        const donor = (await tx.get(doc(db, 'donors', donorId))).data();
+        tx.update(reqRef, { status: 'fulfilled', fulfilled_at: serverTimestamp(), fulfilled_by: adminUid });
+        if (donor?.active_request_id === requestId) {
+          tx.update(doc(db, 'donors', donorId), {
+            last_donation_date: serverTimestamp(),
+            is_available: false,
+            active_request_id: null,
+            reactivation_scheduled_at: Timestamp.fromMillis(Date.now() + 90 * 86400000),
+          });
+          tx.update(doc(db, 'donors_public', donorId), { is_available: false, updated_at: serverTimestamp() });
+          tx.set(doc(db, 'donation_history', requestId), {
+            donor_id: donorId,
+            request_id: requestId,
+            donation_date: serverTimestamp(),
+            confirmed_by: 'admin',
+            verified_by: adminUid,
+            hospital: req.location_label ?? '',
+            blood_group: req.blood_group ?? '',
+          });
+        }
+      });
+      try {
+        // Best effort, like the app: a failed bump must not fail the donation.
+        await runTransaction(db, async (tx) => {
+          const ref = doc(db, 'public_stats', 'impact');
+          const snap = await tx.get(ref);
+          const same = snap.data()?.month_key === currentMonthKey();
+          tx.set(ref, {
+            month_key: currentMonthKey(),
+            donations_this_month: same ? Number(snap.data()?.donations_this_month ?? 0) + 1 : 1,
+            updated_at: serverTimestamp(),
+          });
+        });
+      } catch {
+        /* counter only */
+      }
+      await logAudit('confirm_donation', { uid: requestId });
+    });
+
+  const setFeatureFlag = (key: keyof Omit<FeatureFlags, 'updated_at' | 'updated_by'>, value: boolean) =>
+    run(async () => {
+      await setDoc(
+        doc(db, 'config', 'features'),
+        { [key]: value, updated_by: auth.currentUser?.uid ?? null, updated_at: serverTimestamp() },
+        { merge: true }
+      );
+      await logAudit(`set_${key}_${value ? 'on' : 'off'}`, {});
+    });
+
+  /** Publishes a member's testimonial (optionally edited first) and clears it from the queue in one batch. */
+  const approveTestimonialSubmission = (
+    id: string,
+    fields: { quote: string; name: string; username?: string | null; role: string; author_uid?: string }
+  ) =>
+    run(async () => {
+      const batch = writeBatch(db);
+      const ref = doc(collection(db, 'testimonials'));
+      batch.set(ref, {
+        quote: fields.quote.trim(),
+        name: fields.name.trim(),
+        username: cleanUsername(fields.username),
+        role: fields.role.trim(),
+        author_uid: fields.author_uid ?? null,
+        submitted_by_member: true,
+        created_at: serverTimestamp(),
+        updated_at: serverTimestamp(),
+      });
+      batch.delete(doc(db, 'testimonial_submissions', id));
+      await batch.commit();
+      await logAudit('approve_testimonial', { uid: ref.id, name: fields.name.trim() });
+    });
+
+  const rejectTestimonialSubmission = (id: string, name?: string) =>
+    run(async () => {
+      await deleteDoc(doc(db, 'testimonial_submissions', id));
+      await logAudit('reject_testimonial', { uid: id, name });
     });
 
   /**
@@ -861,6 +1070,9 @@ export function useAdminActions() {
     deleteDonor,
     deleteRequest,
     createHospital,
+    updateHospital,
+    confirmDonation,
+    setFeatureFlag,
     toggleHospitalVerified,
     deleteHospital,
     broadcastNotification,
@@ -874,6 +1086,8 @@ export function useAdminActions() {
     deleteAnnouncement,
     saveTestimonial,
     deleteTestimonial,
+    approveTestimonialSubmission,
+    rejectTestimonialSubmission,
     setImpactCount,
     setStoryHidden,
     deleteStory,

@@ -8,21 +8,25 @@
  *  · Community stories → member posts; hide (reversible) or delete
  *
  * `announcements` and `testimonials` are admin-write-only per
- * firestore.rules — there is no user-submitted path into either, which is
- * what keeps "curated and verified" structural rather than a claim.
+ * firestore.rules. A member can offer a testimonial from the app, but it only
+ * lands in the private `testimonial_submissions` queue; an admin approves it
+ * here (publish as-is or edit first) or rejects it, so nothing reaches the
+ * Testimonials page without a review.
  */
 
 import { useState } from 'react';
 import {
   useAnnouncements,
   useTestimonials,
+  useTestimonialSubmissions,
   useCommunityStories,
   useImpactCounter,
   useAdminActions,
   type Announcement,
   type Testimonial,
+  type TestimonialSubmission,
 } from '../hooks/useFirebaseData';
-import { Plus, Trash2, Pencil, Megaphone, Quote, Droplet, MessagesSquare, Eye, EyeOff } from 'lucide-react';
+import { Plus, Trash2, Pencil, Megaphone, Quote, Droplet, MessagesSquare, Eye, EyeOff, Check, X } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -42,6 +46,7 @@ const textareaClass =
 export default function ContentPage() {
   const { announcements, loading: announcementsLoading } = useAnnouncements();
   const { testimonials, loading: testimonialsLoading } = useTestimonials();
+  const { submissions } = useTestimonialSubmissions();
   const { stories, loading: storiesLoading } = useCommunityStories();
   const { count: impactCount } = useImpactCounter();
   const {
@@ -50,13 +55,23 @@ export default function ContentPage() {
     deleteAnnouncement,
     saveTestimonial,
     deleteTestimonial,
+    approveTestimonialSubmission,
+    rejectTestimonialSubmission,
     setImpactCount,
     setStoryHidden,
     deleteStory,
   } = useAdminActions();
 
   const [announcementForm, setAnnouncementForm] = useState<{ id?: string; title: string; body: string } | null>(null);
-  const [testimonialForm, setTestimonialForm] = useState<{ id?: string; quote: string; name: string; role: string } | null>(null);
+  const [testimonialForm, setTestimonialForm] = useState<{
+    id?: string;
+    submissionId?: string;
+    author_uid?: string;
+    quote: string;
+    name: string;
+    username: string;
+    role: string;
+  } | null>(null);
   const [impactDraft, setImpactDraft] = useState('');
   const [formError, setFormError] = useState('');
 
@@ -75,12 +90,16 @@ export default function ContentPage() {
   async function submitTestimonial(e: React.FormEvent) {
     e.preventDefault();
     if (!testimonialForm) return;
-    if (!testimonialForm.quote.trim() || !testimonialForm.name.trim()) {
-      setFormError('Quote and attribution are both required.');
+    if (!testimonialForm.quote.trim()) {
+      setFormError('The quote is required.');
       return;
     }
     setFormError('');
-    await saveTestimonial(testimonialForm);
+    if (testimonialForm.submissionId) {
+      await approveTestimonialSubmission(testimonialForm.submissionId, testimonialForm);
+    } else {
+      await saveTestimonial(testimonialForm);
+    }
     setTestimonialForm(null);
   }
 
@@ -201,14 +220,15 @@ export default function ContentPage() {
               {testimonialsLoading ? '…' : `${testimonials.length} live behind More → Testimonials`}
             </p>
           </div>
-          <Button size="sm" onClick={() => setTestimonialForm({ quote: '', name: '', role: '' })}>
+          <Button size="sm" onClick={() => setTestimonialForm({ quote: '', name: '', username: '', role: '' })}>
             <Plus className="w-4 h-4" /> New
           </Button>
         </div>
 
         <Card className="p-3 text-xs text-amber-600 border-amber-500/40">
-          Publish a quote only with the person&apos;s written permission — these are attributed by name and are not
-          member posts.
+          The app shows a testimonial under the member&apos;s @username only, never their registered name. Quotes members
+          send from the app arrive below with their consent to publish. A quote you add yourself needs the person&apos;s
+          written permission, and shows as &ldquo;Rakta Bandhan community&rdquo; unless you give it a username.
         </Card>
 
         {testimonialForm && (
@@ -222,9 +242,14 @@ export default function ContentPage() {
                 onChange={(e) => setTestimonialForm({ ...testimonialForm, quote: e.target.value })}
               />
               <Input
-                placeholder="Attributed to"
+                placeholder="Name (internal, never shown in the app)"
                 value={testimonialForm.name}
                 onChange={(e) => setTestimonialForm({ ...testimonialForm, name: e.target.value })}
+              />
+              <Input
+                placeholder="Public @username (optional)"
+                value={testimonialForm.username}
+                onChange={(e) => setTestimonialForm({ ...testimonialForm, username: e.target.value })}
               />
               <Input
                 placeholder="Role (e.g. Donor, Hospital coordinator)"
@@ -243,6 +268,58 @@ export default function ContentPage() {
           </Card>
         )}
 
+        {submissions.length > 0 && (
+          <div className="space-y-2">
+            <h3 className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+              Awaiting review <Badge variant="warning">{submissions.length}</Badge>
+            </h3>
+            {submissions.map((s: TestimonialSubmission) => {
+              const fields = {
+                quote: s.quote,
+                name: s.name || '',
+                username: s.username || '',
+                role: s.role || '',
+                author_uid: s.author_uid,
+              };
+              return (
+                <Card key={s.id} className="p-4 space-y-3 border-amber-500/40">
+                  <p className="text-sm italic whitespace-pre-wrap">&ldquo;{s.quote}&rdquo;</p>
+                  <p className="text-xs text-muted-foreground">
+                    Will appear as {s.username ? `@${s.username}` : 'Rakta Bandhan community'}
+                    {s.role ? ` · ${s.role}` : ''} · {timeAgo(s.created_at)} · from {s.name || 'a member'} · agreed to publish
+                  </p>
+                  <div className="flex flex-wrap gap-2 pt-1 border-t border-border">
+                    <Button
+                      size="sm"
+                      onClick={() => approveTestimonialSubmission(s.id, fields)}
+                    >
+                      <Check className="w-3.5 h-3.5" /> Approve and publish
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setTestimonialForm({ ...fields, submissionId: s.id })}
+                    >
+                      <Pencil className="w-3.5 h-3.5" /> Edit first
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-red-600"
+                      onClick={() => {
+                        if (confirm(`Reject the testimonial from ${s.name || 'this member'}? It will be deleted.`))
+                          rejectTestimonialSubmission(s.id, s.name);
+                      }}
+                    >
+                      <X className="w-3.5 h-3.5" /> Reject
+                    </Button>
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+
         {!testimonialsLoading && testimonials.length === 0 && (
           <Card className="p-4 text-sm text-muted-foreground">
             Nothing published — the Testimonials page shows its empty state.
@@ -255,15 +332,18 @@ export default function ContentPage() {
               <div className="min-w-0 flex-1">
                 <p className="text-sm italic">&ldquo;{t.quote}&rdquo;</p>
                 <p className="text-xs text-muted-foreground mt-2">
-                  {t.name}
+                  {t.username ? `@${t.username}` : 'Rakta Bandhan community'}
                   {t.role ? ` · ${t.role}` : ''} · {timeAgo(t.created_at)}
+                  {t.name ? ` · ${t.name} (internal)` : ''}
                 </p>
               </div>
               <div className="flex gap-1">
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setTestimonialForm({ id: t.id, quote: t.quote, name: t.name, role: t.role || '' })}
+                  onClick={() =>
+                    setTestimonialForm({ id: t.id, quote: t.quote, name: t.name, username: t.username || '', role: t.role || '' })
+                  }
                 >
                   <Pencil className="w-3.5 h-3.5" />
                 </Button>
@@ -272,7 +352,7 @@ export default function ContentPage() {
                   size="sm"
                   className="text-red-600"
                   onClick={() => {
-                    if (confirm(`Delete the testimonial from ${t.name}? This cannot be undone.`))
+                    if (confirm('Delete this testimonial? This cannot be undone.'))
                       deleteTestimonial(t.id, t.name);
                   }}
                 >

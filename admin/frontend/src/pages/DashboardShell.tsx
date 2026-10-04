@@ -8,9 +8,10 @@ import { useState } from 'react';
 import {
   LayoutDashboard, Users, Droplets, Building2, Map as MapIcon,
   History, BarChart3, Bell, Shield, LogOut, ChevronLeft, ChevronRight,
-  Inbox, FileText,
+  Inbox, FileText, Settings,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { usePendingCounts } from '../hooks/useFirebaseData';
 import { cn } from '../lib/utils';
 import raktaMark from '../assets/rakta-mark.png';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -30,6 +31,7 @@ import AuditLogPage from './AuditLogPage';
 import BroadcastPage from './BroadcastPage';
 import InboxPage from './InboxPage';
 import ContentPage from './ContentPage';
+import SettingsPage from './SettingsPage';
 
 const navGroups = [
   {
@@ -61,6 +63,7 @@ const navGroups = [
     items: [
       { to: '/broadcast', label: 'Broadcast', icon: Bell, end: false },
       { to: '/audit', label: 'Audit Log', icon: Shield, end: false },
+      { to: '/settings', label: 'Settings', icon: Settings, end: false },
     ],
   },
 ];
@@ -73,6 +76,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/hospitals': 'Hospitals',
   '/inbox': 'Inbox',
   '/content': 'Content',
+  '/settings': 'Settings',
   '/history': 'Donation History',
   '/analytics': 'Analytics',
   '/broadcast': 'Broadcast',
@@ -83,6 +87,8 @@ export default function DashboardShell() {
   const { currentUser, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const { pathname } = useLocation();
+  const pending = usePendingCounts();
+  const badges: Record<string, number> = { '/inbox': pending.inbox, '/content': pending.testimonials };
   const title = PAGE_TITLES[pathname] || 'Dashboard';
 
   const initial = currentUser?.email?.[0]?.toUpperCase() || 'A';
@@ -133,9 +139,11 @@ export default function DashboardShell() {
                     key={to}
                     to={to}
                     end={end}
+                    title={sidebarOpen ? undefined : label}
                     className={({ isActive }) =>
                       cn(
-                        'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+                        'relative flex items-center gap-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+                        sidebarOpen ? 'px-3' : 'justify-center px-0',
                         isActive
                           ? 'bg-primary/10 text-primary'
                           : 'text-muted-foreground hover:text-foreground hover:bg-accent'
@@ -144,6 +152,17 @@ export default function DashboardShell() {
                   >
                     <Icon className="w-4 h-4 flex-shrink-0" />
                     {sidebarOpen && <span className="truncate">{label}</span>}
+                    {badges[to] > 0 && (
+                      <span
+                        title={`${badges[to]} waiting`}
+                        className={cn(
+                          'rounded-full bg-primary text-primary-foreground text-[10px] font-semibold leading-none',
+                          sidebarOpen ? 'ml-auto px-1.5 py-1' : 'absolute top-1.5 right-3 w-2 h-2 ring-2 ring-card'
+                        )}
+                      >
+                        {sidebarOpen ? badges[to] : ''}
+                      </span>
+                    )}
                   </NavLink>
                 ))}
               </div>
@@ -192,6 +211,7 @@ export default function DashboardShell() {
             <Route path="/analytics"  element={<AnalyticsPage />} />
             <Route path="/broadcast"  element={<BroadcastPage />} />
             <Route path="/audit"      element={<AuditLogPage />} />
+            <Route path="/settings"   element={<SettingsPage />} />
           </Routes>
         </main>
       </div>

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 /// Rakta Bandhan design tokens — the logo-derived warm system from the
-/// approved final artifact (`design_updated/Rakta Bandhan Redesign.dc.html`,
+/// approved final artifact (`design/v3_updated/Rakta Bandhan Redesign.dc.html`,
 /// section "01 · The design system"). Three brand hues (red/orange/gold)
 /// sampled from the supplied logo, each on a light-to-dark ramp, over warm
 /// paper neutrals. Every screen should read colour from here — never a

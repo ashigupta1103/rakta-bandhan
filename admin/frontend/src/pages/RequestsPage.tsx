@@ -4,7 +4,7 @@
 
 import { useState } from 'react';
 import { useRequests, useAdminActions } from '../hooks/useFirebaseData';
-import { Droplets, Clock, AlertTriangle, Trash2 } from 'lucide-react';
+import { Droplets, Clock, AlertTriangle, Trash2, CheckCircle } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -46,7 +46,7 @@ function timeAgo(ts: { toDate: () => Date } | undefined): string {
 export default function RequestsPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const { requests, loading, loadingMore, hasMore, loadMore, total, error } = useRequests(statusFilter);
-  const { deleteRequest } = useAdminActions();
+  const { deleteRequest, confirmDonation } = useAdminActions();
 
   const openCount = requests.filter((r) => r.status === 'open').length;
   const criticalCount = requests.filter((r) => r.urgency === 'critical' && r.status === 'open').length;
@@ -132,6 +132,24 @@ export default function RequestsPage() {
                         <span className="text-xs text-muted-foreground">{timeAgo(req.expires_at)}</span>
                       </TableCell>
                       <TableCell>
+                        {req.status === 'matched' && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-emerald-600"
+                            title="Confirm the donation happened (for example on a hospital's word)"
+                            onClick={() => {
+                              if (
+                                confirm(
+                                  'Confirm this donation? The request closes as fulfilled, the donor starts their 90-day rest period and the donation is recorded.'
+                                )
+                              )
+                                confirmDonation(req.id);
+                            }}
+                          >
+                            <CheckCircle className="w-3.5 h-3.5" />
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="ghost"

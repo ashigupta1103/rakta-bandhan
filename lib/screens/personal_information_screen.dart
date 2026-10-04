@@ -91,10 +91,10 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
     setState(() => _uploading = true);
     try {
       await Backend.instance.uploadIdProof(picked);
-    } catch (_) {
+    } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not upload ID proof. Please try again.')),
+          SnackBar(content: Text('Could not upload ID proof. ${Backend.authErrorMessage(e)}')),
         );
       }
     } finally {

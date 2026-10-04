@@ -138,8 +138,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       await action();
       _showSnackBar(done);
-    } catch (_) {
-      _showSnackBar('Couldn’t update your photo. Check your connection and try again.');
+    } catch (e) {
+      _showSnackBar('Couldn’t update your photo. ${Backend.authErrorMessage(e)}');
     } finally {
       if (mounted) setState(() => _photoBusy = false);
     }

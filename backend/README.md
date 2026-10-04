@@ -9,16 +9,16 @@ Firebase Auth, driven directly from the Flutter client in
 happens client-side inside Firestore transactions, with `firestore.rules`
 enforcing the invariants a Cloud Function would otherwise guard.
 
-See the root `PROJECT_HANDOFF.md` history and the two design PDFs
-(`Rakta_Bandhan_Backend_Design.pdf`, `Rakta_Bandhan_Backend_Reference.pdf`)
+See `docs/handoff/PROJECT_HANDOFF.md` and the two design PDFs
+(`docs/architecture/Rakta_Bandhan_Backend_Design.pdf`, `docs/architecture/Rakta_Bandhan_Backend_Reference.pdf`)
 for the original Cloud-Functions-based design those describe — that design
 needs the Blaze plan to deploy at all and was never built. What's here is
 the Spark-compatible replacement; see the "requires Blaze" table in the
 plan this was built from for exactly what's simulated instead.
 
-## vs. `Rakta_Bandhan_Technical_HLD.md`
+## vs. `docs/architecture/Rakta_Bandhan_Technical_HLD.md`
 
-That doc (root of repo) is the original, more ambitious architecture —
+That doc is the original, more ambitious architecture —
 Cloud Functions, real FCM push, Geoflutterfire, MSG91, a separate web admin
 dashboard. Decision: stay on Spark, keep what's built here. Three
 different reasons an HLD item isn't built as literally specified —

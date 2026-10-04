@@ -6,9 +6,9 @@
  * a chat/call block-and-report (ChatService.report) writes `reports`. All
  * three are create-only for the submitter and admin-updatable per
  * firestore.rules, so triage here is a plain field write: status
- * New → In progress → Resolved, plus an internal note. There is no reply
- * channel — sending mail needs a server, which this project's Spark plan
- * doesn't run — so the note is admin-only and the page says so.
+ * New → In progress → Resolved, plus an internal note that only admins can
+ * read. A reply goes to `support_replies` and shows up in the member's My
+ * reports; partnership inquiries also carry an Email shortcut to the contact.
  * `reports` specifically has no delete in the rules (an abuse report stays
  * on record regardless of outcome), so that section has no delete button.
  */
@@ -19,16 +19,21 @@ import {
   usePartnershipInquiries,
   useAbuseReports,
   useAdminActions,
+  useSender,
   INBOX_STATUSES,
   INBOX_STATUS_LABELS,
+  fetchConversation,
+  fetchStory,
   type InboxStatus,
+  type AbuseReport,
+  type CommunityStory,
 } from '../hooks/useFirebaseData';
-import { Flag, Handshake, ShieldAlert, Trash2, StickyNote, Inbox } from 'lucide-react';
+import { Flag, Handshake, ShieldAlert, Trash2, StickyNote, Inbox, Mail, MessagesSquare, Eye, EyeOff } from 'lucide-react';
 import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '../lib/utils';
-import { collection, onSnapshot, orderBy, query, where, limit } from 'firebase/firestore';
+import { collection, onSnapshot, orderBy, query, where, limit, type DocumentData } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
 function ReplyBox({ source, id }: { source: string; id: string }) {
@@ -60,6 +65,135 @@ function statusOf(raw?: string): InboxStatus {
   return raw === 'in_progress' || raw === 'resolved' ? raw : 'new';
 }
 
+/** The chat thread behind a chat/call report, loaded only when asked for. */
+function ChatContext({ report }: { report: AbuseReport }) {
+  const [open, setOpen] = useState(false);
+  const [lines, setLines] = useState<(DocumentData & { id: string })[] | null>(null);
+  const [error, setError] = useState('');
+
+  async function toggle() {
+    setOpen(!open);
+    if (open || lines) return;
+    try {
+      setLines(await fetchConversation(report.request_id));
+    } catch {
+      setError('Could not load the conversation.');
+    }
+  }
+
+  const who = (uid: string) =>
+    uid === report.reported_uid ? 'Reported' : uid === report.reporter_uid ? 'Reporter' : 'System';
+  // Never print coordinates: a shared location is only noted, not shown.
+  const text = (m: DocumentData) =>
+    m.kind === 'call'
+      ? `Call${m.call_seconds ? ` · ${m.call_seconds}s` : ''}`
+      : m.kind === 'location'
+        ? 'Shared a location'
+        : String(m.text ?? '');
+
+  return (
+    <div className="space-y-2 border-t border-border pt-3">
+      <Button variant="ghost" size="sm" onClick={toggle}>
+        <MessagesSquare className="w-3.5 h-3.5" /> {open ? 'Hide conversation' : 'View conversation'}
+      </Button>
+      {open &&
+        (error ? (
+          <p className="text-sm text-destructive">{error}</p>
+        ) : lines === null ? (
+          <p className="text-sm text-muted-foreground">Loading…</p>
+        ) : lines.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No messages on this request.</p>
+        ) : (
+          <div className="rounded-md border border-border p-3 space-y-1.5 max-h-72 overflow-y-auto">
+            {lines.map((m) => (
+              <p key={m.id} className="text-sm whitespace-pre-wrap">
+                <span className={cn('font-medium', m.sender_uid === report.reported_uid && 'text-red-600')}>
+                  {who(m.sender_uid)}:
+                </span>{' '}
+                {text(m)}
+              </p>
+            ))}
+          </div>
+        ))}
+    </div>
+  );
+}
+
+/** The community post behind a post report, with hide / delete right there. */
+function StoryPanel({ storyId }: { storyId: string }) {
+  const [story, setStory] = useState<CommunityStory | null | undefined>(undefined);
+  const { setStoryHidden, deleteStory, actionLoading } = useAdminActions();
+  const refresh = () => fetchStory(storyId).then(setStory).catch(() => setStory(null));
+
+  useEffect(() => {
+    let live = true;
+    fetchStory(storyId)
+      .then((s) => live && setStory(s))
+      .catch(() => live && setStory(null));
+    return () => {
+      live = false;
+    };
+  }, [storyId]);
+
+  return (
+    <div className="space-y-2 border-t border-border pt-3">
+      {story === undefined ? (
+        <p className="text-sm text-muted-foreground">Loading post…</p>
+      ) : story === null ? (
+        <p className="text-sm text-muted-foreground">This post no longer exists.</p>
+      ) : (
+        <>
+          <p className="text-xs text-muted-foreground">
+            Reported post by {story.author_name || 'a member'}
+            {story.is_hidden ? ' · currently hidden' : ''}
+          </p>
+          <p className="text-sm whitespace-pre-wrap rounded-md border border-border p-3">{story.body}</p>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={actionLoading}
+              onClick={async () => {
+                await setStoryHidden(story.id, !story.is_hidden, story.author_name);
+                refresh();
+              }}
+            >
+              {story.is_hidden ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}{' '}
+              {story.is_hidden ? 'Unhide post' : 'Hide post'}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-red-600"
+              disabled={actionLoading}
+              onClick={async () => {
+                if (!confirm('Delete this post? This cannot be undone.')) return;
+                await deleteStory(story.id, story.author_name);
+                refresh();
+              }}
+            >
+              <Trash2 className="w-3.5 h-3.5" /> Delete post
+            </Button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+type Section = 'all' | 'support' | 'partnerships' | 'abuse';
+
+/** Who sent it: the member's name and @username, looked up once per session. */
+function Sender({ uid, label = 'From' }: { uid?: string; label?: string }) {
+  const who = useSender(uid);
+  if (!uid) return null;
+  return (
+    <p className="text-xs text-muted-foreground mt-0.5">
+      {label} {who || '…'} <span className="font-mono opacity-60">({uid.slice(0, 6)})</span>
+    </p>
+  );
+}
+
 function timeAgo(ts?: { toDate: () => Date }) {
   if (!ts) return '';
   const diff = Date.now() - ts.toDate().getTime();
@@ -85,6 +219,7 @@ export default function InboxPage() {
   } = useAdminActions();
 
   const [filter, setFilter] = useState<InboxStatus | 'all'>('all');
+  const [section, setSection] = useState<Section>('all');
   const loading = reportsLoading || inquiriesLoading || abuseLoading;
 
   const visibleReports = useMemo(
@@ -104,6 +239,19 @@ export default function InboxPage() {
     reports.filter((r) => statusOf(r.status) !== 'resolved').length +
     inquiries.filter((i) => statusOf(i.status) !== 'resolved').length +
     abuseReports.filter((r) => statusOf(r.status) !== 'resolved').length;
+
+  const open = (items: { status?: string }[]) => items.filter((i) => statusOf(i.status) !== 'resolved').length;
+  const sections: { key: Section; label: string; count: number }[] = [
+    { key: 'all', label: 'All', count: unresolved },
+    { key: 'support', label: 'Help & support', count: open(reports) },
+    { key: 'partnerships', label: 'Partnerships', count: open(inquiries) },
+    { key: 'abuse', label: 'Chat & call reports', count: open(abuseReports) },
+  ];
+  const show = (key: Exclude<Section, 'all'>) => section === 'all' || section === key;
+  const shown =
+    (show('support') ? visibleReports.length : 0) +
+    (show('partnerships') ? visibleInquiries.length : 0) +
+    (show('abuse') ? visibleAbuseReports.length : 0);
 
   async function editNote(current: string, save: (note: string) => Promise<unknown>) {
     const next = window.prompt('Internal note — only admins can read this.', current);
@@ -127,6 +275,24 @@ export default function InboxPage() {
       )}
 
       <div className="flex flex-wrap gap-2">
+        {sections.map(({ key, label, count }) => (
+          <button
+            key={key}
+            onClick={() => setSection(key)}
+            className={cn(
+              'px-3 py-1.5 rounded-full text-sm font-medium border transition-colors',
+              section === key
+                ? 'bg-foreground text-background border-transparent'
+                : 'border-border text-muted-foreground hover:text-foreground hover:bg-accent'
+            )}
+          >
+            {label}
+            {count > 0 && <span className="ml-1.5 text-xs opacity-70">{count}</span>}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex flex-wrap gap-2">
         {(['all', ...INBOX_STATUSES] as const).map((value) => (
           <button
             key={value}
@@ -143,7 +309,7 @@ export default function InboxPage() {
         ))}
       </div>
 
-      {!loading && visibleReports.length === 0 && visibleInquiries.length === 0 && visibleAbuseReports.length === 0 && (
+      {!loading && shown === 0 && (
         <Card className="p-8 flex flex-col items-center gap-2 text-center">
           <Inbox className="w-6 h-6 text-muted-foreground" />
           <p className="text-sm text-muted-foreground">
@@ -154,7 +320,7 @@ export default function InboxPage() {
         </Card>
       )}
 
-      {visibleAbuseReports.length > 0 && (
+      {show('abuse') && visibleAbuseReports.length > 0 && (
         <section className="space-y-3">
           <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             <ShieldAlert className="w-3.5 h-3.5" /> Chat &amp; call reports
@@ -166,6 +332,8 @@ export default function InboxPage() {
                 <div className="flex items-start gap-3">
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium">{report.reason}</p>
+                    <Sender uid={report.reporter_uid} />
+                    {!report.story_id && <Sender uid={report.reported_uid} label="Reported" />}
                     <p className="text-xs text-muted-foreground font-mono mt-0.5">
                       {report.story_id
                         ? <>community post {report.story_id}</>
@@ -212,6 +380,11 @@ export default function InboxPage() {
                     <StickyNote className="w-3.5 h-3.5" /> {report.admin_note ? 'Edit note' : 'Add note'}
                   </Button>
                 </div>
+                {report.story_id ? (
+                  <StoryPanel storyId={report.story_id} />
+                ) : report.request_id ? (
+                  <ChatContext report={report} />
+                ) : null}
                 <ReplyBox source="reports" id={report.id} />
               </Card>
             );
@@ -219,7 +392,7 @@ export default function InboxPage() {
         </section>
       )}
 
-      {visibleReports.length > 0 && (
+      {show('support') && visibleReports.length > 0 && (
         <section className="space-y-3">
           <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             <Flag className="w-3.5 h-3.5" /> Issue reports
@@ -231,6 +404,7 @@ export default function InboxPage() {
                 <div className="flex items-start gap-3">
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium">{report.reason}</p>
+                    <Sender uid={report.reporter_uid} />
                     {report.details && (
                       <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">{report.details}</p>
                     )}
@@ -289,7 +463,7 @@ export default function InboxPage() {
         </section>
       )}
 
-      {visibleInquiries.length > 0 && (
+      {show('partnerships') && visibleInquiries.length > 0 && (
         <section className="space-y-3">
           <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             <Handshake className="w-3.5 h-3.5" /> Partnership inquiries
@@ -301,6 +475,7 @@ export default function InboxPage() {
                 <div className="flex items-start gap-3">
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium">{inquiry.org_name}</p>
+                    <Sender uid={inquiry.requester_uid} label="Sent by member" />
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {inquiry.contact_name} · {inquiry.work_email}
                     </p>
@@ -336,6 +511,14 @@ export default function InboxPage() {
                     </button>
                   ))}
                   <div className="flex-1" />
+                  <a
+                    className={buttonVariants({ variant: 'ghost', size: 'sm' })}
+                    href={`mailto:${encodeURIComponent(inquiry.work_email)}?subject=${encodeURIComponent(
+                      `Rakta Bandhan partnership: ${inquiry.org_name}`
+                    )}`}
+                  >
+                    <Mail className="w-3.5 h-3.5" /> Email
+                  </a>
                   <Button
                     variant="ghost"
                     size="sm"
