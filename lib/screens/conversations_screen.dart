@@ -4,11 +4,15 @@ import '../services/backend.dart';
 import '../services/chat_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
+import '../widgets/brand_glyph.dart';
 import '../widgets/identity_disc.dart';
 import '../widgets/pressable.dart';
 import '../widgets/state_card.dart';
 import 'call_screen.dart';
 import 'chat_screen.dart';
+import 'create_request_screen.dart';
+import 'main_navigation_screen.dart';
+import 'tracking_screen.dart';
 import '../widgets/rb_icon.dart';
 
 /// Messages inbox — every person this user has been matched with, newest
@@ -19,11 +23,16 @@ import '../widgets/rb_icon.dart';
 /// Reached from the chat icon on the Request tab (badged with the unread
 /// count) and from the in-app message banner.
 class ConversationsScreen extends StatelessWidget {
-  const ConversationsScreen({super.key});
+  /// Overrides for tests only — production reads the real services.
+  final Stream<List<Conversation>>? conversations;
+  final Stream<MyRequestState>? requestState;
+  final String? myUidOverride;
+
+  const ConversationsScreen({super.key, this.conversations, this.requestState, this.myUidOverride});
 
   @override
   Widget build(BuildContext context) {
-    final myUid = Backend.instance.currentUser?.uid ?? '';
+    final myUid = myUidOverride ?? Backend.instance.currentUser?.uid ?? '';
     return Scaffold(
       backgroundColor: AppColors.warmPageBackground,
       body: SafeArea(
@@ -43,9 +52,13 @@ class ConversationsScreen extends StatelessWidget {
                 ],
               ),
             ),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Text('Your conversations about donations', style: TextStyle(fontSize: 13.5, color: AppColors.ink2)),
+            ),
             Expanded(
               child: StreamBuilder<List<Conversation>>(
-                stream: ChatService.instance.watchConversations(),
+                stream: conversations ?? ChatService.instance.watchConversations(),
                 builder: (context, snap) {
                   if (snap.hasError) {
                     return Center(child: StateCard.error(title: 'Couldn’t load your messages', message: 'Check your connection and try again.'));
@@ -53,16 +66,7 @@ class ConversationsScreen extends StatelessWidget {
                   if (!snap.hasData) return const Center(child: CircularProgressIndicator(strokeWidth: 2));
                   final all = snap.data!;
                   if (all.isEmpty) {
-                    return const Center(
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 24),
-                        child: StateCard(
-                          icon: RbGlyph.message,
-                          title: 'No conversations yet',
-                          message: 'When a donor accepts your request — or you accept someone’s — you can message and call each other here. Phone numbers stay private.',
-                        ),
-                      ),
-                    );
+                    return _EmptyMessages(requestState: requestState);
                   }
                   final active = all.where((c) => c.isOpen).toList();
                   final past = all.where((c) => !c.isOpen).toList();
@@ -85,6 +89,93 @@ class ConversationsScreen extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// What the empty state needs to know about the user's own requests.
+/// [openIds] are requests still waiting for a donor; [hasAny] is any
+/// request at all (past ones included).
+typedef MyRequestState = ({List<String> openIds, bool hasAny});
+
+/// Read-only: reuses [Backend.myRequestsStream] (the requester's own
+/// requests — nothing about anyone else).
+Stream<MyRequestState> _myRequestState() => Backend.instance.myRequestsStream().map((q) {
+      final open = q.docs.where((d) => d.data()['status'] == 'open').map((d) => d.id).toList();
+      return (openIds: open, hasAny: q.docs.isNotEmpty);
+    });
+
+/// No conversations: explain what Messages is for and offer the next step
+/// that fits the user's real state. Messaging only opens once a donor and
+/// requester are matched (backend rules). If the lookup fails, falls back to
+/// the generic state.
+class _EmptyMessages extends StatelessWidget {
+  final Stream<MyRequestState>? requestState;
+  const _EmptyMessages({this.requestState});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<MyRequestState>(
+      stream: requestState ?? _myRequestState(),
+      builder: (context, snap) {
+        if (!snap.hasData && !snap.hasError) {
+          return const Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)));
+        }
+        final s = snap.data; // null on error -> generic
+        final openIds = s?.openIds ?? const <String>[];
+        final active = openIds.isNotEmpty;
+        final many = openIds.length > 1;
+        final title = active ? (many ? 'Your requests are active' : 'Your request is active') : (s?.hasAny ?? false) ? 'No conversations yet' : 'No conversations yet';
+        final body = active
+            ? 'Your conversation will appear here when a donor responds. Phone numbers stay private.'
+            : (s?.hasAny ?? false)
+                ? 'Once a request is accepted or someone responds, your conversation will appear here.'
+                : 'Your conversations with donors and requesters will appear here. Phone numbers stay private.';
+        return Align(
+          alignment: const Alignment(0, -0.35),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const BrandGlyph(icon: RbGlyph.message, size: 52),
+                const SizedBox(height: 16),
+                Text(title, textAlign: TextAlign.center, style: AppTextStyles.display(fontSize: 22, color: AppColors.ink)),
+                const SizedBox(height: 8),
+                Text(body, textAlign: TextAlign.center, style: const TextStyle(fontSize: 14, height: 1.45, color: AppColors.ink2)),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    // One open request -> its tracking screen; several -> the
+                    // Request tab, where the user picks one.
+                    onPressed: () => many
+                        ? Navigator.pushAndRemoveUntil(
+                            context,
+                            MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
+                            (_) => false,
+                          )
+                        : Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => active ? TrackingScreen(requestId: openIds.first) : const CreateRequestScreen()),
+                          ),
+                    child: Text(many ? 'View my requests' : active ? 'View my request' : 'Request blood'),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                TextButton(
+                  onPressed: () => Navigator.pushAndRemoveUntil(
+                    context,
+                    MaterialPageRoute(builder: (_) => const MainNavigationScreen(initialTab: 1)),
+                    (_) => false,
+                  ),
+                  child: const Text('Find donors'),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

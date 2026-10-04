@@ -604,7 +604,7 @@ service cloud.firestore {
         && request.resource.data.author_uid == request.auth.uid
         && request.resource.data.consent_to_publish == true
         && request.resource.data.quote is string
-        && request.resource.data.quote.size() >= 10
+        && request.resource.data.quote.size() >= 1
         && request.resource.data.quote.size() <= 600;
       allow read, delete: if isAdmin();
       allow update: if false;

@@ -8,7 +8,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/app_header.dart';
 import '../widgets/blood_group_droplet.dart';
-import '../widgets/impact_trail.dart';
+import '../widgets/donation_journey.dart';
 import '../widgets/urgent_alert_toggle.dart';
 import '../widgets/logout_flow.dart';
 import '../widgets/pulsing_dot.dart';
@@ -217,12 +217,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       _recoveryCard(reactivateAt),
                     ],
                     const RbSectionLabel('Your impact'),
-                    ImpactTrail(
+                    DonationJourney(
                       count: donationCount,
-                      caption: donationCount == 0
-                          ? 'No donations recorded yet'
-                          : '${donationCount == 1 ? '1 donation' : '$donationCount donations'} recorded through Rakta Bandhan',
+                      message: donationCount == 0
+                          ? 'Your first donation starts your journey. Every confirmed donation will appear here.'
+                          : 'Confirmed donations recorded through Rakta Bandhan.',
                     ),
+                    if (donationCount == 0) ...[
+                      const SizedBox(height: 12),
+                      const Align(alignment: Alignment.centerLeft, child: SeeWhoNeedsHelpButton()),
+                    ],
                     const RbSectionLabel('Account'),
                     RbListGroup(
                       children: [

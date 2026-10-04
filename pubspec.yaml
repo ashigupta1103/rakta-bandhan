@@ -31,9 +31,6 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # The following adds the Cupertino Icons font to your application.
-  # Use with the CupertinoIcons class for iOS style icons.
-  cupertino_icons: ^1.0.8
   lucide_icons_flutter: ^3.1.15
   firebase_core: ^3.6.0
   cloud_firestore: ^5.4.4
@@ -53,7 +50,6 @@ dependencies:
   # remain the fallback (web, and builds without a key).
   google_maps_flutter: ^2.18.2
   latlong2: ^0.9.1
-  country_flags: ^3.1.0
   image_picker: ^1.2.3
   image: ^4.10.1
   firebase_analytics: ^11.6.0
@@ -101,8 +97,6 @@ flutter:
   assets:
     - assets/branding/final-logo.jpeg
     - assets/branding/final-logo-transparent.png
-    - assets/illustrations/received-empty-state.png
-    - assets/illustrations/hands_heart.png
     - assets/sounds/urgent_alert.wav
     - assets/sounds/incoming_call.wav
     # About › Our team: member photos and logo.

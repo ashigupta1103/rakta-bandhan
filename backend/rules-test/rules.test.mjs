@@ -666,6 +666,15 @@ describe('admin-only areas', () => {
     await assertFails(addDoc(collection(verified('u1'), 'testimonials'), t));
   });
 
+  test('a short testimonial is accepted; empty and over-long ones are refused', async () => {
+    const t = { author_uid: 'u1', name: 'A', role: '', consent_to_publish: true, created_at: serverTimestamp() };
+    const col = () => collection(verified('u1'), 'testimonial_submissions');
+    await assertSucceeds(addDoc(col(), { ...t, quote: 'Thank you!' }));
+    await assertSucceeds(addDoc(col(), { ...t, quote: 'x'.repeat(600) }));
+    await assertFails(addDoc(col(), { ...t, quote: '' }));
+    await assertFails(addDoc(col(), { ...t, quote: 'x'.repeat(601) }));
+  });
+
   test('members cannot read the testimonial queue', async () => {
     await seed((db) => setDoc(doc(db, 'testimonial_submissions/t1'), { author_uid: 'u1', quote: 'x'.repeat(20), consent_to_publish: true }));
     await assertFails(getDoc(doc(verified('u2'), 'testimonial_submissions/t1')));

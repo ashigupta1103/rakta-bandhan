@@ -202,19 +202,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ],
           ),
-          const RbSectionLabel('What others can see'),
-          RbCard(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
-            child: Column(
-              children: [
-                _privacyLine(RbGlyph.hangUp, 'Your phone number', 'Never shown to anyone. You see only its last three digits.'),
-                _privacyLine(RbGlyph.pin, 'Your location', 'Others see your neighbourhood, rounded to about 1 km — never an exact address.'),
-                _privacyLine(RbGlyph.photo, 'Your profile photo', 'Visible only to you.'),
-                _privacyLine(RbGlyph.idCard, 'Your ID proof', 'Seen only by the verification team, then deleted.'),
-                _privacyLine(RbGlyph.message, 'Chats and calls', 'Only between you and the person you’re matched with. Calls are never recorded.'),
-              ],
-            ),
-          ),
+          const PrivacyVisibility(),
           const RbSectionLabel('Your data'),
           RbListGroup(
             children: [
@@ -262,7 +250,50 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   void _open(Widget screen) => Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
 
-  Widget _privacyLine(RbGlyph icon, String title, String body) => Padding(
+  Widget _smallSpinner() => const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2));
+}
+
+/// What other people can and cannot see about you. Kept separate and
+/// worded from the other person's point of view so it reads in seconds.
+/// Matches the data model: `donors_public` (name, username, blood group,
+/// availability, ~1 km area) is shared; phone, exact location, photo and ID
+/// proof stay private.
+class PrivacyVisibility extends StatelessWidget {
+  const PrivacyVisibility({super.key});
+
+  static const canSee = [
+    (RbGlyph.person, 'Your name and username', 'Shown on your donor listing and on requests you make or accept.'),
+    (RbGlyph.droplet, 'Your blood group and availability', 'Shown to people looking for donors.'),
+    (RbGlyph.pin, 'Your neighbourhood', 'Rounded to about 1 km. Never an exact address.'),
+    (RbGlyph.message, 'Chats and calls', 'Only the person you’re matched with. Calls are never recorded.'),
+  ];
+
+  static const cannotSee = [
+    (RbGlyph.hangUp, 'Your phone number', 'Never shown to anyone. You see only its last three digits.'),
+    (RbGlyph.pin, 'Your exact location', 'Kept private. Only the rounded neighbourhood is shared.'),
+    (RbGlyph.photo, 'Your profile photo', 'Visible only to you.'),
+    (RbGlyph.idCard, 'Your ID proof', 'Seen only by the verification team, then deleted.'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const RbSectionLabel('What others can see'),
+        _group(canSee),
+        const RbSectionLabel('What others cannot see'),
+        _group(cannotSee),
+      ],
+    );
+  }
+
+  Widget _group(List<(RbGlyph, String, String)> lines) => RbCard(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 2),
+        child: Column(children: [for (final (icon, title, body) in lines) _line(icon, title, body)]),
+      );
+
+  Widget _line(RbGlyph icon, String title, String body) => Padding(
         padding: const EdgeInsets.only(bottom: 12),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -283,5 +314,4 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       );
 
-  Widget _smallSpinner() => const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2));
 }

@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import '../services/backend.dart';
 import '../services/donation_history_service.dart';
 import '../theme/app_colors.dart';
-import '../theme/app_text_styles.dart';
-import '../widgets/blood_group_droplet.dart';
+import '../widgets/certificate_card.dart';
+import '../widgets/donation_journey.dart';
+import '../widgets/pressable.dart';
+import '../widgets/rb_ui.dart';
 import '../widgets/state_card.dart';
 import 'certificate_screen.dart';
 import '../widgets/rb_icon.dart';
@@ -16,16 +18,20 @@ import '../widgets/rb_icon.dart';
 /// the per-donation list comes from FirestoreDonationHistoryService,
 /// which reads the real `donation_history` collection.
 class DonationHistoryScreen extends StatefulWidget {
-  const DonationHistoryScreen({super.key});
+  /// Replaces the Firestore loads — widget tests run without Firebase.
+  @visibleForTesting
+  final Future<(int, List<DonationRecord>, String)> Function()? loader;
+
+  const DonationHistoryScreen({super.key, this.loader});
 
   @override
   State<DonationHistoryScreen> createState() => _DonationHistoryScreenState();
 }
 
 class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
-  final DonationHistoryService _service = FirestoreDonationHistoryService();
+  late final DonationHistoryService _service = FirestoreDonationHistoryService();
   // Not final: "Try again" replaces it.
-  late Future<(int, List<DonationRecord>)> _future;
+  late Future<(int, List<DonationRecord>, String)> _future;
 
   @override
   void initState() {
@@ -33,18 +39,13 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
     _future = _load();
   }
 
-  Future<(int, List<DonationRecord>)> _load() async {
+  Future<(int, List<DonationRecord>, String)> _load() async {
+    if (widget.loader != null) return widget.loader!();
     final count = await Backend.instance.myDonationCount();
     final history = await _service.fetchHistory();
-    return (count, history);
-  }
-
-  /// DonationRecord.date is formatted "D Month YYYY" by the mock service —
-  /// split into day/month for the timeline's serif date badge (drops the
-  /// year, which the design doesn't show per row).
-  (String, String) _dayMonth(String date) {
-    final parts = date.split(' ');
-    return parts.length >= 2 ? (parts[0], parts[1]) : (date, '');
+    // Same name the certificate screen prints, so the preview matches it.
+    final name = (await Backend.instance.myDonorDoc()).data()?['name'] as String?;
+    return (count, history, name ?? 'A Rakta Bandhan donor');
   }
 
   @override
@@ -68,7 +69,7 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
               ),
             ),
             Expanded(
-              child: FutureBuilder<(int, List<DonationRecord>)>(
+              child: FutureBuilder<(int, List<DonationRecord>, String)>(
                 future: _future,
                 builder: (context, snapshot) {
                   if (snapshot.hasError) {
@@ -79,64 +80,28 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
                   if (!snapshot.hasData) {
                     return const Center(child: CircularProgressIndicator(strokeWidth: 2));
                   }
-                  final (count, history) = snapshot.data!;
-                  final milestone = 10;
-                  final toMilestone = (milestone - count).clamp(0, milestone);
-
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                  final (count, history, name) = snapshot.data!;
+                  return ListView(
+                    padding: kRbPagePadding,
                     children: [
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(24, 6, 24, 0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Text('$count', style: AppTextStyles.display(fontSize: 44, color: AppColors.textPrimaryWarm, height: 0.88)),
-                                const SizedBox(width: 14),
-                                Padding(
-                                  padding: const EdgeInsets.only(bottom: 4),
-                                  child: Text(
-                                    '${count == 1 ? 'unit given' : 'units given'} ·\n${count == 1 ? '1 person' : '$count people'} helped',
-                                    style: const TextStyle(fontSize: 13.5, color: AppColors.textSecondary, height: 1.4),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                for (var i = 0; i < milestone; i++)
-                                  BloodGroupDroplet(label: '', size: 22, filled: i < count, color: i < count ? AppColors.primary : AppColors.dividerWarm),
-                              ],
-                            ),
-                            if (toMilestone > 0) ...[
-                              const SizedBox(height: 10),
-                              Text(
-                                '$toMilestone more and you reach the $milestone-unit mark',
-                                style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
-                              ),
-                            ],
-                            Container(height: 1, color: AppColors.dividerWarm, margin: const EdgeInsets.symmetric(vertical: 22)),
-                          ],
-                        ),
+                      const Padding(
+                        padding: EdgeInsets.only(bottom: 10),
+                        child: Text('Your journey', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.ink2)),
                       ),
-                      Expanded(
-                        child: history.isEmpty
-                            ? Center(child: StateCard.empty(icon: RbGlyph.history, title: 'No donations recorded yet.'))
-                            : SingleChildScrollView(
-                                padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-                                child: Column(
-                                  children: [
-                                    for (var i = 0; i < history.length; i++)
-                                      _timelineRow(history[i], isLast: i == history.length - 1, donationNumber: history.length - i),
-                                  ],
-                                ),
-                              ),
+                      DonationJourney(
+                        count: count,
+                        message: count == 0
+                            ? 'Your first confirmed donation will start your history here.'
+                            : 'Every confirmed donation is listed below.',
                       ),
+                      const SizedBox(height: 14),
+                      if (history.isEmpty)
+                        _empty()
+                      else
+                        for (var i = 0; i < history.length; i++) ...[
+                          if (i > 0) const Divider(height: 1, color: AppColors.dividerWarm),
+                          _row(history[i], name: name, donationNumber: history.length - i),
+                        ],
                     ],
                   );
                 },
@@ -148,64 +113,69 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
     );
   }
 
-  Widget _timelineRow(DonationRecord record, {required bool isLast, required int donationNumber}) {
-    final (day, month) = _dayMonth(record.date);
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SizedBox(
-            width: 22,
-            child: Column(
-              children: [
-                Container(width: 11, height: 11, margin: const EdgeInsets.only(top: 4), decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle)),
-                if (!isLast) Expanded(child: Container(width: 1, color: AppColors.dividerWarm, margin: const EdgeInsets.only(top: 4))),
-              ],
+  /// Compact and top-aligned: no icon, no vertical centring.
+  Widget _empty() => const Padding(
+        padding: EdgeInsets.only(top: 22),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('No donations recorded yet', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
+            SizedBox(height: 6),
+            Text(
+              'After your first confirmed donation, your donation date, hospital and certificate will appear here.',
+              style: TextStyle(fontSize: 14, height: 1.45, color: AppColors.textSecondary),
             ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 24),
+            SizedBox(height: 14),
+            SeeWhoNeedsHelpButton(),
+          ],
+        ),
+      );
+
+  /// Thumbnail = the real certificate, whole and in its own proportions.
+  Widget _thumb(DonationRecord record, String name, int donationNumber) {
+    const w = 58.0;
+    final h = w * DonationCertificateCard.size.height / DonationCertificateCard.size.width;
+    return Container(
+      width: w,
+      height: h,
+      decoration: BoxDecoration(borderRadius: BorderRadius.circular(4), border: Border.all(color: AppColors.warmBorder)),
+      clipBehavior: Clip.antiAlias,
+      child: FittedBox(
+        child: ExcludeSemantics(
+          child: DonationCertificateCard(record: record, donationNumber: donationNumber, name: name),
+        ),
+      ),
+    );
+  }
+
+  Widget _row(DonationRecord record, {required String name, required int donationNumber}) {
+    final meta = [if (record.date.isNotEmpty) record.date, if (record.bloodGroup.isNotEmpty) record.bloodGroup].join(' · ');
+    return Pressable(
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CertificateScreen(record: record, donationNumber: donationNumber))),
+      semanticLabel: 'View certificate, donation at ${record.hospital}',
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        child: Row(
+          children: [
+            _thumb(record, name, donationNumber),
+            const SizedBox(width: 14),
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Text(record.hospital, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
-                      ),
-                      Text('$day $month', style: AppTextStyles.display(fontSize: 14.5, color: AppColors.textPrimaryWarm)),
-                    ],
-                  ),
-                  const SizedBox(height: 3),
-                  Text(record.bloodGroup, style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary)),
-                  const SizedBox(height: 6),
-                  GestureDetector(
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => CertificateScreen(record: record, donationNumber: donationNumber)),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        RbIcon(RbGlyph.certificate, size: 13, color: AppColors.primary),
-                        SizedBox(width: 5),
-                        Text('View certificate', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primary)),
-                      ],
-                    ),
-                  ),
-                  if (isLast) ...[
-                    const SizedBox(height: 7),
-                    const Text('Your first donation', style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                  Text(record.hospital, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600, color: AppColors.textPrimaryWarm)),
+                  if (meta.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(meta, style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary)),
                   ],
+                  const SizedBox(height: 6),
+                  const Text('View certificate', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.primary)),
                 ],
               ),
             ),
-          ),
-        ],
+            const RbIcon(RbGlyph.chevron, size: 16, color: AppColors.chevronMuted),
+          ],
+        ),
       ),
     );
   }
