@@ -149,7 +149,7 @@ class CorporatePartnershipsScreen extends StatelessWidget {
 /// against backend.dart), so submitting never claims the message reached
 /// anyone. Backend requirement: a write-only "partnership_enquiries"
 /// endpoint/collection plus a way for the Rakta Bandhan team to see
-/// submissions — tracked in STAKEHOLDER_REQUIREMENTS_CHECKLIST.md.
+/// submissions — tracked in docs/launch/STAKEHOLDER_REQUIREMENTS_CHECKLIST.md.
 class _ConversationSheet extends StatefulWidget {
   const _ConversationSheet();
 

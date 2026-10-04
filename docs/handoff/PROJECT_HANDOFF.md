@@ -130,7 +130,7 @@ Antigravity is an agentic Flutter IDE the user is using, working directly on the
 
 ### Audit prompt
 ```
-Read design/rakta-bandhan-style-guide.md and design/rakta-bandhan-full-build-spec.md.
+Read design/v1_original/rakta-bandhan-style-guide.md and design/v1_original/rakta-bandhan-full-build-spec.md.
 
 Before making any changes, explore the lib/ folder and give me a summary of:
 1. Every screen/widget file that currently exists and what it renders
@@ -417,8 +417,8 @@ Plan required one explicit confirmation before approval: `FindDonorsScreen` and 
 
 | File | Purpose |
 |---|---|
-| `design/rakta-bandhan-style-guide.md` | Standalone visual style guide: exact hex colors, typography scale, spacing/radius rules, component specs, and an explicit "what NOT to do" list. Intended to be dropped into the project folder and read by Antigravity. |
-| `design/rakta-bandhan-full-build-spec.md` | Merged document combining the 9-screen content wireframe (from the user's own ChatGPT session) with the same visual system from the style guide — this is the primary spec Antigravity was instructed to follow screen-by-screen. |
+| `design/v1_original/rakta-bandhan-style-guide.md` | Standalone visual style guide: exact hex colors, typography scale, spacing/radius rules, component specs, and an explicit "what NOT to do" list. Intended to be dropped into the project folder and read by Antigravity. |
+| `design/v1_original/rakta-bandhan-full-build-spec.md` | Merged document combining the 9-screen content wireframe (from the user's own ChatGPT session) with the same visual system from the style guide — this is the primary spec Antigravity was instructed to follow screen-by-screen. |
 | `lib/theme/app_colors.dart` | All color constants (brand, neutral, status) — single source of truth for color, referenced by every screen. |
 | `lib/theme/app_theme.dart` | Central `ThemeData` — button/input/text/icon theming, radius rules, wired into `MaterialApp` in `main.dart`. |
 | `lib/main.dart` (or project root `main.dart`) | App entry point; sets `theme: AppTheme.lightTheme` and `home: SplashScreen`. |
@@ -487,6 +487,6 @@ Plan required one explicit confirmation before approval: `FindDonorsScreen` and 
 4. **Do not rebuild working features unnecessarily.** If a screen already matches spec, leave it alone — focus effort on the two specifically flagged visual-risk items (Section 12, items 3 and 4) and on getting the app actually running.
 5. **Do not reintroduce any of the rejected designs/approaches in Section 11** — most importantly: no emoji icons, no native date pickers, no multiple saturated colors, no ALL CAPS text, no logo changes, no hardcoded inline colors.
 6. **Clearly distinguish prototype/mock functionality from production functionality** (Section 9) when discussing next steps with the user — don't let "the OTP screen works" be confused with "OTP verification is real," for example.
-7. **Use `design/rakta-bandhan-style-guide.md` and `design/rakta-bandhan-full-build-spec.md` (if present in the project) as ongoing design reference/context** for any future screen work or edits — they are the canonical visual and content spec.
+7. **Use `design/v1_original/rakta-bandhan-style-guide.md` and `design/v1_original/rakta-bandhan-full-build-spec.md` (if present in the project) as ongoing design reference/context** for any future screen work or edits — they are the canonical visual and content spec.
 8. **Ask before making major architectural changes** — e.g., adding a state management library, adding `google_maps_flutter` and its API key/billing requirement, choosing a backend, or restructuring navigation — none of these were decided in this conversation, and the user has shown a strong preference throughout for reviewing and approving changes before they're made, not having them made unilaterally.
 9. **When in doubt about a visual detail not covered here, default to the exact values in Section 3** rather than a generic Flutter/Material default.

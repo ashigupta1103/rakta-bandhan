@@ -679,6 +679,70 @@ describe('admin-only areas', () => {
     await seed((db) => setDoc(doc(db, 'testimonial_submissions/t1'), { author_uid: 'u1', quote: 'x'.repeat(20), consent_to_publish: true }));
     await assertFails(getDoc(doc(verified('u2'), 'testimonial_submissions/t1')));
   });
+
+  test('an admin approves a queued testimonial in one batch and can reject another', async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db, 'admins/boss'), { role: 'admin' });
+      await setDoc(doc(db, 'testimonial_submissions/t1'), { author_uid: 'u1', name: 'A', quote: 'x'.repeat(20), consent_to_publish: true });
+      await setDoc(doc(db, 'testimonial_submissions/t2'), { author_uid: 'u2', name: 'B', quote: 'y'.repeat(20), consent_to_publish: true });
+    });
+    const adminDb = verified('boss');
+    const batch = writeBatch(adminDb);
+    batch.set(doc(adminDb, 'testimonials/live1'), { quote: 'x'.repeat(20), name: 'A', role: '', author_uid: 'u1', submitted_by_member: true, created_at: serverTimestamp() });
+    batch.delete(doc(adminDb, 'testimonial_submissions/t1'));
+    await assertSucceeds(batch.commit());
+    await assertSucceeds(deleteDoc(doc(adminDb, 'testimonial_submissions/t2')));
+    // the same batch from a member is refused
+    const memberDb = verified('u1');
+    const bad = writeBatch(memberDb);
+    bad.set(doc(memberDb, 'testimonials/live2'), { quote: 'z'.repeat(20), name: 'A', created_at: serverTimestamp() });
+    await assertFails(bad.commit());
+  });
+});
+
+describe('admin: confirm a donation, feature switches', () => {
+  const seedMatched = () => seed(async (db) => {
+    await setDoc(doc(db, 'admins/boss'), { role: 'admin' });
+    await setDoc(doc(db, 'requests/r1'), {
+      requester_uid: 'u1', blood_group: 'O+', units_needed: 1, status: 'matched', matched_donor_id: 'u2',
+      location_label: 'Apollo, Greams Road', created_at: serverTimestamp(),
+    });
+    await setDoc(doc(db, 'donors/u2'), { name: 'D', blood_group: 'O+', is_available: false, active_request_id: 'r1' });
+    await setDoc(doc(db, 'donors_public/u2'), { name: 'D', blood_group: 'O+', is_available: false });
+  });
+
+  test('an admin can close a matched request as donated, start the rest period and record it', async () => {
+    await seedMatched();
+    const db = verified('boss');
+    const batch = writeBatch(db);
+    batch.update(doc(db, 'requests/r1'), { status: 'fulfilled', fulfilled_at: serverTimestamp(), fulfilled_by: 'boss' });
+    batch.update(doc(db, 'donors/u2'), {
+      last_donation_date: serverTimestamp(), is_available: false, active_request_id: null, reactivation_scheduled_at: future(90),
+    });
+    batch.update(doc(db, 'donors_public/u2'), { is_available: false, updated_at: serverTimestamp() });
+    batch.set(doc(db, 'donation_history/r1'), {
+      donor_id: 'u2', request_id: 'r1', donation_date: serverTimestamp(), confirmed_by: 'admin', verified_by: 'boss',
+      hospital: 'Apollo, Greams Road', blood_group: 'O+',
+    });
+    batch.set(doc(db, 'public_stats/impact'), { month_key: '2026-10', donations_this_month: 1, updated_at: serverTimestamp() });
+    await assertSucceeds(batch.commit());
+  });
+
+  test('a member cannot write an admin-confirmed history record', async () => {
+    await seedMatched();
+    await assertFails(setDoc(doc(verified('u2'), 'donation_history/r1'), {
+      donor_id: 'u2', request_id: 'r1', donation_date: serverTimestamp(), confirmed_by: 'admin', verified_by: 'u2',
+      hospital: 'Apollo, Greams Road', blood_group: 'O+',
+    }));
+  });
+
+  test('only an admin can flip a feature switch, and anyone signed in can read it', async () => {
+    await seed((db) => setDoc(doc(db, 'admins/boss'), { role: 'admin' }));
+    const flag = { phone_required: true, updated_by: 'boss', updated_at: serverTimestamp() };
+    await assertFails(setDoc(doc(verified('u1'), 'config/features'), flag, { merge: true }));
+    await assertSucceeds(setDoc(doc(verified('boss'), 'config/features'), flag, { merge: true }));
+    await assertSucceeds(getDoc(doc(verified('u1'), 'config/features')));
+  });
 });
 
 describe('private support conversations', () => {

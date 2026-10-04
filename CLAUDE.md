@@ -10,9 +10,9 @@ Deployable parts in this repo:
 - `lib/` — the Flutter app (the main product).
 - `backend/` — Firestore + Storage security rules, indexes, and `rules-test/` (emulator tests).
 - `functions/` — Cloud Functions (TypeScript, Blaze): push notifications, call ringing, nearby-donor fan-out, broadcasts, request expiry. They only *notify*; all data invariants stay in the rules.
-- `admin/frontend/` — React 19 + Vite + Tailwind + shadcn admin dashboard, reads Firestore directly, deployed to Firebase Hosting (`firebase.json` → `admin/frontend/build`), with static legal pages (`public/legal/`) and the share page (`public/app/`). `admin/backend/functions/` is an old, undeployed draft — the live functions are in `functions/`.
+- `admin/frontend/` — React 19 + Vite + Tailwind + shadcn admin dashboard, reads Firestore directly (Inbox: support, partnership and chat/post reports with replies; Content, incl. the testimonial review queue; Requests can confirm a donation; Settings flips the `config/features` switches), deployed to Firebase Hosting (`firebase.json` → `admin/frontend/build`), with static legal pages (`public/legal/`) and the share page (`public/app/`). `admin/backend/functions/` is an old, undeployed draft — the live functions are in `functions/`.
 
-`design/`, `design_new/`, `design_updated/` are design artifacts and a separate reference Flutter snapshot (`design_new/flutter`, excluded from analysis) — not app source.
+`design/` (`v1_original/`, `v2_new/`, `v3_updated/`; the approved final is `v3_updated/Rakta Bandhan Redesign.dc.html`) holds design artifacts and a separate reference Flutter snapshot (`design/v2_new/flutter`, excluded from analysis) — not app source. `docs/` is split into `architecture/`, `handoff/`, `planning/`, `launch/`, `publishing/` and `specs/`; `releases/` holds old APKs.
 
 ## Commands
 
@@ -75,7 +75,7 @@ Firebase **Spark** until the owner upgrades to Blaze. Data logic runs client-sid
 
 ## Design system rules
 
-`PROJECT_HANDOFF.md` documents the original redesign; its palette section is **outdated** — the live tokens are in `lib/theme/`:
+`docs/handoff/PROJECT_HANDOFF.md` documents the original redesign; its palette section is **outdated** — the live tokens are in `lib/theme/`:
 - Colors only via `AppColors` (logo-derived warm system: `brandRed` ramp, vermilion/orange, gold, warm neutrals, `emberField*` gradient reserved for emotional-peak screens — consent, matching, match, certificate). Many legacy aliases (`primary`, `textPrimaryWarm`, …) point at the same tokens; don't add new duplicates.
 - Two type voices: Barlow (theme default, all UI chrome) and Newsreader via `AppTextStyles.display()` for names, headlines, counts only.
 - Icons: `lucide_icons_flutter` only. No emoji or Unicode glyphs as icons, no Material `Icons.*`. Icon-on-tint mounts use `BrandGlyph` (droplet), not a tinted circle.

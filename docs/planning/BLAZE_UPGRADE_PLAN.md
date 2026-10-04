@@ -74,7 +74,7 @@ CLI token is stale. Ask the user to run `firebase login --reauth`. You can't do 
 4. `lib/services/admin_service.dart` and `lib/screens/admin_dashboard_screen.dart` / `admin_content_tab.dart` make up the in-app admin console.
 5. `admin/frontend/src/hooks/useFirebaseData.ts` holds the web console's reads and writes and mirrors the Flutter admin actions.
 6. `lib/services/notifications_service.dart` builds the in-app notification feed from existing data. Nothing about it is stored.
-7. `Rakta_Bandhan_Technical_HLD.md` and the two PDFs in the root describe the **original** Cloud Functions design. That design was never built. Treat it as the target, not as current state.
+7. `docs/architecture/Rakta_Bandhan_Technical_HLD.md` and the two PDFs beside it describe the **original** Cloud Functions design. That design was never built. Treat it as the target, not as current state.
 
 ---
 
@@ -123,7 +123,7 @@ CLI token is stale. Ask the user to run `firebase login --reauth`. You can't do 
 | Likes and comments on stories | Not modelled | Subcollection plus a counter maintained by a Function (P8, optional) |
 | Address search quality | Nominatim only | Google Places Autocomplete, India-biased (P4) |
 | Admin egress | `AdminService.init()` streams the whole `donors` collection including base64 ID proofs. That was 62–92% of all egress in the cost model. | Storage migration (P3) plus paginated admin lists (P9) |
-| Placeholder copy | About, Certificate, Help contact, "version placeholder" in `app_header.dart:185` | Needs real copy from the team (see `STAKEHOLDER_REQUIREMENTS_CHECKLIST.md`). Don't invent it. List it in the final report. |
+| Placeholder copy | About, Certificate, Help contact, "version placeholder" in `app_header.dart:185` | Needs real copy from the team (see `docs/launch/STAKEHOLDER_REQUIREMENTS_CHECKLIST.md`). Don't invent it. List it in the final report. |
 
 ---
 

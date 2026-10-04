@@ -1,11 +1,11 @@
 /**
- * HospitalsPage — Manage hospital records: add, verify, delete.
+ * HospitalsPage — Manage hospital records: add, edit, verify, delete.
  * Direct Firestore writes (hospitals/{id} is admin-write-only per rules).
  */
 
 import { useState } from 'react';
-import { useHospitals, useAdminActions } from '../hooks/useFirebaseData';
-import { Plus, CheckCircle, XCircle, Building2 } from 'lucide-react';
+import { useHospitals, useAdminActions, type Hospital } from '../hooks/useFirebaseData';
+import { Plus, CheckCircle, XCircle, Building2, Pencil } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 
@@ -27,25 +27,46 @@ const EMPTY_FORM: HospitalFormData = {
 
 export default function HospitalsPage() {
   const { hospitals, loading, total, error, hasMore, loadingMore, loadMore } = useHospitals();
-  const { actionLoading, actionError, createHospital, toggleHospitalVerified, deleteHospital } = useAdminActions();
+  const { actionLoading, actionError, createHospital, updateHospital, toggleHospitalVerified, deleteHospital } =
+    useAdminActions();
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<HospitalFormData>(EMPTY_FORM);
   const [formError, setFormError] = useState('');
 
-  async function handleCreate(e: React.FormEvent) {
+  async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     setFormError('');
+    const fields = {
+      ...form,
+      lat: form.lat ? parseFloat(form.lat) : undefined,
+      lng: form.lng ? parseFloat(form.lng) : undefined,
+    };
     try {
-      await createHospital({
-        ...form,
-        lat: form.lat ? parseFloat(form.lat) : undefined,
-        lng: form.lng ? parseFloat(form.lng) : undefined,
-      });
+      if (editingId) await updateHospital(editingId, fields);
+      else await createHospital(fields);
       setForm(EMPTY_FORM);
+      setEditingId(null);
       setShowForm(false);
     } catch (err: unknown) {
-      setFormError(err instanceof Error ? err.message : 'Failed to create hospital');
+      setFormError(err instanceof Error ? err.message : 'Failed to save hospital');
     }
+  }
+
+  function startEdit(h: Hospital) {
+    setForm({
+      name: h.name ?? '',
+      address: h.address ?? '',
+      city: h.city ?? '',
+      state: h.state ?? '',
+      contact_phone: h.contact_phone ?? '',
+      contact_email: h.contact_email ?? '',
+      lat: h.lat != null ? String(h.lat) : '',
+      lng: h.lng != null ? String(h.lng) : '',
+    });
+    setEditingId(h.id);
+    setFormError('');
+    setShowForm(true);
   }
 
   async function handleDelete(hospitalId: string, name: string) {
@@ -62,7 +83,13 @@ export default function HospitalsPage() {
             {loading ? '…' : `${total ?? '…'} hospitals · ${hospitals.length} loaded · ${hospitals.filter(h => h.verified).length} verified in this page`}
           </p>
         </div>
-        <Button onClick={() => setShowForm(!showForm)}>
+        <Button
+          onClick={() => {
+            setForm(EMPTY_FORM);
+            setEditingId(null);
+            setShowForm(!showForm);
+          }}
+        >
           <Plus className="w-4 h-4" /> Add Hospital
         </Button>
       </div>
@@ -73,8 +100,8 @@ export default function HospitalsPage() {
 
       {showForm && (
         <Card className="p-5">
-          <h2 className="text-sm font-semibold mb-4">Add New Hospital</h2>
-          <form onSubmit={handleCreate} className="grid grid-cols-2 gap-4">
+          <h2 className="text-sm font-semibold mb-4">{editingId ? 'Edit hospital' : 'Add New Hospital'}</h2>
+          <form onSubmit={handleSave} className="grid grid-cols-2 gap-4">
             {[
               { field: 'name', label: 'Hospital Name', required: true, span: 2 },
               { field: 'address', label: 'Address', required: true, span: 2 },
@@ -100,7 +127,7 @@ export default function HospitalsPage() {
             <div className="col-span-2 flex gap-2 justify-end">
               <Button type="button" variant="secondary" onClick={() => setShowForm(false)}>Cancel</Button>
               <Button type="submit" disabled={actionLoading}>
-                {actionLoading ? 'Creating…' : 'Create Hospital'}
+                {actionLoading ? 'Saving…' : editingId ? 'Save changes' : 'Create Hospital'}
               </Button>
             </div>
           </form>
@@ -144,6 +171,9 @@ export default function HospitalsPage() {
                   onClick={() => toggleHospitalVerified(hospital.id, !hospital.verified, hospital.name)}
                 >
                   {hospital.verified ? 'Unverify' : 'Verify'}
+                </Button>
+                <Button size="sm" variant="secondary" disabled={actionLoading} onClick={() => startEdit(hospital)}>
+                  <Pencil className="w-3.5 h-3.5" />
                 </Button>
                 <Button
                   size="sm"

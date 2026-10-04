@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 
 /// Destructive-action confirmation as a bottom sheet (ported from
-/// design_new/flutter). A sheet rather than an AlertDialog so confirmations
+/// design/v2_new/flutter). A sheet rather than an AlertDialog so confirmations
 /// sit inside the mobile composition; one solid action, the escape hatch is
 /// plain text. Returns true only if the user taps the confirm action.
 class ConfirmSheet {

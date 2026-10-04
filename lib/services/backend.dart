@@ -14,6 +14,7 @@ import 'package:image_picker/image_picker.dart' show XFile;
 
 import 'features.dart';
 import 'geo_config.dart';
+import 'live_merge.dart';
 import 'edge.dart';
 import 'photos.dart';
 import 'usernames.dart';
@@ -642,48 +643,17 @@ class Backend {
     required List<String> cells,
     required Query<Map<String, dynamic>> Function(Query<Map<String, dynamic>>) extraFilters,
   }) {
-    late final StreamController<List<QueryDocumentSnapshot<Map<String, dynamic>>>> controller;
-    final latest = <String, List<QueryDocumentSnapshot<Map<String, dynamic>>>>{};
-    var subs = <StreamSubscription>[];
-
-    void emit() {
-      final seen = <String>{};
-      final merged = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-      for (final docs in latest.values) {
-        for (final doc in docs) {
-          if (seen.add(doc.id)) merged.add(doc);
-        }
-      }
-      controller.add(merged);
-    }
-
-    // Broadcast: a screen that leaves and comes back (switching tabs) listens
-    // again. A single-subscription stream throws "Stream has already been
-    // listened to" the second time, which blanked the Requests tab.
-    controller = StreamController<List<QueryDocumentSnapshot<Map<String, dynamic>>>>.broadcast(
-      onListen: () {
-        for (final cell in cells) {
-          Query<Map<String, dynamic>> q = _db
-              .collection(collection)
-              .where('geohash', isGreaterThanOrEqualTo: cell)
-              .where('geohash', isLessThan: '$cell~');
-          q = extraFilters(q);
-          subs.add(q.snapshots().listen((snap) {
-            latest[cell] = snap.docs;
-            emit();
-          }, onError: controller.addError));
-        }
-      },
-      onCancel: () async {
-        final old = subs;
-        subs = [];
-        latest.clear();
-        for (final sub in old) {
-          await sub.cancel();
-        }
+    return mergeCellStreams<QueryDocumentSnapshot<Map<String, dynamic>>>(
+      cells: cells,
+      idOf: (doc) => doc.id,
+      open: (cell) {
+        Query<Map<String, dynamic>> q = _db
+            .collection(collection)
+            .where('geohash', isGreaterThanOrEqualTo: cell)
+            .where('geohash', isLessThan: '$cell~');
+        return extraFilters(q).snapshots().map((snap) => snap.docs);
       },
     );
-    return controller.stream;
   }
 
   /// Open requests within [radiusKm] of a point, newest first — a bounded
@@ -1266,6 +1236,7 @@ class Backend {
     batch.set(ref, {
       'quote': (data['quote'] as String? ?? '').trim(),
       'name': (data['name'] as String? ?? '').trim(),
+      'username': data['username'],
       'role': (data['role'] as String? ?? '').trim(),
       'author_uid': data['author_uid'],
       'submitted_by_member': true,
