@@ -2,7 +2,7 @@
 name = "rakta-bandhan-edge"
 main = "src/index.ts"
 compatibility_date = "2025-09-01"
-account_id = "361246d2529c9324af1bacc33d2adfb8"
+account_id = "6201e4d84a008753d32f482a2f1912d1"
 
 # Photos live in the owner's existing private Standard bucket.
 [[r2_buckets]]
@@ -10,10 +10,10 @@ binding = "MEDIA"
 bucket_name = "bloodbank"
 
 [vars]
-FIREBASE_PROJECT_ID = "rakta-bandhan2026"
+FIREBASE_PROJECT_ID = "rakta-bandhan-india"
 # Browser origins allowed to call the private routes (admin console, web build).
 # The phone app is not a browser and needs no entry.
-ALLOWED_ORIGINS = "https://rakta-bandhan2026.web.app,https://rakta-bandhan2026.firebaseapp.com"
+ALLOWED_ORIGINS = "https://rakta-bandhan-india.web.app,https://rakta-bandhan-india.firebaseapp.com"
 
 # Secrets (never in this file):
 #   npx wrangler secret put TURN_KEY_ID      # Cloudflare dashboard > Realtime > TURN

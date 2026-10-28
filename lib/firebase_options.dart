@@ -50,20 +50,20 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyDX-ErtJ-YzGrsmA35-QVowcIGEcyIRPjs',
-    appId: '1:686452527533:web:96e80f3e108d8f3015d124',
-    messagingSenderId: '686452527533',
-    projectId: 'rakta-bandhan2026',
-    authDomain: 'rakta-bandhan2026.firebaseapp.com',
-    storageBucket: 'rakta-bandhan2026.firebasestorage.app',
-    measurementId: 'G-D7RXE48E0D',
+    apiKey: 'AIzaSyA26RwQWBPJpSMOejUM9TRoHwZgHmc0sto',
+    appId: '1:469374681836:web:71d7edb17ba9c1de355bc9',
+    messagingSenderId: '469374681836',
+    projectId: 'rakta-bandhan-india',
+    authDomain: 'rakta-bandhan-india.firebaseapp.com',
+    storageBucket: 'rakta-bandhan-india.firebasestorage.app',
+    measurementId: 'G-WDEZZBY3QD',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyA1pAyg9LQwU94Qli0R1BubgDsMBA6n9CA',
-    appId: '1:686452527533:android:1612485ff7a2ebc715d124',
-    messagingSenderId: '686452527533',
-    projectId: 'rakta-bandhan2026',
-    storageBucket: 'rakta-bandhan2026.firebasestorage.app',
+    apiKey: 'AIzaSyDIV2ihaDmWJahQjnnwEuxVrrkE2tpS1bc',
+    appId: '1:469374681836:android:10c3f22d45b980ec355bc9',
+    messagingSenderId: '469374681836',
+    projectId: 'rakta-bandhan-india',
+    storageBucket: 'rakta-bandhan-india.firebasestorage.app',
   );
 }

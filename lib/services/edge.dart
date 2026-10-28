@@ -9,7 +9,7 @@ import 'package:http/http.dart' as http;
 /// Photos and TURN only. Email sign-in stays on Functions after Blaze.
 /// Defaults to the deployed Worker (not a secret); override with
 /// `--dart-define=EDGE_URL=...` to point a build elsewhere.
-const kEdgeUrl = String.fromEnvironment('EDGE_URL', defaultValue: 'https://rakta-bandhan-edge.rakta-bandhan-edge.workers.dev');
+const kEdgeUrl = String.fromEnvironment('EDGE_URL', defaultValue: 'https://rakta-bandhan-edge.raktabandhan.workers.dev');
 
 String newMediaName() {
   final random = Random.secure();

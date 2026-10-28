@@ -3,7 +3,7 @@
     python tool/make_share_page.py
 
 Writes admin/frontend/public/app/index.html and og-image.png (1200×630).
-Firebase Hosting serves it at https://rakta-bandhan2026.web.app/app/ — the
+Firebase Hosting serves it at https://rakta-bandhan-india.web.app/app/ — the
 link the app shares, so WhatsApp, Instagram and X show a proper card (title,
 tagline, image) instead of a bare URL. Change SITE if a custom domain is
 added, and re-run tool/export_legal_html.py so the legal pages point at it.
@@ -12,7 +12,7 @@ import os
 
 from PIL import Image, ImageDraw, ImageFont
 
-SITE = 'https://rakta-bandhan2026.web.app'
+SITE = 'https://rakta-bandhan-india.web.app'
 PLAY = 'https://play.google.com/store/apps/details?id=com.raktabandhan.app'
 OUT = 'admin/frontend/public/app'
 

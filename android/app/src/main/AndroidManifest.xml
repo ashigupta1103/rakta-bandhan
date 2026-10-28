@@ -2,7 +2,6 @@
     xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
-    <uses-permission android:name="android.permission.CAMERA"/>
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <!-- In-app voice calls (flutter_webrtc) -->
@@ -27,6 +26,10 @@
          phone" uses the dialer intent, which needs neither). -->
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" tools:node="remove"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" tools:node="remove"/>
+    <!-- CAMERA: the call plugin adds it for video calls, which this app doesn't
+         have. Photos are taken with the phone's own camera app (image_picker),
+         which needs no permission. -->
+    <uses-permission android:name="android.permission.CAMERA" tools:node="remove"/>
     <!-- No ads: Firebase Analytics must not collect the Advertising ID (keeps
          the Play Data safety answer "Advertising ID: not collected" true). -->
     <uses-permission android:name="com.google.android.gms.permission.AD_ID" tools:node="remove"/>
@@ -54,6 +57,12 @@
         <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="${mapsApiKey}" />
+        <!-- geolocator declares a location foreground service the app never starts
+             (no background location). Removing it keeps Play's foreground-service
+             declaration to the one phone-call type. -->
+        <service
+            android:name="com.baseflow.geolocator.GeolocatorLocationService"
+            tools:node="remove" />
         <!-- Audio-only calls: drop the camera type from the plugin's service. -->
         <service
             android:name="com.hiennv.flutter_callkit_incoming.CallkitNotificationService"

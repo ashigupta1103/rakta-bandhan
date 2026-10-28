@@ -36,4 +36,15 @@ void main() {
     await t.pump(StartupAdScreen.maxDuration);
     await t.pumpAndSettle();
   });
+
+  testWidgets('the ad area takes about 90% of the screen height', (t) async {
+    t.view.physicalSize = const Size(400, 800);
+    t.view.devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    await pumpAd(t, () async => null);
+    await t.pump();
+    expect(t.getSize(find.byType(StartupAdSlot)).height, greaterThanOrEqualTo(800 * 0.85));
+    await t.pump(StartupAdScreen.maxDuration);
+    await t.pumpAndSettle();
+  });
 }

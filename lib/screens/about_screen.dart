@@ -16,7 +16,7 @@ class AboutScreen extends StatelessWidget {
 
   /// Public share page with a social preview card (tool/make_share_page.py);
   /// it links on to the store listing.
-  static const shareUrl = 'https://rakta-bandhan2026.web.app/app/';
+  static const shareUrl = 'https://rakta-bandhan-india.web.app/app/';
 
   static const _missionPoints = [
     (RbGlyph.community, 'Empower', 'patients and caregivers with access to nearby blood donors.'),
@@ -110,7 +110,7 @@ class AboutScreen extends StatelessWidget {
                               text: 'A service project of\n',
                               style: TextStyle(fontSize: 12.5, color: AppColors.onEmberMuted, height: 1.5),
                               children: [
-                                TextSpan(text: 'Rotary Club of Madras Cosmos & Rotary Club of Chennai Capital', style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.gold)),
+                                TextSpan(text: 'Rotary Club of Madras Cosmos', style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.gold)),
                               ],
                             ),
                             textAlign: TextAlign.center,
@@ -156,7 +156,7 @@ class AboutScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: 12),
                           _paragraph(
-                            'The initiative is a collaborative service project of Madras Cosmos Charitable Trust, managed by Rotary Club of Madras Cosmos, and Chennai Capital Trust, managed by Rotary Club of Chennai Capital, with support from Rotary International District 3233.',
+                            'The initiative is a service project of Madras Cosmos Charitable Trust, managed by Rotary Club of Madras Cosmos, with support from Rotary International District 3233.',
                           ),
                           const SizedBox(height: 12),
                           _paragraph(

@@ -5,7 +5,7 @@
 //
 //   cd functions && npm run build
 //   node scripts/seed-review-accounts.mjs --emulator
-//   node scripts/seed-review-accounts.mjs --project rakta-bandhan2026 --yes-live \
+//   node scripts/seed-review-accounts.mjs --project rakta-bandhan-india --yes-live \
 //        --email-a <REVIEW_EMAIL_A> --email-b <REVIEW_EMAIL_B>      (the owner, with credentials)
 //
 // Options: --lat/--lng (where A is; default Chennai Central), --area (label shown on B's card).

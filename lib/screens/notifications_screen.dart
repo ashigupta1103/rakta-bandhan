@@ -5,6 +5,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/blood_group_droplet.dart';
 import '../widgets/rb_ui.dart';
+import '../widgets/settings_snack_bar.dart';
 import 'match_contact_screen.dart';
 import 'tracking_screen.dart';
 import '../widgets/rb_icon.dart';
@@ -119,9 +120,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               onPressed: () async {
                 final messenger = ScaffoldMessenger.of(context);
                 final allowed = await UrgentAlertService.instance.requestPushPermission();
-                messenger.showSnackBar(SnackBar(
-                  content: Text(allowed ? 'Notifications are on.' : 'Notifications are still off — allow them in your device settings.'),
-                ));
+                messenger.showSnackBar(allowed
+                    ? const SnackBar(content: Text('Notifications are on.'))
+                    : openSettingsSnackBar('Notifications are still off. Allow them in your device settings.'));
               },
               child: const Text('Turn on notifications'),
             ),

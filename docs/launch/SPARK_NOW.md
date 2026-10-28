@@ -37,7 +37,7 @@ Both steps say "Simulation", send nothing, verify nothing, and have "Skip for no
 2. **Deploy the rules and indexes.** The app uses collections and queries the old rules and indexes do not have (usernames, support replies, geohash queries), so registration and requests fail until this is done:
 
    ```sh
-   firebase deploy --project rakta-bandhan2026 --only firestore:rules,firestore:indexes
+   firebase deploy --project rakta-bandhan-india --only firestore:rules,firestore:indexes
    ```
 
    Indexes take a few minutes to build; wait until they all show *Enabled* in the console.
@@ -50,7 +50,7 @@ Both steps say "Simulation", send nothing, verify nothing, and have "Skip for no
 flutter build apk --release
 ```
 
-`EDGE_URL` defaults to the deployed Worker (`https://rakta-bandhan-edge.rakta-bandhan-edge.workers.dev`, not a secret). Override it with `--dart-define=EDGE_URL=...` only to point a build somewhere else. The admin console needs `VITE_EDGE_URL` set to the same address at build time (already in the ignored `admin/frontend/.env.local`).
+`EDGE_URL` defaults to the deployed Worker (`https://rakta-bandhan-edge.raktabandhan.workers.dev`, not a secret). Override it with `--dart-define=EDGE_URL=...` only to point a build somewhere else. The admin console needs `VITE_EDGE_URL` set to the same address at build time (already in the ignored `admin/frontend/.env.local`).
 
 ## Cloudflare Worker setup
 

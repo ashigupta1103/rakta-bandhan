@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart' show FirebaseAuthException;
 import 'package:flutter/material.dart';
@@ -55,11 +57,14 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _showPassword = false;
   String? _emailError;
   String? _error;
+  Timer? _resetTimer;
+  int _resetWait = 0;
 
   static final emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]{2,}$');
 
   @override
   void dispose() {
+    _resetTimer?.cancel();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -131,7 +136,20 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
     }
-    messenger.showSnackBar(SnackBar(content: Text('If an account exists for $email, a reset link is on its way. Check Spam too.')));
+    messenger.showSnackBar(SnackBar(content: Text('If an account exists for $email, a reset link is on its way. Check your Spam folder too.')));
+    _startResetWait();
+  }
+
+  /// One reset email per 30 seconds, so a slow inbox isn't answered by a pile of them.
+  void _startResetWait() {
+    if (!mounted) return;
+    setState(() => _resetWait = 30);
+    _resetTimer?.cancel();
+    _resetTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) return t.cancel();
+      setState(() => _resetWait--);
+      if (_resetWait <= 0) t.cancel();
+    });
   }
 
   @override
@@ -236,8 +254,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         if (!_creating)
                           TextButton(
-                            onPressed: _busy ? null : _forgotPassword,
-                            child: const Text('Forgot password?', style: TextStyle(fontSize: 13, color: AppColors.ink2)),
+                            onPressed: _busy || _resetWait > 0 ? null : _forgotPassword,
+                            child: Text(_resetWait > 0 ? 'Resend in ${_resetWait}s' : 'Forgot password?', style: const TextStyle(fontSize: 13, color: AppColors.ink2)),
                           ),
                       ],
                     ),

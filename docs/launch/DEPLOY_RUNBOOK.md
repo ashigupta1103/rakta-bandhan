@@ -21,14 +21,14 @@ Smoke tests use `demo-rakta-bandhan` emulators. Local emulator secrets are dummy
 4. Deploy Firestore rules/indexes and Hosting with an explicit project:
 
    ```sh
-   firebase deploy --project rakta-bandhan2026 --only firestore:rules,firestore:indexes,hosting
+   firebase deploy --project rakta-bandhan-india --only firestore:rules,firestore:indexes,hosting
    ```
 
    Wait for indexes to finish building. Existing donors need a `name_lower` backfill before name-prefix search can find them. Review the migration script and run it as owner after a backup; never invent usernames for existing users. From `functions/`:
 
    ```sh
-   node scripts/backfill-search.mjs --project rakta-bandhan2026 --yes-live
-   node scripts/backfill-search.mjs --project rakta-bandhan2026 --yes-live --apply
+   node scripts/backfill-search.mjs --project rakta-bandhan-india --yes-live
+   node scripts/backfill-search.mjs --project rakta-bandhan-india --yes-live --apply
    ```
 
    The script uses the Admin SDK and needs owner Application Default Credentials with Firestore access; Firebase CLI login alone does not provide these. The owner can configure local ADC with `gcloud auth application-default login` following [Google's Firestore authentication guide](https://docs.cloud.google.com/firestore/native/docs/authentication). The agent does not run that login or the live migration.
@@ -38,14 +38,14 @@ Smoke tests use `demo-rakta-bandhan` emulators. Local emulator secrets are dummy
 6. After Blaze, follow [the upgrade checklist](AFTER_BLAZE_UPGRADE.md) and deploy Functions explicitly:
 
    ```sh
-   firebase deploy --project rakta-bandhan2026 --only functions
+   firebase deploy --project rakta-bandhan-india --only functions
    ```
 
    Turn on `server_jobs` only after server jobs are verified. Enable App Check enforcement last.
 7. Build artifacts:
 
    ```sh
-   flutter build apk --release --dart-define=EDGE_URL=https://rakta-bandhan-edge.rakta-bandhan-edge.workers.dev
+   flutter build apk --release --dart-define=EDGE_URL=https://rakta-bandhan-edge.raktabandhan.workers.dev
    ```
 
    This produces the real app and requires the owner-deployed services. Verify signing and legal approval before store release.

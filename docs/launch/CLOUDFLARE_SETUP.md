@@ -75,18 +75,18 @@ The secret list shows names, not values. Both names should be present. You do no
 The checked-in browser origins already include:
 
 ```text
-https://rakta-bandhan2026.web.app
-https://rakta-bandhan2026.firebaseapp.com
+https://rakta-bandhan-india.web.app
+https://rakta-bandhan-india.firebaseapp.com
 ```
 
-Use the Worker dashboard's bindings/settings to confirm `MEDIA` refers to `bloodbank`, `FIREBASE_PROJECT_ID` is `rakta-bandhan2026`, and both TURN secrets exist. Do not enable `AUTH_EMULATOR` or `FIRESTORE_EMULATOR_HOST` on a deployed Worker. If another admin/web domain is used later, add its exact origin to `ALLOWED_ORIGINS` in `edge/wrangler.toml` before deploying.
+Use the Worker dashboard's bindings/settings to confirm `MEDIA` refers to `bloodbank`, `FIREBASE_PROJECT_ID` is `rakta-bandhan-india`, and both TURN secrets exist. Do not enable `AUTH_EMULATOR` or `FIRESTORE_EMULATOR_HOST` on a deployed Worker. If another admin/web domain is used later, add its exact origin to `ALLOWED_ORIGINS` in `edge/wrangler.toml` before deploying.
 
 ## 6. Copy and check the Worker address
 
 The deployed address (printed by `wrangler deploy`) is:
 
 ```text
-https://rakta-bandhan-edge.rakta-bandhan-edge.workers.dev
+https://rakta-bandhan-edge.raktabandhan.workers.dev
 ```
 
 Open it with **`/health`** appended in a browser. Expected response:

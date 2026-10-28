@@ -5,7 +5,7 @@
 # Prerequisites:
 #   - an Android emulator running (adb devices shows emulator-5554)
 #   - Firebase emulators running for the app's project:
-#       firebase emulators:start --project rakta-bandhan2026 --only auth,firestore
+#       firebase emulators:start --project rakta-bandhan-india --only auth,firestore
 #
 # Usage: bash tool/e2e_screenshots.sh [output-dir] [test-file]
 set -u
@@ -28,7 +28,7 @@ mkdir -p "$OUT"
 (
   for _ in $(seq 1 600); do
     if "$ADB" shell pm list packages 2>/dev/null | grep -q "$PKG"; then
-      for p in ACCESS_FINE_LOCATION ACCESS_COARSE_LOCATION POST_NOTIFICATIONS RECORD_AUDIO CAMERA; do
+      for p in ACCESS_FINE_LOCATION ACCESS_COARSE_LOCATION POST_NOTIFICATIONS RECORD_AUDIO; do
         "$ADB" shell pm grant "$PKG" "android.permission.$p" >/dev/null 2>&1
       done
     fi

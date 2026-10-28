@@ -2,7 +2,7 @@
 // and requester_flow_test.dart). They drive the real app on an Android
 // emulator against the local Firebase emulators:
 //
-//   firebase emulators:start --project rakta-bandhan2026 --only auth,firestore
+//   firebase emulators:start --project rakta-bandhan-india --only auth,firestore
 //   bash tool/e2e_screenshots.sh              # donor side
 //   bash tool/e2e_screenshots.sh build/e2e_requester integration_test/requester_flow_test.dart
 //
@@ -19,7 +19,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 
 const host = '10.0.2.2';
-const project = 'rakta-bandhan2026';
+const project = 'rakta-bandhan-india';
 const fsBase = 'http://$host:8080/v1/projects/$project/databases/(default)/documents';
 const ownerHeaders = {'Authorization': 'Bearer owner', 'Content-Type': 'application/json'};
 

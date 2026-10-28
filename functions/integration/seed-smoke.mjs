@@ -49,7 +49,7 @@ assert.equal((await db.doc(`donors/${b.uid}`).get()).get('username_changed_at').
 console.log('✔ seed-review-accounts: creates verified requester and donor accounts, and is idempotent');
 
 // Refuses to touch a real project without being told twice.
-assert.throws(() => execFileSync('node', ['scripts/seed-review-accounts.mjs', '--project', 'rakta-bandhan2026'], { stdio: 'pipe' }));
+assert.throws(() => execFileSync('node', ['scripts/seed-review-accounts.mjs', '--project', 'rakta-bandhan-india'], { stdio: 'pipe' }));
 console.log('✔ seed-review-accounts: refuses a real project without --yes-live');
 
 console.log('\nSeed smoke checks passed.');

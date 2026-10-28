@@ -12,7 +12,7 @@ typedef StartupAdLoader = Future<Widget?> Function();
 /// No ad provider connected yet — the slot stays as a reserved placeholder.
 Future<Widget?> startupAdLoader() async => null;
 
-/// Reserved, labelled ad area. Reusable anywhere an ad slot is needed.
+/// Reserved, labelled ad area. Fills the space it is given.
 class StartupAdSlot extends StatelessWidget {
   final Widget? ad;
   final bool loading;
@@ -21,13 +21,11 @@ class StartupAdSlot extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const Text('Advertisement', style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
         const SizedBox(height: 8),
-        AspectRatio(
-          aspectRatio: 4 / 5,
+        Expanded(
           child: Container(
             decoration: BoxDecoration(
               color: Colors.white,
@@ -102,21 +100,16 @@ class _StartupAdScreenState extends State<StartupAdScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.warmPageBackground,
+      // The ad takes about 90% of the screen; the name sits underneath.
       body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 360),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  StartupAdSlot(ad: _ad, loading: _loading),
-                  const SizedBox(height: 20),
-                  Text('Rakta Bandhan', style: AppTextStyles.display(fontSize: 20)),
-                ],
-              ),
-            ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+          child: Column(
+            children: [
+              Expanded(child: StartupAdSlot(ad: _ad, loading: _loading)),
+              const SizedBox(height: 10),
+              Text('Rakta Bandhan', style: AppTextStyles.display(fontSize: 18)),
+            ],
           ),
         ),
       ),

@@ -4,6 +4,7 @@ import '../services/backend.dart';
 import '../services/urgent_alert_service.dart';
 import '../theme/app_colors.dart';
 import 'rb_ui.dart';
+import 'settings_snack_bar.dart';
 import 'brand_glyph.dart';
 import 'rb_icon.dart';
 
@@ -77,11 +78,9 @@ class _UrgentAlertToggleState extends State<UrgentAlertToggle> {
     try {
       final systemAllowed = await UrgentAlertService.instance.requestPushPermission();
       await Backend.instance.setUrgentAlerts(true);
-      messenger.showSnackBar(SnackBar(
-        content: Text(systemAllowed
-            ? 'Urgent alerts are on.'
-            : 'Urgent alerts are on in the app. System notifications are off — you can allow them in device settings.'),
-      ));
+      messenger.showSnackBar(systemAllowed
+          ? const SnackBar(content: Text('Urgent alerts are on.'))
+          : openSettingsSnackBar('Urgent alerts are on in the app. System notifications are off. You can allow them in device settings.'));
     } catch (_) {
       messenger.showSnackBar(const SnackBar(content: Text('Could not turn on alerts. Please try again.')));
     } finally {

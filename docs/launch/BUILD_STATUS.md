@@ -2,7 +2,7 @@
 
 Branch: `feat/prelaunch`. Upstream `origin/master` at `0e19c5d` was merged, preserving the updated UI. The owner approved connecting missing actions while retaining that design.
 
-Live project (`rakta-bandhan2026`), 2026-10-02: the Cloudflare Worker was deployed (below); the owner deployed `firestore:rules` and `firestore:indexes`; people's data was cleared from Firestore (pre-launch test data; the admin collections were kept) and the Auth test accounts other than the admin are removed in the console. No Cloud Functions are deployed (Spark).
+Live project (`rakta-bandhan-india`), 2026-10-02: the Cloudflare Worker was deployed (below); the owner deployed `firestore:rules` and `firestore:indexes`; people's data was cleared from Firestore (pre-launch test data; the admin collections were kept) and the Auth test accounts other than the admin are removed in the console. No Cloud Functions are deployed (Spark).
 
 ## Implemented
 
@@ -39,7 +39,7 @@ Final check logs and APKs are local, ignored artifacts in `build/checks/` and `b
 
 ## Cloudflare Worker deployment, 2026-10-02
 
-Deployed by the coding agent after the owner told it to finish the Cloudflare setup itself. Worker `rakta-bandhan-edge` is live at `https://rakta-bandhan-edge.rakta-bandhan-edge.workers.dev`. It was deployed as version `5c81c77b-c465-4f0e-afab-9e42532a34f5`; each of the two `secret put` commands then published a newer version. Account `361246d2…`; `MEDIA` is bound to the private `bloodbank` bucket; `TURN_KEY_ID` and `TURN_API_TOKEN` are stored as Worker secrets (names confirmed with `wrangler secret list`; the values were never written to a file or committed). Wrangler registered the account's `workers.dev` subdomain as `rakta-bandhan-edge` automatically. It can be renamed in the Cloudflare dashboard, but every build that embeds the URL would then need updating.
+Deployed by the coding agent after the owner told it to finish the Cloudflare setup itself. Worker `rakta-bandhan-edge` is live at `https://rakta-bandhan-edge.raktabandhan.workers.dev`. It was deployed as version `5c81c77b-c465-4f0e-afab-9e42532a34f5`; each of the two `secret put` commands then published a newer version. Account `361246d2…`; `MEDIA` is bound to the private `bloodbank` bucket; `TURN_KEY_ID` and `TURN_API_TOKEN` are stored as Worker secrets (names confirmed with `wrangler secret list`; the values were never written to a file or committed). Wrangler registered the account's `workers.dev` subdomain as `rakta-bandhan-edge` automatically. It can be renamed in the Cloudflare dashboard, but every build that embeds the URL would then need updating.
 
 Checked live from outside, without signing in: `/health` returns `{"ok":true}`; `/ice`, ID-photo reads and uploads without a valid token return 401; a missing public photo returns 404 (the R2 binding works); an unsigned "emulator" token is refused with 401, so emulator mode is off in production; a token with an unknown signing key returns 401 and not 503 (the Worker can fetch Google's signing keys); CORS allows the Hosting origin and no other. The TURN key was also validated directly against Cloudflare (HTTP 201 with relay credentials).
 

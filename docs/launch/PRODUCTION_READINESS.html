@@ -1,0 +1,1085 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rakta Bandhan launch decisions</title>
+<style>
+:root{
+  --bg:#fbf8f5; --card:#ffffff; --ink:#2a1f1c; --muted:#6d5f5a; --line:#eadfd8; --soft:#f5eee8;
+  --brand:#b3261e; --brand-ink:#ffffff; --blocker:#b3261e; --should:#a86400; --later:#2f6f4f;
+  --ok:#1f7a4d; --okbg:#e8f4ed; --warnbg:#fff4e0; --blue:#2d5fa8; --bluebg:#e8f0fb; --failbg:#fde9e7;
+  --shadow:0 1px 2px rgba(60,30,20,.06);
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#1a1412; --card:#241c19; --ink:#f3e9e4; --muted:#b4a49d; --line:#3a2e29; --soft:#2d2420;
+    --brand:#e5534b; --brand-ink:#1a1412; --blocker:#ff8a80; --should:#ffc266; --later:#7fd1a0;
+    --ok:#7fd1a0; --okbg:#1d2c24; --warnbg:#2f2518; --blue:#8db4f0; --bluebg:#1b2535; --failbg:#3a1f1c;
+    --shadow:none;
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:0 16px 80px}
+h1{font-size:1.9rem;line-height:1.2;margin:28px 0 6px}
+h2{font-size:1.35rem;margin:0 0 4px}
+h3{font-size:1rem;margin:0}
+p{margin:0 0 .6rem}
+code{background:var(--soft);padding:1px 5px;border-radius:5px;font-size:.88em}
+a{color:var(--blue)}
+.sub{color:var(--muted);margin:0 0 18px}
+.box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin:14px 0;box-shadow:var(--shadow)}
+.box h3{margin-bottom:6px}
+.box ul{margin:6px 0 0;padding-left:20px}
+.box li{margin:3px 0}
+.box.ok{background:var(--okbg);border-color:transparent}
+.legend{display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:8px;font-size:.92rem}
+.chip{display:inline-block;font-size:.75rem;font-weight:600;padding:2px 9px;border-radius:99px;border:1px solid var(--line);background:var(--soft);color:var(--muted);white-space:nowrap}
+.chip.B{color:var(--blocker);border-color:var(--blocker)}
+.chip.S{color:var(--should);border-color:var(--should)}
+.chip.L{color:var(--later);border-color:var(--later)}
+.chip.key{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}
+.toolbar{position:sticky;top:0;z-index:20;background:var(--bg);border-bottom:1px solid var(--line);padding:10px 0 8px;margin:0 -16px;padding-left:16px;padding-right:16px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.progress{flex:1 1 220px;min-width:180px}
+.bar{height:8px;background:var(--soft);border-radius:99px;overflow:hidden;margin-top:4px}
+.bar i{display:block;height:100%;width:0;background:var(--ok);transition:width .2s}
+.small{font-size:.85rem;color:var(--muted)}
+button{font:inherit;cursor:pointer}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:8px 14px;border-radius:10px;font-weight:600;font-size:.92rem}
+.btn:hover{background:var(--soft)}
+.btn.primary{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}
+.btn.primary:hover{filter:brightness(1.07)}
+.btn:focus-visible,.seg button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.filters{margin-top:8px;gap:6px}
+.filters .group{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.f{border:1px solid var(--line);background:var(--card);color:var(--muted);padding:3px 11px;border-radius:99px;font-size:.82rem;font-weight:600}
+.f[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+input[type=search]{font:inherit;padding:6px 10px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);min-width:150px;flex:1 1 150px}
+.jump{display:flex;flex-wrap:wrap;gap:6px;margin:14px 0 4px}
+.jump a{font-size:.85rem;text-decoration:none;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:3px 11px;border-radius:99px}
+.jump a:hover{background:var(--soft)}
+section{margin-top:34px;scroll-margin-top:150px}
+section>.intro{color:var(--muted);margin-bottom:10px}
+.shead{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;border-bottom:2px solid var(--line);padding-bottom:6px;margin-bottom:10px}
+.tablewrap{overflow-x:auto;margin:10px 0 14px;border:1px solid var(--line);border-radius:12px;background:var(--card)}
+table{border-collapse:collapse;width:100%;min-width:640px;font-size:.88rem}
+th,td{padding:8px 10px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line)}
+th{background:var(--soft);font-size:.78rem;text-transform:none;color:var(--muted)}
+tr:last-child td{border-bottom:0}
+.card{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--line);border-radius:12px;padding:14px 16px;margin:10px 0;box-shadow:var(--shadow)}
+.card[hidden]{display:none}
+.card.s-do,.card.s-done,.card.s-pass,.card.sA,.card.sB,.card.sC,.card.sD{border-left-color:var(--ok)}
+.card.s-later{border-left-color:var(--should)}
+.card.s-skip{border-left-color:var(--muted)}
+.card.s-change{border-left-color:var(--blue)}
+.card.s-fail{border-left-color:var(--blocker);background:var(--failbg)}
+.ctop{display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap}
+.id{font-weight:700;font-size:.8rem;color:var(--muted);background:var(--soft);padding:2px 8px;border-radius:7px;margin-top:2px}
+.ctitle{font-weight:700;flex:1 1 260px}
+.chips{display:flex;gap:5px;flex-wrap:wrap}
+.lab{font-size:.74rem;font-weight:700;color:var(--muted);margin:10px 0 2px;letter-spacing:.02em}
+.txt{margin:0}
+.opts{margin:6px 0 0;padding:0;list-style:none}
+.opts li{display:flex;gap:9px;padding:6px 9px;border:1px solid var(--line);border-radius:9px;margin:4px 0;background:var(--soft)}
+.opts li.pick{border-color:var(--ok);background:var(--okbg)}
+.opts b{min-width:18px}
+.pk{font-size:.7rem;font-weight:700;color:var(--ok);margin-left:6px}
+.seg{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.seg button{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:6px 12px;border-radius:9px;font-size:.88rem;font-weight:600}
+.seg button:hover{background:var(--soft)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.seg button.pos[aria-pressed="true"]{background:var(--ok);border-color:var(--ok);color:#fff}
+.seg button.neg[aria-pressed="true"]{background:var(--blocker);border-color:var(--blocker);color:#fff}
+.note{width:100%;margin-top:8px;font:inherit;font-size:.9rem;padding:7px 10px;border:1px solid var(--line);border-radius:9px;background:var(--bg);color:var(--ink);resize:vertical;min-height:38px}
+.out{width:100%;min-height:260px;font:13px/1.45 ui-monospace,Consolas,monospace;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink)}
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:99px;font-weight:600;opacity:0;pointer-events:none;transition:opacity .2s;z-index:50;max-width:92vw;text-align:center}
+.toast.show{opacity:1}
+.empty{display:none;text-align:center;color:var(--muted);padding:30px}
+@media (max-width:560px){ h1{font-size:1.5rem} .btn{padding:7px 11px} }
+@media print{ .toolbar,.seg,.note,.jump{display:none} .card{break-inside:avoid} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Rakta Bandhan: what is left before real users</h1>
+<p class="sub">Written 27 Oct 2026 from the code, the deployed project and the built APK. Every card says what can go wrong and what I suggest. Nothing here has been changed in the app yet. It is all a proposal until you decide.</p>
+
+<div class="box">
+  <h3>How to use this page (2 minutes)</h3>
+  <ul>
+    <li>Read a card. Tap <b>one button</b> on it: <b>Do it</b> (go with my suggestion), <b>Done</b> (you already finished it), <b>Later</b>, <b>Skip</b>, or <b>Change</b> (write your own answer in the box).</li>
+    <li>Cards with <b>Option A / B / C</b>: tap the option you want. The one I recommend is marked <span class="pk" style="margin:0">MY PICK</span>.</li>
+    <li>Test cards at the bottom: <b>Pass</b> or <b>Fail</b>, and write what you saw in the box.</li>
+    <li>When you finish (or want to stop), press <b>Copy my decisions</b> at the top, then paste the whole text into the chat with me. Your choices are saved in this browser, so you can close the page and come back. Use the same browser and the same file.</li>
+    <li>Short on time? Press <b>Key decisions</b> in the filter bar. Those are the 13 that change what I build.</li>
+  </ul>
+  <div class="legend">
+    <span><span class="chip B">Blocker</span> must be done before real users or the store</span>
+    <span><span class="chip S">Should</span> do before launch if you can, else in the first update</span>
+    <span><span class="chip L">Later</span> after launch</span>
+  </div>
+  <div class="legend">
+    <span><span class="chip">Seen in code</span> I read it in this repo</span>
+    <span><span class="chip">Needs a real test</span> only a phone can answer it</span>
+    <span><span class="chip">Advice / policy</span> not in the code</span>
+  </div>
+</div>
+
+<div class="box ok">
+  <h3>Already checked and fine (no action)</h3>
+  <ul>
+    <li>Target Android is API 36 (Play's current rule). Minimum is Android 7.</li>
+    <li>16 KB memory-page support: every arm64 native library is aligned (zip and ELF both checked).</li>
+    <li>No risky permissions: no background location, call log, SMS, contacts, storage, advertising ID or full-screen intent.</li>
+    <li>Android 14 phone-call permissions are present (<code>FOREGROUND_SERVICE_PHONE_CALL</code>, <code>MANAGE_OWN_CALLS</code>, microphone type).</li>
+    <li>The four notification channels are created at launch. Dead push tokens are removed automatically.</li>
+    <li>Accepting a request is one transaction: only one donor wins, and the database rules check it again. Donation needs both people to confirm.</li>
+    <li>Phone numbers are never copied onto requests. 14 Cloud Functions and the Worker are live. Last test runs: 97 app tests, 26 Worker tests.</li>
+  </ul>
+</div>
+
+<div class="toolbar" id="toolbar">
+  <div class="row">
+    <div class="progress">
+      <div class="small"><b id="pcount">0</b> of <b id="ptotal">0</b> decided</div>
+      <div class="bar"><i id="pbar"></i></div>
+    </div>
+    <button class="btn primary" id="copyBtn" type="button">Copy my decisions</button>
+    <button class="btn" id="dlBtn" type="button">Download .txt</button>
+    <button class="btn" id="resetBtn" type="button">Reset</button>
+  </div>
+  <div class="row filters" id="filters">
+    <div class="group" data-f="pri"><span class="small">Priority</span>
+      <button class="f" data-v="all" aria-pressed="true" type="button">All</button>
+      <button class="f" data-v="B" aria-pressed="false" type="button">Blocker</button>
+      <button class="f" data-v="S" aria-pressed="false" type="button">Should</button>
+      <button class="f" data-v="L" aria-pressed="false" type="button">Later</button>
+    </div>
+    <div class="group" data-f="who"><span class="small">Who</span>
+      <button class="f" data-v="all" aria-pressed="true" type="button">All</button>
+      <button class="f" data-v="You" aria-pressed="false" type="button">You</button>
+      <button class="f" data-v="Me" aria-pressed="false" type="button">Me</button>
+      <button class="f" data-v="Both" aria-pressed="false" type="button">Both</button>
+      <button class="f" data-v="Counsel" aria-pressed="false" type="button">Lawyer/doctor</button>
+    </div>
+    <div class="group" data-f="st"><span class="small">Show</span>
+      <button class="f" data-v="all" aria-pressed="true" type="button">All</button>
+      <button class="f" data-v="open" aria-pressed="false" type="button">Not decided</button>
+      <button class="f" data-v="key" aria-pressed="false" type="button">Key decisions</button>
+    </div>
+    <input type="search" id="q" placeholder="Search (push, legal, call...)" aria-label="Search cards">
+  </div>
+</div>
+
+<nav class="jump" id="jump" aria-label="Sections"></nav>
+
+<main id="main"></main>
+<p class="empty" id="empty">Nothing matches these filters.</p>
+
+<section id="output">
+  <div class="shead"><h2>Your decisions (this is what gets copied)</h2></div>
+  <p class="small">It updates by itself. You can also select this text by hand. Paste all of it into the chat.</p>
+  <textarea class="out" id="outText" readonly aria-label="Decisions text"></textarea>
+  <div class="row" style="margin-top:10px"><button class="btn primary" id="copyBtn2" type="button">Copy my decisions</button></div>
+</section>
+
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* ============================== DATA ============================== */
+const D = (id,pri,who,ev,title,what,fix,x) => Object.assign({id,pri,who,ev,title,what,fix},x||{});
+const T = (id,pri,who,title,steps,expect) => ({id,pri,who,ev:'test',title,what:steps,fix:expect,k:'test'});
+
+const SECTIONS = [
+
+/* ---------------------------------------------------------------- A */
+{id:'a', title:'Accounts, money and keys', intro:'The slow, boring parts that block everything else. Start the first two today because they take weeks.', items:[
+D('A1','B','You','policy','Apply for the D-U-N-S number',
+ 'Google Play will not open an organisation account without it. It takes 1 to 4 weeks, so it is the slowest step in the whole launch.',
+ 'Apply now (free) in the trust\'s legal name, Madras Cosmos Charitable Trust, with its registration papers. Do not wait for anything else.'),
+D('A2','B','You','policy','Open the Google Play organisation account ($25, once)',
+ 'Nothing can be uploaded without it. An organisation account also skips the "12 testers for 14 days" rule that personal accounts must pass.',
+ 'Use the trust\'s name and a club email, not a personal Gmail. Add a second owner from the club.'),
+D('A3','B','Both','code','Create the upload keystore and back it up',
+ '<code>android/key.properties</code> does not exist, so release builds are signed with the debug key and Play will reject them. If the keystore is lost later, updating the app becomes painful.',
+ 'I give you the exact command. You run it, save the 2 passwords in a password manager and keep 2 copies of the <code>.jks</code> file off this PC (pen drive plus cloud). Turn on Play App Signing so Google keeps the real signing key.'),
+D('A4','B','You','docs','Move the Google Cloud free trial to a paid account before 25 Jan 2027',
+ 'The Rs 28,797 trial credit ends on 25 Jan 2027. After that, resources can be stopped and later deleted.',
+ 'In Billing choose Upgrade (your data stays). Set a phone alarm for 10 Jan 2027. Do it earlier if you launch earlier.'),
+D('A5','B','You','policy','Set budget alerts so a surprise bill reaches you',
+ 'Blaze has no spending cap. A bug or an attack can run reads and writes up quickly.',
+ 'Google Cloud Billing, then Budgets: Rs 3,000 a month with alerts at 50%, 90% and 100%, sent to 2 emails. In Cloudflare, add a billing/usage alert under Notifications.'),
+D('A6','B','Both','docs','Replace the Cloudflare TURN key (it was pasted in chat)',
+ 'The TURN token appeared in a chat window. Anyone who sees it can use your call-relay quota.',
+ 'Cloudflare, Realtime, TURN: create a new key, delete the old one, then run <code>wrangler secret put TURN_KEY_ID</code> and <code>TURN_API_TOKEN</code> and redeploy. I give you the commands. Do it right before launch, after your testing.'),
+D('A7','S','You','docs','Subscribe to Cloudflare Workers Paid ($5 a month) the day before launch',
+ 'The free plan stops at about 100,000 requests a day. Every photo view and every call set-up is one request. When the limit is hit, photos and calls simply fail until the next day.',
+ 'Workers and Pages, Plans, Workers Paid. Check Metrics once a week. Upgrade earlier if you pass 50,000 a day.'),
+D('A8','S','You','policy','Buy the domain (about Rs 800 to 1,200 a year)',
+ 'You need it for the email sender, the support/privacy mailboxes and a professional store listing. A personal Gmail as legal contact looks weak and breaks when that person leaves.',
+ 'Buy something like raktabandhan.in or .org in the trust\'s name (Cloudflare Registrar sells at cost). Turn on 2-step login on the registrar account.'),
+D('A9','B','Both','policy','Create shared mailboxes: support@, privacy@, grievance@',
+ 'The legal pages have no contact email yet, which is a store blocker. Mail must reach an inbox that is watched, not one person\'s private mail.',
+ 'With the domain on Cloudflare, free Email Routing forwards all three to 2 club members. Then I put the address in <code>legal_config.dart</code> and regenerate the pages.'),
+D('A10','S','You','policy','Protect the accounts: 2-step login, recovery and a second owner',
+ 'Firebase, Cloudflare, Play and the domain all hang on one Gmail, raktabandhan2026@gmail.com. If it gets locked, or someone leaves the club, the whole project is stuck.',
+ 'Use an authenticator app (not only SMS). Print the backup codes and give them to the club secretary. Add a second Owner on Firebase/Google Cloud, a Super Administrator on Cloudflare and an Admin on Play Console. Never share the password in chat.'),
+D('A11','B','Both','code','Delete all test data and test users before opening to the public',
+ 'Test requests, fake donors, test posts and test sign-in accounts would show up for the first real users and for the Play reviewers.',
+ 'Keep only the admin. I can give you a clean-up script, or you delete in the Firebase console. Do this last, just before the public build. Also empty the test photos from the R2 bucket <code>bloodbank</code>.'),
+D('A12','L','You','docs','Close the leftovers: old Firebase project and old Cloudflare accounts',
+ 'The old project <code>rakta-bandhan2026</code> and Cloudflare accounts 1 and 2 still exist. They could confuse you or be billed.',
+ 'Delete the old Firebase project (Project settings, Delete). Retry removing the account 2 card after 11 Nov 2026.'),
+D('A13','S','You','policy','One shared renewals calendar',
+ 'Domain (yearly), Apple ($99 a year), Resend ($20 a month), Workers ($5 a month). A missed renewal takes mail or the app down.',
+ 'One shared calendar with every date and who pays. Use auto-renew on a club card where possible.'),
+]},
+
+/* ---------------------------------------------------------------- B */
+{id:'b', title:'Sign-in, email check and phone check', intro:'Today new accounts pass a fake email check (code 123456) and a fake phone check (code 246810). That is fine for testing but not for real users or store reviewers.', items:[
+D('B1','B','Both','code','How do users prove their email at launch?',
+ 'Anyone can register with someone else\'s email or a made-up one. The rules treat every account as "verified" until <code>email_verified_required</code> is switched on. Real users and Play reviewers also see a fake-code screen, which looks broken and can be flagged as misleading.',
+ 'Pick one route.',
+ {key:true, pick:'A', o:[
+  'Firebase\'s own verification link. Free, no Resend, no domain needed. The user taps a link in an email, comes back and taps "I have verified". The database rules already accept <code>email_verified</code>. About half a day of work for me. Emails come from a firebaseapp.com address and may reach spam (see B5).',
+  'Resend emailed 6-digit code (the original plan). Passwordless and nicer, but needs the domain, Resend (about $20 a month at scale), an IAM role and the <code>EMAIL_CODE_LIVE</code> build. See B4.',
+  'Keep the fake check for the first release. Not recommended: reviewers and users see a fake code screen.'
+ ]}),
+D('B2','B','Both','code','Switch on <code>email_verified_required</code> once real checking works',
+ 'Until then anyone can create accounts with fake emails and write data (requests, posts). Switching it on too early locks out your own testers.',
+ 'After B1 is live and tested on 2 phones with a fresh account: Firestore, <code>config/features</code>, set <code>email_verified_required = true</code>. Keep a test account that is already verified.'),
+D('B3','S','Me','code','Remove the fake phone-check screen from the store build',
+ 'The phone step shows "enter 246810" and verifies nothing. Showing a fake verification to real users is confusing, and Play or Apple reviewers can treat it as misleading.',
+ 'Keep collecting the phone number (admins use it) but skip the fake code screen, and never call the number "verified". Real checking comes later (B6). If you keep the screen anyway, the review notes must say it is a simulation.',
+),
+D('B4','S','Both','docs','Set up Resend properly (only if you chose Option B in B1)',
+ 'Resend needs a verified domain (SPF, DKIM, DMARC records) or mails go to spam. The free plan allows 100 mails a day, so one busy day blocks sign-ins.',
+ 'Resend, Domains, add yours, copy the DNS records into Cloudflare DNS. Make an API key. Set the <code>SMTP_URL</code> secret and <code>MAIL_FROM</code> in <code>functions/.env.rakta-bandhan-india</code>. Give the functions account the Service Account Token Creator role. Deploy. Build with <code>EMAIL_CODE_LIVE=true</code>. Take the Pro plan before launch.'),
+D('B5','S','Both','docs','Make the verification and reset emails look right',
+ 'Firebase\'s default emails are English, come from noreply@...firebaseapp.com and often land in spam. People may never find them.',
+ 'Firebase, Authentication, Templates: edit the wording (app name, one short Tamil/English line) and set a custom sender domain once the domain exists. In the app I add "Check your spam folder" under "email sent" and a resend button with a 30-second wait.'),
+D('B6','L','Both','docs','Real phone-number check (SMS, WhatsApp, Truecaller)',
+ 'It is not built on the server: no function for it exists. It costs about Rs 13,300 a year at your volume. SMS in India needs DLT registration (about Rs 5,900 a year) and takes 1 to 2 weeks.',
+ 'Launch without it; the phone stays "not verified". Add later in this order: Truecaller one-tap (free), then WhatsApp, with SMS as fallback. Keep <code>phone_required=false</code> until tested.'),
+D('B7','S','Both','policy','Admin accounts: 2-step login and a short list',
+ 'Admins can read every donor\'s phone number, ID photo and chat. They sign in with only an email and password, so one leaked password exposes everybody.',
+ 'Keep 2 or 3 admins with long unique passwords in a password manager. Turn on authenticator-app 2-step login for admins (Firebase Identity Platform upgrade; check the current pricing), or at least read the audit log every week.'),
+D('B8','S','Me','code','Stop fake-account floods',
+ 'Firebase\'s sign-up API can be called by scripts. Fake accounts lead to fake requests and push spam to donors.',
+ 'Email checking (B2), App Check (J2) and request limits (H4) together make mass fake accounts useless. Nothing extra to build now.'),
+]},
+
+/* ---------------------------------------------------------------- C */
+{id:'c', title:'Legal, medical and compliance', intro:'Some of these need a lawyer or the Rotary blood-bank doctor, not me. I only write what they approve.', items:[
+D('C1','B','Both','code','Fill the legal contact email and the Grievance Officer',
+ '<code>kLegalContactEmail</code> and <code>kGrievanceOfficerName</code> are empty. Play needs a contact, Indian rules need a named Grievance Officer, and the delete-account web page must show a way to reach you.',
+ 'Send me the name and the email from A9. I set them, regenerate the legal pages, rebuild the admin site and redeploy hosting.'),
+D('C2','B','Counsel','policy','Lawyer review, then remove the "draft" banner',
+ 'Privacy, Terms and Community guidelines show a draft banner until <code>kLegalApproved = true</code>. Reviewers and users see the word "draft".',
+ 'Give the 3 documents to your lawyer (DPDP Act 2023, IT Act, limits on medical advice). After approval I flip the flag and re-export the hosted pages. Ask the questions in C3 to C7 at the same time.'),
+D('C3','B','Counsel','docs','Chennai Capital Trust: keep it in the legal text or remove it?',
+ 'You asked me to remove it from About and the certificate. The legal config and the legal documents still name Chennai Capital Trust as a responsible party, so the app now says two different things.',
+ 'Choose one. Whichever you pick, the entity named in the policy must be the real one that runs the app. Your lawyer should confirm.',
+ {key:true, pick:'A', o:[
+  'Remove it everywhere (legal text, config, store listing) because it is not part of the project now.',
+  'Keep it in the legal text and put it back in About, because it is a real operator.'
+ ]}),
+D('C4','B','Counsel','policy','What must a donor confirm about their health?',
+ 'The app only asks "I am 18 or older". It never asks weight, upper age, recent illness, tattoo, surgery or pregnancy. A donor who is not fit can accept. The Terms say donors must meet medical rules, but nothing in the app reminds them.',
+ 'Add a short self-declaration the first time a donor goes Available and again when they accept ("I am 18 to 65, weigh at least 45 kg, feel well today, no fever or antibiotics, no recent tattoo or surgery, last donated more than 3 months ago"). The Rotary blood-bank doctor must approve the exact list; these are typical Indian rules, not final. I build it after that.',
+ {key:true, pick:'A', o:[
+  'Add the checklist (doctor approves the wording). My pick.',
+  'Keep only the 18+ tick box and rely on the hospital to screen. Faster, but the app takes more legal risk.'
+ ]}),
+D('C5','S','Counsel','policy','Rest period: 90 days for everyone, or longer for women?',
+ 'The app uses 90 days for every donor. Indian guidance is commonly quoted as 3 months for men and 4 months for women; please confirm with your doctor. There is no gender field in the app.',
+ 'Ask the doctor. The rest period is the main safety guard against donating too often, so do not guess.',
+ {key:true, pick:'A', o:[
+  'Keep 90 days for all and say so in the Terms (simple, slightly short for women).',
+  'Add an optional gender field and use 120 days when it is female. Needs the doctor\'s approval and a rules change.'
+ ]}),
+D('C6','S','Both','code','Put the medical and emergency line where people act',
+ 'The disclaimer lives only in Terms and Help. A frightened requester never reads it, and may assume the app will find blood in time, or that the donor\'s group is checked.',
+ 'One line on the Raise-request screen: "Rakta Bandhan connects people. It is not a blood bank or emergency service. In an emergency call 108 or 112." One line on Accept: "The hospital will test your blood group before donating." I write both once you approve the words.'),
+D('C7','S','Counsel','policy','DPDP Act basics: retention, breach plan, consent record',
+ 'Chats, call records and old requests are kept with no stated time limit. The app does not save which version of the Terms each user accepted or when. There is no written breach plan.',
+ 'Decide retention (for example chats and calls deleted 90 days after a request closes, requests kept 1 year). I add <code>terms_version</code> and <code>accepted_at</code> to the profile and the cleanup in J4. Your lawyer writes the breach steps (who is told, how fast).'),
+D('C8','B','Both','policy','Fill the Play Console declarations',
+ 'Data safety, Health apps, content rating, target audience 18+, ads declaration, foreground-service declaration (phone call and microphone, needs a screen recording), App access (test logins) and the account-deletion URL. Any mismatch with the real app means rejection.',
+ 'Every answer is pre-written in <code>docs/publishing/store-listing.md</code>. I re-check each one against the final build (permissions are in section D). You paste them into the Console. Record the incoming-call video once push works.'),
+D('C9','S','Both','policy','Rotary name and logo permission',
+ 'The Rotary wheel is a trademark. The app icon avoids it but other places use the full logo. Apple guideline 5.2.1 and Rotary branding rules can force a removal.',
+ 'Ask the club president to confirm in writing that the club may show the wheel in a public app. If not, I swap to the droplet mark only.'),
+D('C10','S','You','policy','Team page: confirm names and bios',
+ 'About shows Adarsh, Sathish Kumar and Radhika. Nobody has confirmed these are real, approved, public names.',
+ 'Each person approves their name, role and photo in writing (a WhatsApp message is enough), or I hide the team section until then.'),
+D('C11','S','Counsel','policy','Is the certificate an "official" document?',
+ 'The donation certificate looks official. If a hospital or employer treats it as proof, a mistake has weight.',
+ 'I add "Issued by the Rakta Bandhan app. Not a medical record." on it. Decide who may sign it, for example the club president.'),
+D('C12','S','Both','policy','Consent for testimonials and community photos',
+ 'Testimonials need consent (there is a tick box). Community posts can show faces or IDs, photo links stay open to anyone with the link, and people cannot easily withdraw a testimonial.',
+ 'Keep the tick box. Add "Remove my testimonial" in Help; admins remove within 72 hours; say so in the policy.'),
+]},
+
+/* ---------------------------------------------------------------- D */
+{id:'d', title:'Permissions (what the phone asks, and what happens on No)', intro:'This table comes from the permission list inside the built APK, plus the code that asks for each one.',
+ table:`<div class="tablewrap"><table>
+<tr><th>Permission</th><th>Why the app has it</th><th>When the phone asks</th><th>If the user says No</th><th>My verdict</th></tr>
+<tr><td><b>Location</b> (precise and approximate)</td><td>Find requests and donors near you; save your area</td><td>The moment the Registration screen opens (before the app explains why), again on the Find map and when raising a request</td><td>User searches an area or drops a pin. Map centres on Chennai for display only. Nothing fake is stored</td><td>Explain first (D1)</td></tr>
+<tr><td><b>Notifications</b> (Android 13+)</td><td>Request alerts, chat, ringing calls</td><td>Right after the signed-in app opens; the call plugin asks again with its own text</td><td>No push and no ringing when the app is closed. The in-app list still works. The donor is silently skipped by the nearby alert</td><td>Ask later, with a reason (D2, D3)</td></tr>
+<tr><td><b>Microphone</b></td><td>Voice calls</td><td>The first time a call is placed or answered</td><td>The call fails with a message. No "Open settings" button</td><td>Ask early, add a button (D4)</td></tr>
+<tr><td><b>Camera</b></td><td>ID photo and story photo</td><td>When taking a photo</td><td>Falls back or explains</td><td>Probably not needed (D5)</td></tr>
+<tr><td><b>Nearby devices</b> (Bluetooth connect)</td><td>Send call audio to a Bluetooth headset</td><td>May appear during the first call on Android 12+</td><td>Call still works on earpiece or speaker</td><td>Keep, test (D6)</td></tr>
+<tr><td>Foreground service (phone call, microphone), Manage own calls</td><td>Keeps a ringing or live call alive</td><td>No prompt</td><td>-</td><td>Needs Play declaration and a video (C8)</td></tr>
+<tr><td>Wake lock, Disable keyguard, Turn screen on</td><td>Wake the phone for an incoming call</td><td>No prompt</td><td>-</td><td>Fine</td></tr>
+<tr><td><b>Do Not Disturb access</b> (<code>ACCESS_NOTIFICATION_POLICY</code>)</td><td>Added by the call plugin. The app does not use it</td><td>No prompt</td><td>-</td><td>Remove if possible (D7)</td></tr>
+<tr><td>Internet, network state, vibrate, audio settings, change network state, Play install referrer, push receive</td><td>Normal permissions</td><td>No prompt</td><td>-</td><td>Fine</td></tr>
+<tr><td><b>Not requested (good)</b></td><td colspan="4">Background location, full-screen intent, advertising ID, call log, phone, SMS, contacts, storage, exact alarms.</td></tr>
+</table></div>`,
+ items:[
+D('D1','S','Me','code','Explain location before the system pop-up',
+ 'Opening the Registration screen immediately triggers the phone\'s location dialog. The explanation (consent screen) comes later. First-time users see an unexplained "Allow location?" and many tap Deny. Then they must search or pin their area, which works but is slower.',
+ 'Add a short screen before it: "We use your location only to find requests and donors near you. Other people see only an approximate area." with Continue, then the system dialog. Ask for "While using the app" only, never "Always".'),
+D('D2','S','Me','code','Ask for notifications at the right moment, with a reason',
+ 'The permission is requested the moment the app opens after sign-in, before the user knows why. Saying No means the person never gets a request or a call while the app is closed. That is the core of the app, and a donor with no push token is silently skipped by the nearby alert.',
+ 'After registration show a short "Turn on alerts" screen: "So we can tell you when someone near you needs your blood group, and ring you when your matched person calls." Then ask. If they refuse, show a gentle banner on the Request tab ("Alerts are off, you may miss requests") with Open settings.'),
+D('D3','S','Me','code','Notifications denied for good: add "Open settings"',
+ 'After the user says No twice, Android stops showing the dialog. The "Turn on notifications" card then does nothing except a message saying to allow them in settings, with no button.',
+ 'When the answer is denied, open the app\'s settings page with a button "Open settings" (the code already uses this for location).'),
+D('D4','S','Me','code','Microphone: ask early and add "Open settings"',
+ 'The first ask happens during a call. If someone answers from the lock screen with the app closed, the permission dialog pops over the call and the caller may hang up. If denied for good, the message says to change settings but gives no button.',
+ 'Ask once during onboarding or when the donor first goes Available ("so you can take calls from your matched person"). Add an Open settings button to the call error.'),
+D('D5','L','Me','code','Drop the CAMERA permission',
+ '<code>CAMERA</code> is declared, but photos are taken through the image picker, which opens the phone\'s own camera app. Declaring it adds a Play Data-safety line and a possible prompt for nothing.',
+ 'Remove the line from <code>AndroidManifest.xml</code> and test taking an ID photo and a story photo on 2 phones. If any phone fails, put it back.'),
+D('D6','L','Both','test','Bluetooth "Nearby devices" prompt in the first call',
+ 'On Android 12 and newer a Bluetooth permission dialog can appear in the middle of the first call and confuse people.',
+ 'Test on an Android 12+ phone. If it appears, ask it together with the microphone in D4 with one sentence: "to use your headset in calls".'),
+D('D7','S','Me','code','Remove the Do Not Disturb permission the call plugin adds',
+ '<code>ACCESS_NOTIFICATION_POLICY</code> is in the APK although the app never asks for it. Reviewers may ask why, and it adds to your Play permission questions.',
+ 'Remove it with <code>tools:node="remove"</code> and test an incoming call with the phone on silent and on Do Not Disturb. It should ring or vibrate exactly as before. If something breaks, keep it and explain it.'),
+D('D8','L','Both','test','Saving the certificate on Android 9 and older',
+ 'The app supports Android 7 and up. Saving an image to Photos on Android 9 or older needs a storage permission that is not declared, so Save may fail there. Share still works.',
+ 'Test on an Android 8 or 9 phone if you can find one. If it fails, hide Save on old versions (Share only) or add the permission limited to Android 9 and below.'),
+D('D9','B','Both','test','Test every "No" path',
+ 'Each permission can be refused once or for good. The app must never crash and must always show a way forward.',
+ 'Use the denial tests in section P. Expected: search or pin for location, Open settings for notifications, microphone and location, Share when Save fails.'),
+]},
+
+/* ---------------------------------------------------------------- E */
+{id:'e', title:'Notifications and push', intro:'Push is the heart of the app, and it has never sent a single message from the new project. The table shows what is supposed to be sent.',
+ table:`<div class="tablewrap"><table>
+<tr><th>Event</th><th>Who gets it</th><th>App open</th><th>App closed or phone locked</th></tr>
+<tr><td>New request nearby</td><td>Compatible, available donors with a push token, within 15 km (25 km if urgent or critical). Donors who turned on Urgent alerts get the loud channel for urgent and critical</td><td>In-app banner, or full-screen alert (opt-in)</td><td>System notification</td></tr>
+<tr><td>A donor accepted</td><td>The requester</td><td>Banner</td><td>Notification</td></tr>
+<tr><td>Donor can't make it / Requester cancelled a matched request</td><td>Requester / the donor</td><td>Banner</td><td>Notification</td></tr>
+<tr><td>"I've donated" / "Donation received"</td><td>The other person (asks them to confirm)</td><td>Banner</td><td>Notification</td></tr>
+<tr><td>Donation completed</td><td>Both</td><td>Banner</td><td>Notification</td></tr>
+<tr><td>No donor in 6 hours</td><td>The requester</td><td>Banner</td><td>Notification</td></tr>
+<tr><td>Chat message or shared location</td><td>The other person</td><td>Top banner unless that chat is open</td><td>Notification (message text shows)</td></tr>
+<tr><td>Incoming call</td><td>The callee</td><td>Full-screen ring</td><td>Native call screen with Answer and Decline, rings 45 s. Heads-up banner on a locked phone</td></tr>
+<tr><td>Missed call</td><td>The callee</td><td>Chat row</td><td>Notification</td></tr>
+<tr><td>Rest period over (90 days)</td><td>The donor, daily at 06:00 IST</td><td>-</td><td>Notification</td></tr>
+<tr><td>Admin broadcast</td><td>Everyone, or one blood group</td><td>Banner</td><td>Notification</td></tr>
+<tr><td>Support reply</td><td>The person who reported</td><td colspan="2"><b>Currently OFF</b> (<code>ENABLE_SUPPORT_DELIVERY=false</code>)</td></tr>
+</table></div>`,
+ items:[
+D('E1','B','You','test','Prove push works on real phones',
+ 'All 14 functions are deployed, but the logs show only start-up lines. No push has ever been sent from this project. Unknowns: is the sender allowed to send, does each phone save its token, do the channels exist.',
+ 'Run the two-phone script in section P. If nothing arrives, send me the red text. I read the function logs and the donor\'s <code>fcm_token</code>.'),
+D('E2','B','Me','code','Fix the old wording: "Alerts with the app closed arrive in an upcoming update"',
+ 'The Urgent-alert opt-in sheet says closed-app alerts are not ready. Once push is live that is wrong and may stop donors turning it on.',
+ 'After E1 passes I change it to "Rings even when the app is closed, as long as notifications are allowed." If E1 fails, the old text stays.'),
+D('E3','S','Me','code','A donor with no push token is silently skipped',
+ 'The nearby alert only picks donors who have a token. Notifications denied, a failed token save (offline at first launch) or a banned donor all mean no alert. The Matching screen\'s "N donors nearby" counts all of them, so the requester is told a bigger number than will actually be alerted.',
+ 'Re-register the token on every app start and when the app comes back from Settings. Show the requester only the count of donors who can really be alerted.'),
+D('E4','S','Me','code','One failure skips the topic subscriptions',
+ 'In <code>registerDevice</code> the token save and the topic subscriptions are in one try block. If the token save fails (offline or a rule), the topics <code>all</code> and <code>bg_&lt;group&gt;</code> are never subscribed, so admin broadcasts do not arrive.',
+ 'Split them into separate blocks and retry on the next start.'),
+D('E5','S','Both','policy','Too many pings for normal requests',
+ 'Every non-urgent request also pings up to 60 donors per area cell within 15 km. In a busy city one donor may get many pings a day and turn all notifications off. Then they miss the urgent one.',
+ 'Pick one.',
+ {key:true, pick:'A', o:[
+  'A donor setting in Settings: "Urgent only / All requests / Off". Default "All" for the first month, then review the opt-out rate.',
+  'No setting; cap non-urgent pushes at 3 per donor per day.',
+  'Leave as it is for the pilot and watch how many people switch notifications off.'
+ ]}),
+D('E6','S','Both','policy','Quiet hours for non-urgent pushes',
+ 'A normal request raised at 2 am wakes donors for something that can wait.',
+ 'Non-urgent notifications between 10 pm and 7 am IST arrive silently (low priority). Urgent and critical always go with sound. Tell me if you want different hours.'),
+D('E7','S','Both','policy','Lock-screen privacy',
+ 'Chat text and the hospital area appear on the lock screen. Anyone who picks up the phone can read "Need O+ at XYZ Hospital" or the private message.',
+ 'Chat notifications show only "New message" on a locked phone (Android <code>visibility: private</code>). Request pushes stay as they are (they show only the group and area). Say if you want something different.'),
+D('E8','B','Me','code','Support-reply push depends on the email working',
+ 'In <code>support.ts</code> the email is sent first. If the email fails (no mail service yet), the push is skipped and the reply is marked failed. With the Firebase-link route (no Resend), support replies would never push. The switch is also off.',
+ 'Send the push first and the email second, each in its own try block. Then switch <code>ENABLE_SUPPORT_DELIVERY</code> on after testing.'),
+D('E9','S','Both','test','Phones that kill background apps',
+ 'Xiaomi/Redmi, Realme, Oppo, Vivo, OnePlus and Samsung (battery saver) often stop notifications for closed apps. Many donors in India use these. High-priority push helps but does not fix every phone.',
+ 'Test on at least 2 of these brands. I add a Help item "Not getting alerts?" with the steps (auto-start on, battery "No restrictions") and a link to dontkillmyapp.com.'),
+D('E10','S','Me','code','Nudge people after a match',
+ 'A donor accepts and then goes quiet. The requester waits blindly. Nothing reminds either side today.',
+ '2 hours after matching, push the donor "Still planning to donate? Tell {name}." At 4 hours with no chat or call, push the requester "No message yet. You can call, or reopen your request." Ties in with H1.'),
+D('E11','L','Me','code','Tell the requester how many donors were really alerted',
+ 'After raising a request the requester only sees a rough count and does not know if anyone was pinged.',
+ 'The function writes <code>notified_count</code> on the request. The Matching screen shows "We alerted 12 donors near you". If it is 0, show next steps (H11).'),
+D('E12','S','Both','policy','Rules for admin broadcasts',
+ 'A broadcast reaches every phone. One careless message annoys everybody and there is no approval step.',
+ 'Policy: at most 2 a week, only for drives, events or emergencies, wording checked by a second admin. I add a "Send to all N users?" confirm on the admin site.'),
+D('E13','S','Me','code','Get alerted when pushes start failing',
+ 'Failed sends are only logged as warnings. If the sender permission breaks, nobody notices until users complain.',
+ 'A Cloud Monitoring alert on push failures and function errors (more than 5 in 10 minutes) emailing you. See L2.'),
+]},
+
+/* ---------------------------------------------------------------- F */
+{id:'f', title:'Voice calls', intro:'Audio goes phone to phone. Firestore only carries the hand-shake. The Cloudflare Worker supplies the relay (TURN) that many Indian mobile networks need.', items:[
+D('F1','B','You','test','Call test on different networks (the relay path)',
+ 'The Worker\'s <code>/ice</code> route has never been used by a signed-in phone. If it takes more than 3 seconds the app falls back to STUN only, and two phones on mobile data may never connect.',
+ 'Test Wi-Fi to data, Jio to Airtel data, and both on hotspot. A call should connect within about 5 seconds. If not, I check the Worker logs and the <code>/ice</code> answer.'),
+D('F2','S','Both','test','Locked phone: what does an incoming call look like?',
+ 'We removed the full-screen-intent permission because Play only allows it for calling apps. On a locked phone the call may appear as a small banner instead of a full screen, which is easy to miss.',
+ 'Test on 2 phones. If it is too easy to miss, we make the ring louder or accept it. Do not add the permission back unless Play approves.'),
+D('F3','S','Both','policy','Do Not Disturb and silent mode',
+ 'Calls follow the ringer mode. The urgent-alert sound is a notification sound, so Do Not Disturb silences it. A sleeping donor with Do Not Disturb on will not hear a critical alert.',
+ 'Keep it (overriding Do Not Disturb needs a sensitive permission that many people dislike). Add a hint in the Urgent alerts sheet: "Allow Rakta Bandhan in your Do Not Disturb exceptions to hear alerts at night."'),
+D('F4','S','Me','code','Both people call each other at the same moment',
+ 'Each phone creates its own call, and each ignores the other\'s because it is already calling. Both ring for 45 seconds and it ends as missed.',
+ 'If a ringing call already exists for the same request, answer it instead of placing a new one.'),
+D('F5','L','Me','code','Network switch during a call (Wi-Fi to mobile data)',
+ 'The call ends as "Connection lost" as soon as the connection fails. There is no automatic reconnect.',
+ 'Try one ICE restart before ending, and show "Reconnecting...". Test first; build it only if it happens often.'),
+D('F6','S','Both','policy','There is no phone-number fallback for calls',
+ 'The docs say "Call their phone instead" appears after 15 seconds. The code has no such button, and phone numbers are private by design. If mobile data is bad inside a hospital, the two people have no other way to talk.',
+ 'Pick one.',
+ {key:true, pick:'A', o:[
+  'Add "Share my number with {name}" in the chat: one tap, explicit, only that person sees it. Then a normal phone call becomes possible when both agree.',
+  'Keep everything fully private (current behaviour) and fix the docs.',
+  'Show both numbers after a match. Not recommended: it breaks the privacy promise.'
+ ]}),
+D('F7','S','Both','test','Audio route: earpiece, speaker, Bluetooth, wired',
+ 'People answer and then cannot hear because the sound goes to the wrong place.',
+ 'Test the default earpiece, the speaker toggle, a Bluetooth headset, and unplugging a wired headset during a call.'),
+D('F8','S','Both','test','The first ring after a quiet period may be late',
+ 'The ringing function starts on demand. The first call after a quiet time can ring 2 to 5 seconds late.',
+ 'Measure it in the two-phone test. If it is slow, keep one instance warm for that function (a few dollars a month).'),
+D('F9','L','Both','test','Call while a normal phone call or another app is using the microphone',
+ 'A normal phone call or a WhatsApp call blocks the microphone. Our call may connect in silence.',
+ 'Test it. If silent, show "Your microphone is busy" when no audio arrives for 5 seconds.'),
+D('F10','S','Both','policy','Prank or abusive calls',
+ 'Matched people can call at any hour, and abuse is possible.',
+ 'Already there: Block closes chat and calls for both, and Report goes to admins. Optional: allow calls only 6 am to 11 pm unless the request is urgent or critical. Tell me if you want that.'),
+]},
+
+/* ---------------------------------------------------------------- G */
+{id:'g', title:'Pop-ups, messages and wording', intro:'Every dialog, sheet and full-screen takeover I found in the code, and what is wrong with it.',
+ table:`<div class="tablewrap"><table>
+<tr><th>Where</th><th>What appears</th><th>Status</th></tr>
+<tr><td>Log out</td><td>Confirm dialog</td><td>OK</td></tr>
+<tr><td>Delete account</td><td>Confirm sheet, then password box (password sign-in), then a message</td><td>OK. Clear about what is deleted</td></tr>
+<tr><td>Cancel request (4 screens)</td><td>Confirm sheet: "Donors will stop seeing it..."</td><td>OK</td></tr>
+<tr><td>"Can't make it anymore?"</td><td>Sheet: the request goes back to donors</td><td>OK</td></tr>
+<tr><td>"Did you donate for this request?" and "Did {name} donate?"</td><td>Sheets, both sides must confirm</td><td>OK</td></tr>
+<tr><td>Block and close chat</td><td>Sheet: can't be undone</td><td>OK</td></tr>
+<tr><td>Report (chat, community)</td><td>Reasons sheet</td><td>OK. Missing for open requests (H5)</td></tr>
+<tr><td>Accept a request</td><td><b>No confirmation</b></td><td>Add one (G1)</td></tr>
+<tr><td>Urgent alerts opt-in</td><td>Sheet explaining the full-screen ring</td><td>Old wording (E2)</td></tr>
+<tr><td>Notifications off card</td><td>Card with a button</td><td>No Open settings (D3)</td></tr>
+<tr><td>Location ask / denied</td><td>Cards with Allow and Open settings</td><td>OK</td></tr>
+<tr><td>Microphone denied</td><td>Text message only</td><td>Add a button (D4)</td></tr>
+<tr><td>Photo source, photo preview</td><td>Sheets and a dialog</td><td>OK</td></tr>
+<tr><td>Testimonial, partnership, help forms</td><td>Bottom sheets</td><td>OK</td></tr>
+<tr><td>Incoming call, urgent alert</td><td>Full-screen takeovers</td><td>OK</td></tr>
+<tr><td>New message while using the app</td><td>Top banner</td><td>OK</td></tr>
+<tr><td>Errors</td><td>Friendly messages. The test APK also prints the real error</td><td>Make sure the store build has no test flag (G2)</td></tr>
+</table></div>`,
+ items:[
+D('G1','S','Me','code','Add a confirmation before "Accept"',
+ 'One tap on Accept locks the donor to that request and pushes the requester. An accidental tap wastes the requester\'s time, and the requester has already been told.',
+ 'A small sheet: "Can you reach {place} in the next few hours?" plus the health line from C4, with "Yes, I will go" and "Not now".'),
+D('G2','B','Me','code','Never ship the test flag',
+ 'The test APK shows the real error text (<code>SHOW_ERRORS=true</code>). Good for us, but it would show raw internals to real users.',
+ 'The release command in section O has no such flag. I check the final build before you upload it.'),
+D('G3','S','Me','test','Offline: buttons that hang',
+ 'Firestore keeps a write waiting when the phone is offline. A spinner may spin until the network returns, then suddenly "succeed". Users double-tap, or think a request exists when it does not.',
+ 'A 10-second limit on the main actions (raise request, accept, confirm, send message) with "No connection. Try again." plus a thin "You are offline" bar. Test with airplane mode first to see what really happens.'),
+D('G4','S','Me','code','A forced-update screen, from the very first release',
+ 'If we change rules or data later, old app versions get "permission denied" and show "Your session may have expired". That is confusing and nothing makes people update. This cannot be added to old builds afterwards.',
+ 'A <code>config/app</code> document holds <code>min_version</code>. On launch the app compares and shows "Please update" with a Play Store button.'),
+D('G5','S','Me','code','Wrong wording: the requester is told "Thanks for donating!"',
+ 'After completion the requester\'s list says "Thanks for donating!", although they received blood. The bell\'s unread dot also never lights up.',
+ 'Requester: "Donation completed. {donor} helped." Donor: "Thanks for donating!" Turn the dot on when there are unseen items.'),
+D('G6','S','Both','policy','Language: English only',
+ 'Chennai users may prefer Tamil, and other states Hindi or Malayalam. All text is written into the code. A person in an emergency may struggle in English.',
+ 'Pick one.',
+ {key:true, pick:'B', o:[
+  'Tamil must be in version 1. Adds about 2 to 3 days of work plus a native-speaker review, and delays launch.',
+  'English first, Tamil in version 1.1 two to four weeks later, then Hindi and Malayalam.',
+  'English only for now.'
+ ]}),
+D('G7','L','Both','test','Large text and screen reader',
+ 'Large fonts and TalkBack have not been tested. Older screens have icon buttons without labels.',
+ 'Test at 200% font and with TalkBack on the Request, Chat and Call screens. I fix the overflows and labels.'),
+D('G8','L','Me','code','Ask for a Play review at the happy moment',
+ 'Play reviews decide how high the app ranks. The best moment to ask is right after a completed donation.',
+ 'One in-app review prompt after a completed donation, at most once a month.'),
+D('G9','S','Me','code','Portrait only?',
+ 'The app is not locked to portrait (nothing in the code or the Android manifest does it). If someone rotates the phone, some screens may overflow.',
+ 'Lock to portrait for version 1. Or test landscape on the main screens. I recommend locking.'),
+]},
+
+/* ---------------------------------------------------------------- H */
+{id:'h', title:'The life of a request: where it can get stuck', intro:'These are the "wrong thing happens" scenarios in the core flow. Most are quiet: nothing crashes, but a real person is left waiting.', items:[
+D('H1','B','Both','code','A matched request can stay stuck forever',
+ 'Expiry only closes requests that are still <b>open</b>. After a donor accepts, nothing times out. (1) The donor donates and taps "I\'ve donated", but the requester never confirms: the donor gets no certificate, no rest period and no history, stays locked, and cannot accept another request except by releasing it (which would wrongly cancel their donation). (2) The donor goes silent: the requester can only cancel and re-raise. (3) The requester deletes the app: the donor stays locked.',
+ 'Pick the timings. All run on the server every hour.',
+ {key:true, pick:'A', o:[
+  'Reminders at 2 h and 4 h (E10). If the donor confirmed and the requester stays silent for 48 h, auto-complete it as "confirmed by donor only" (certificate and rest are recorded, flagged for admin). If nobody confirmed within 24 h, reopen the request (or close it if the requester is gone) and unlock the donor, telling both.',
+  'Only reminders, no automatic closing. Admins fix stuck ones by hand.',
+  'Same as A but with different hours (write them in the box).'
+ ]}),
+D('H2','B','Me','code','The phone\'s own clock decides expiry and the 90-day rest',
+ '<code>expires_at</code> and the donor\'s rest end are calculated from the phone clock. Wrong clocks are common on cheap phones. A clock a few hours behind makes a request die early (6 or more hours behind: instantly, and anyone can then expire it); a clock ahead makes it live longer. "Release" is refused by the rules if the clock is more than 1 hour ahead. A donor who sets the clock back can shorten the 90-day rest, which is a health risk.',
+ 'Use server time. Rules: on create, <code>expires_at</code> must be between now and now+6 h 5 min; on completion the rest must end at least 89 days after the server time. The app uses a server-time offset. I extend the rules tests.'),
+D('H3','B','Me','code','Creating a request has no validation',
+ 'The rule for creating a request only checks who you are. A modified app can send 5,000 units, an invalid blood group, no location, an expiry 100 years away, or a 10,000-character place name. That bad data then shows in every donor\'s feed or never expires.',
+ 'Rules: blood group is one of the 8, units 1 to 10, urgency is one of 3 values, lat/lng are numbers inside India, place is at most 200 characters, the expiry window from H2, and no unknown fields. The 82 rules tests grow with it.'),
+D('H4','B','Me','code','Nothing limits how many requests one person can raise',
+ 'A fake or careless user can raise 50 requests, and each can push up to hundreds of donors. Donors then switch notifications off. Cloud usage rises too.',
+ 'A server step on create: more than 2 open requests per person, or more than 5 in 24 hours, means the extra one is closed and not pushed, and the person is told why. This also stops duplicates for the same patient.'),
+D('H5','S','Me','code','Donors cannot report a suspicious open request',
+ 'Reporting exists only inside a chat (after matching) and on posts. A donor who sees a fake or money-asking request in the feed has no button.',
+ 'Add "Report this request" on the request page (fake, asks for money, duplicate, wrong group). Three different people reporting hides it and flags the admins.'),
+D('H6','S','Both','policy','The search radius is different on each screen (15, 25 and 50 km)',
+ 'A donor sees a request in the feed at 40 km but would never be pushed (15 or 25 km). The requester sees "N donors nearby" from yet another radius. The expectation does not match.',
+ 'Pick one rule. I change the app and the functions together.',
+ {key:true, pick:'A', o:[
+  'Normal 15 km, Urgent 25 km, Critical 40 km, the same for the feed, the count and the push.',
+  '25 km for everything.',
+  'Leave as it is for the pilot.'
+ ]}),
+D('H7','S','Me','code','A donor\'s area never updates when they move',
+ 'Alerts follow the area saved at registration. A donor who moves or travels gets alerts for the old city and nothing near them.',
+ 'On app start, if the GPS fix is more than 15 km from the saved area, ask "You seem to be in {area}. Use it for alerts?". The existing "change area" option stays.'),
+D('H8','S','Both','code','Several units needed, but only one donor can accept',
+ 'A request for 3 units can be accepted by one donor. After that it is "fulfilled" even if 2 units are still needed. Real hospital needs are often 2 to 4 units.',
+ 'Version 1: after completion ask "Do you still need more blood?" and pre-fill a new request for the remaining units. Version 1.1: allow several donors per request (a bigger change that touches the rules).'),
+D('H9','S','Both','test','Banned users\' requests and listing',
+ 'A ban disables the sign-in (a function does this) and blocks writes. I found nothing that cancels their open requests, hides them from the Find map, or releases a donor they were matched with.',
+ 'Check with a test ban first. If confirmed, the same function also cancels their open requests, sets their public listing to unavailable and releases the match.'),
+D('H10','S','Me','code','"Request O+ blood" on a donor card is not private',
+ 'It creates a normal public request, not a message to that one donor. People expect a private ask.',
+ 'Rename it "Ask nearby donors for O+" and say on the sheet "This goes to all compatible donors nearby". A private ask can come later.'),
+D('H11','S','Both','policy','No donors in the area',
+ 'In a city with few donors the requester sees "no match" and nothing more, at the worst possible moment.',
+ 'On that screen show practical next steps: call nearby blood banks, the national e-RaktKosh blood-availability portal, 108/112 and your state health helpline (104 in Tamil Nadu), and "share this request on WhatsApp". Wording approved by the club. Also seed donors before promoting (M5).'),
+D('H12','L','Both','code','No planned time or ETA',
+ 'The original idea has "track and schedule". Today there is chat and status only. The two cannot say "I will be there at 4 pm".',
+ 'Later: one "planned time" field on the match, with reminder pushes.'),
+]},
+
+/* ---------------------------------------------------------------- I */
+{id:'i', title:'Safety, trust and abuse', intro:'The app puts strangers in touch about blood. These are the ways that can go wrong for people.', items:[
+D('I1','S','Both','policy','What does "Verified donor" mean?',
+ 'Today it is only a badge that an admin sets after checking an ID. Nothing requires it to accept a request. If store text or the app says "verified by the team" it must be true.',
+ 'Pick one.',
+ {key:true, pick:'A', o:[
+  'Keep it optional, rename the badge "ID checked", and list ID-checked donors first in Find and in alerts.',
+  'Require verification before a donor can accept. Safer, but fewer donors at launch.',
+  'Leave as it is and change the store wording so it makes no promise.'
+ ]}),
+D('I2','S','Both','policy','Blood group is self-declared',
+ 'A wrong group is a medical risk, and the app takes the donor\'s word for it.',
+ 'At registration add "Choose the group from your donor card or lab report. The hospital will test it again." Later: an optional card upload that admins can mark verified.'),
+D('I3','S','Both','policy','Safety tips for meeting',
+ 'Strangers meet at hospitals. The main risks are stalking and scams ("pay for blood"). Chat already has a pinned "blood is never bought or sold" line.',
+ 'A "Meeting safely" sheet shown once after a match: meet only at the hospital or blood bank, never pay or accept money, tell someone you trust, report anything odd.'),
+D('I4','S','Both','policy','How much of a donor is visible to every signed-in user',
+ 'The public donor listing holds the real name and a position rounded to about 1 km, readable by any signed-in account. Combined with chat, that allows stalking, especially of women donors.',
+ 'Pick one.',
+ {key:true, pick:'A', o:[
+  'Show first name only and an area circle (no pin), and nothing more.',
+  'Add "Hide me from Find (I still get requests)" in Settings.',
+  'Leave as it is.'
+ ]}),
+D('I5','S','Both','policy','Community posts: moderation rule',
+ 'Posts and photos publish instantly. Reports go to admins, and nothing hides a post automatically.',
+ 'Report-only for version 1, plus: three reports from different people hide the post until an admin looks (a function), and admins review within 24 hours. Approving every post first is safer but kills the feel.'),
+D('I6','S','Both','policy','Phone numbers and money talk in chat',
+ 'People may paste phone numbers or ask for money.',
+ 'Do not filter numbers (they sometimes really need them). Report already has "asked for money". Add: an admin bans within 24 hours, and a warning banner when words like "pay" or "UPI" appear.'),
+D('I7','S','Counsel','policy','Under-18s',
+ 'The only barrier is a tick box "I am 18 or older". A 16-year-old can tick it.',
+ 'Accept this for version 1 (the usual standard, stated in the Terms). If your lawyer wants more, ask the date of birth and block under 18.'),
+D('I8','L','Both','code','Use the verified hospital list',
+ 'The admin has a hospitals list the app never reads. A request\'s place is free text, so anyone can type anything.',
+ 'Later: pick from a verified hospital list with a map pin, and allow free text only as "Other".'),
+]},
+
+/* ---------------------------------------------------------------- J */
+{id:'j', title:'Security and data protection', intro:'', items:[
+D('J1','B','You','docs','Restrict the API keys',
+ 'The Firebase Android key is inside the APK. An unrestricted key can be copied and abused.',
+ 'Google Cloud, APIs and Services, Credentials: limit the Android key to package <code>com.raktabandhan.app</code> plus your SHA-1 fingerprints (debug, upload, Play signing). Limit the web key to your 2 hosting domains. Limit the Maps key to the Maps SDK and the package. Set daily quotas on Maps and LocationIQ.'),
+D('J2','S','Both','docs','App Check: register, watch, then enforce',
+ 'Without it, any script with the public key and an account can call Firestore. Enforcing too early blocks your own testers.',
+ 'Register Play Integrity with the Play-signing SHA-256 (after the first upload). Put tester debug tokens in the console. Watch the metrics for a week. Then enforce Firestore, then Auth, then Functions. Admin site: reCAPTCHA key.'),
+D('J3','S','Both','docs','Backups',
+ 'Nothing backs up Firestore. A mistaken mass delete or a bad admin action cannot be undone. R2 photos have no backup either.',
+ 'Turn on Firestore point-in-time recovery (7 days) and a daily export to a Cloud Storage bucket with 30-day retention (a few rupees a month). Restore once into a dummy project to prove it works. Photos can stay as they are.'),
+D('J4','S','Me','code','Old call and chat data is never deleted',
+ 'Call records and their connection candidates (these contain network addresses) cannot be deleted by the app (the rules forbid it) and nothing deletes them. They stay forever, together with old chats and closed requests. That is more personal data than the policy needs.',
+ 'Add an <code>expire_at</code> field (for example +7 days for calls and candidates, +90 days after close for chats, +1 year for requests) and turn on Firestore TTL policies, including on the candidate sub-documents. Then write the periods into the privacy policy (C7).'),
+D('J5','S','Both','docs','Rotate secrets and keep them out of git',
+ 'The Resend key, TURN token and review code are secrets. One was pasted in chat.',
+ 'Rotate before launch (A6). Env files are already ignored; I run a check that no secret is in the git history before you share the repo.'),
+D('J6','S','Me','code','Android auto-backup can restore old logins onto a new phone',
+ 'The manifest does not turn off Android\'s automatic app backup. A restored backup can bring old Firebase login and push IDs onto a new phone and cause wrong or duplicate push tokens.',
+ 'Set <code>android:allowBackup="false"</code>. The hidden-authors list and the emergency contact are on the phone only and would not be restored; that is acceptable.'),
+D('J7','S','Me','code','Run every test suite before every release',
+ 'The rules protect all the data. A rules change that quietly breaks a test can leak data.',
+ 'Release checklist: <code>flutter analyze</code>, <code>flutter test</code>, the 82 rules tests, the functions tests and the 26 Worker tests. I run them and paste the results into the release note.'),
+D('J8','L','Both','docs','Dependency and vulnerability check',
+ 'Old packages carry known holes.',
+ 'Run <code>flutter pub outdated</code> and <code>npm audit</code> (functions, edge, admin) once before launch and monthly. I list only the serious ones.'),
+D('J9','S','Both','docs','Who can reach the admin website',
+ 'The admin site is public at the hosting address. Only the login protects it.',
+ 'That is fine with strong passwords and 2-step login (B7). Optional later: Cloudflare Access in front of it.'),
+D('J10','L','Both','docs','Limit abuse of photo uploads',
+ 'Uploads are per signed-in user, but a logged-in abuser could upload many 2 MB photos and fill the bucket.',
+ 'Add a per-user daily upload cap in the Worker and one Cloudflare rate-limit rule. Check the bucket size monthly.'),
+]},
+
+/* ---------------------------------------------------------------- K */
+{id:'k', title:'Bad network, old phones, small screens', intro:'', items:[
+D('K1','S','Both','test','Slow 2G/3G and flaky Wi-Fi',
+ 'Many users will be on weak signal inside hospitals.',
+ 'Test with throttled network: the map, photo upload (progress and time-out), address search (8-second limit) and call set-up.'),
+D('K2','S','Both','test','A low-end phone (2 GB memory, Android 8 to 10)',
+ 'The map, WebRTC and live Firestore listeners are heavy. The universal APK is 109 MB; the store download will be smaller.',
+ 'Test on the cheapest phone you can borrow. Look for crashes, freezes and slow start-up. I optimise if needed.'),
+D('K3','S','You','docs','Install the Android SDK Command-line Tools to shrink the app',
+ 'Without them the store bundle is 86.7 MB (native symbols not stripped) instead of about 35 MB. Low-storage phones and slow networks suffer.',
+ 'Android Studio, SDK Manager, SDK Tools, tick Command-line Tools, Apply. Then run <code>flutter doctor --android-licenses</code>. I rebuild and compare sizes.'),
+D('K4','L','Both','test','Dark mode, font size, tablets',
+ 'The app has one look. Dark mode on the phone, big fonts and tablets are untested.',
+ 'Test dark mode and 200% font. Tablets are not a launch target.'),
+]},
+
+/* ---------------------------------------------------------------- L */
+{id:'l', title:'Monitoring, release and cost', intro:'', items:[
+D('L1','S','Me','code','Add crash reporting',
+ 'There is no crash reporting. After launch, crashes are invisible except in Play Console vitals, which only cover some users.',
+ 'Add Firebase Crashlytics, and update the Play Data-safety form (crash logs) and the privacy policy. No personal data in the logs.'),
+D('L2','S','Both','docs','Alerts you will actually read',
+ 'Without alerts a broken function or a cost spike goes unseen for days.',
+ 'Cloud Monitoring alerts for function errors and Firestore reads above normal, plus the budget alerts from A5. An uptime check on the Worker\'s <code>/health</code> and on the hosting address (free UptimeRobot also works), sent to 2 people.'),
+D('L3','S','Both','docs','Release and rollback plan',
+ 'A bad release reaches everyone at once.',
+ 'Play staged rollout 5%, 20%, 50%, 100% about 24 to 48 hours apart, watching crashes; halt if more than 1% crash. Rules and functions roll back by redeploying the previous git tag (I keep tags). Keep the last good bundle.'),
+D('L4','S','Both','docs','Look at the cost every week',
+ 'Spend should be a number you check, not a surprise.',
+ 'First month: look at Firebase usage and Billing every 2 days, then weekly. Expected at 1 lakh users: about Rs 1,700, 5,000 and 10,000 a month at 5%, 15% and 30% daily active.'),
+D('L5','S','Both','docs','Deploy from a clean tag',
+ 'Live rules and indexes must be exactly what is in the repo.',
+ 'Before release: deploy the rules and indexes from a clean tag and check every index shows Enabled.'),
+]},
+
+/* ---------------------------------------------------------------- M */
+{id:'m', title:'Product decisions', intro:'', items:[
+D('M1','S','Both','policy','The startup "Advertisement" screen',
+ 'Every launch shows a labelled, empty "Advertisement" card for 3 seconds. No ad provider is connected, and the store form says "Ads: none". If a sponsor image is ever shown, the Play ads declaration, Data safety and privacy policy all change.',
+ 'Pick one.',
+ {key:true, pick:'B', o:[
+  'Remove it until a sponsor is signed.',
+  'Keep the slot, but skip the whole screen when there is no sponsor image (no empty box, no 3-second wait). Update the Play ads declaration the day a sponsor goes live.',
+  'Connect an ad network. Not recommended for a blood-donation app.'
+ ]}),
+D('M2','S','Me','code','Real names are still saved on posts and testimonials',
+ 'The app shows only the @username, but the registered name is still saved on community posts and testimonials, and other signed-in users can read those documents. The promise is true on screen but not in the data.',
+ 'Stop writing the name; the rules reject it; a one-time script removes it from old documents.'),
+D('M3','S','Both','policy','The emergency contact is saved only on the phone',
+ 'It is lost on reinstall and nobody else can use it.',
+ 'Keep it and label it "Saved only on this phone" (already done), or remove the feature from version 1.'),
+D('M4','S','Both','policy','The Corporate partnerships screen is empty',
+ 'The form works, but there are no partners, terms or prices, so it may look unfinished.',
+ 'Hide the menu row until the club decides the terms, or keep it as a plain "contact us".'),
+D('M5','S','Both','policy','Launch area: Chennai first, or all India?',
+ 'A city with few donors makes the app feel dead, and first impressions decide whether people come back.',
+ 'Pick one.',
+ {key:true, pick:'A', o:[
+  'Announce only in Chennai. Seed with Rotary members first (aim for 200 or more registered donors before promoting). Outside Chennai people can join but see "Not many donors here yet".',
+  'All India from day one.'
+ ]}),
+D('M6','S','Both','policy','The Community tab is empty on day one',
+ 'Stories, announcements and testimonials all start empty.',
+ 'The club posts 5 to 8 announcements and real stories (with consent) before launch.'),
+D('M7','L','Me','code','Old code and out-of-date docs',
+ 'Old in-app admin screens, <code>home_screen.dart</code> and some docs no longer match the app.',
+ 'Delete the unused screens and fix the docs, after launch (low risk).'),
+]},
+
+/* ---------------------------------------------------------------- N */
+{id:'n', title:'People and daily running', intro:'The app is only as safe as the people who answer its reports.', items:[
+D('N1','B','You','policy','Who runs the admin inbox every day?',
+ 'Reports about fake requests and money demands, ID checks, support questions and grievance mail all arrive on the admin site. If nobody looks, the safety promise is empty.',
+ 'Name 2 people and a backup. Check at 9 am and 6 pm. Targets: safety reports 24 hours, ID checks 48 hours, support 72 hours. Put a promise in the policy only if you can keep it.'),
+D('N2','B','Both','policy','A one-page moderation runbook',
+ 'Admins will face money requests, fake requests, harassment, abusive photos and legal notices.',
+ 'I write one page: what to do for each (warn, hide, ban, report to police), who decides, where it is logged. The club approves it.'),
+D('N3','S','Both','policy','A critical request with no donor needs a human',
+ 'Nobody is told when a critical request stays unmatched.',
+ 'A function messages the ops team when a critical request has been open 30 minutes with no match, and a volunteer calls blood banks. Decide who is on that list.'),
+D('N4','S','Both','docs','A short incident sheet',
+ 'When something breaks at night, people lose time working out who to call.',
+ 'One page for: app down, pushes not arriving, bill spike, leaked key, data breach. Who to call, which console, which command. I write it.'),
+D('N5','S','Both','test','Open every admin page with real data',
+ 'The admin pages (Inbox, Content, Requests, Settings, ID verification) were never used against the live project.',
+ 'After the phone test I walk through each with the test data. You check the ID-photo view and "confirm donation".'),
+D('N6','S','Counsel','policy','Data requests and legal notices',
+ 'Someone will ask for their data, or the police will ask for a user\'s details.',
+ 'A lawyer-approved template: who replies, what may be shared, and a record of each case.'),
+]},
+
+/* ---------------------------------------------------------------- O */
+{id:'o', title:'Play Store listing and release build', intro:'', items:[
+D('O1','B','Both','policy','Screenshots with fictional data',
+ 'The current screenshots show a real hospital name and "Priya (test)". Real names in store images are a privacy and policy risk.',
+ 'Fill the emulator with made-up people and a made-up hospital, then take at least 6 phone screenshots. I can script it with the existing screenshot tool.'),
+D('O2','B','Both','policy','Icon 512x512 and feature graphic 1024x500',
+ 'Both are required by Play.',
+ 'Made from the droplet mark, not the Rotary wheel unless C9 is approved.'),
+D('O3','B','Both','policy','Review logins and a short demo video',
+ 'The reviewer must sign in and see something. They are outside Chennai, so "near you" is empty for them, and the app needs two people.',
+ 'Two review accounts (one requester, one donor) in the "App access" form, and a 60 to 90 second unlisted video showing request, accept, chat, call and confirm. The review notes explain that two people and location are needed.'),
+D('O4','B','Me','code','The final build command and checks',
+ 'A wrong flag in the final build ships a test build, or an unsigned one.',
+ '<code>flutter build appbundle --release --dart-define=GOOGLE_MAPS=true</code> with the upload keystore, the LocationIQ key, a higher version code, no <code>SHOW_ERRORS</code>, plus <code>EMAIL_CODE_LIVE=true</code> only if you chose B1 Option B. Then check the signature and upload the debug symbols.'),
+D('O5','S','You','policy','Is the name free on Play?',
+ 'Play app titles must be unique, and a trademark clash can get the listing removed.',
+ 'Search Play for "Rakta Bandhan". Keep a backup name, for example "Rakta Bandhan: Blood Donors".'),
+D('O6','S','Both','policy','Play\'s automatic pre-launch test',
+ 'Play runs your app on test phones and reports crashes. It cannot get past sign-in without a login.',
+ 'Put the review login in "App access" (O3) so the crawl gets in.'),
+D('O7','S','You','policy','First release notes and staged rollout',
+ 'The first "What\'s new" text and the rollout steps are easy to forget.',
+ 'Short release notes with the support email. Start at 5% (see L3).'),
+]},
+
+/* ---------------------------------------------------------------- P */
+{id:'p', title:'Test script: two phones', intro:'Phone A is the requester, phone B is the donor. Use two different accounts with compatible blood groups, a few km apart. Install the current APK on both and allow notifications, microphone and location unless a step says otherwise. Mark each step Pass or Fail and write what you saw. Send me the red error text for any Fail.', items:[
+T('P1','B','You','Fresh account and every location answer',
+ 'Register a new account on A. When the location pop-up comes, tap Allow. Repeat on another new account and tap Don\'t allow, then "Don\'t ask again".',
+ 'Never a crash. Without location the person can search or pin their area. The app still works.'),
+T('P2','B','You','Refuse each permission',
+ 'On a new install deny, one at a time: notifications, microphone (try a call), camera/gallery (try a photo).',
+ 'A clear message each time. For notifications, microphone and location the screen offers a way to open settings (or tell me it doesn\'t).'),
+T('P3','B','You','Push with the app closed',
+ 'On B go Available and turn on Urgent alerts, then swipe the app away. On A raise an Urgent request.',
+ 'B gets a loud notification within about 10 seconds. Tapping it opens that request.'),
+T('P4','B','You','Push with a locked screen, battery saver and Do Not Disturb',
+ 'Repeat P3 with B\'s screen locked. Then with battery saver on. Then with Do Not Disturb on.',
+ 'Locked: arrives. Battery saver: arrives, maybe a bit late. Do Not Disturb: silent but visible. Note what you see.'),
+T('P5','B','You','Accept',
+ 'On B tap Accept on A\'s request. Try to accept a second request.',
+ 'A gets a push and the tracking screen updates. B cannot accept a second one while matched.'),
+T('P6','B','You','Chat in every state',
+ 'Send messages both ways with the receiving app open, in another app, closed, and phone locked.',
+ 'Open: top banner. Closed or locked: notification. Unread count and "Seen" work.'),
+T('P7','B','You','A call with the app closed',
+ 'Close B\'s app. Call from A. On B tap Answer. Talk for a full minute, both directions, then hang up on either side.',
+ 'B shows the call screen with Answer and Decline. Audio both ways. Both ends return cleanly with no stuck "on a call" bar.'),
+T('P8','B','You','Locked phone, Decline, no answer',
+ 'Lock B and call. Then Decline. Then call again and let it ring out for 45 seconds.',
+ 'Locked: a visible call banner. Decline: A sees "Declined". Ring out: both see a missed-call row and B gets a "Missed call" notification.'),
+T('P9','B','You','Calls across networks',
+ 'A on Wi-Fi and B on mobile data. Then A on Jio and B on Airtel. Then both on one phone\'s hotspot.',
+ 'Connects within about 5 seconds each time and the audio is clear. If any combination fails, write which.'),
+T('P10','S','You','Network drop in a call',
+ 'During a call put B in airplane mode for 3 seconds, then switch back. Also switch B from Wi-Fi to mobile data.',
+ 'Either the call recovers, or it ends with a clear message. It must not hang forever.'),
+T('P11','S','You','Both call at the same moment',
+ 'Tap Call on A and B within one second of each other.',
+ 'Ideally they connect. At worst both show missed after 45 seconds (see F4).'),
+T('P12','B','You','Donor backs out',
+ 'On B tap "I can\'t make it". On a third phone or account accept the reopened request.',
+ 'The request reopens, A gets a push, the second donor can accept.'),
+T('P13','B','You','Both confirmation orders',
+ 'Complete one request with the donor confirming first, and another with the requester confirming first.',
+ 'The request is "fulfilled" only after both. Certificate, 90-day rest and history appear for the donor once. The impact count goes up once.'),
+T('P14','S','You','Cancel while matched',
+ 'On A cancel a request that B has accepted.',
+ 'B gets "Request cancelled", is unlocked and can accept another request.'),
+T('P15','S','You','Nobody accepts',
+ 'Raise a request and let it sit past its 6-hour life (or ask me for a short test timer).',
+ 'A gets "No donor found in time". Status becomes expired.'),
+T('P16','B','You','Wrong phone clock',
+ 'On A set the date and time 2 hours forward, then 2 hours back. Raise a request each time. Then on B try "I can\'t make it" with the clock 2 hours forward.',
+ 'Today this probably fails (see H2). After my fix: requests last about 6 hours and Release still works.'),
+T('P17','B','You','Airplane mode actions',
+ 'Turn on airplane mode, then try to raise a request, accept, and send a chat message. Turn it off again.',
+ 'No spinner that hangs for ever. A clear message. Nothing is done twice when the network returns.'),
+T('P18','S','You','Photos',
+ 'Upload a profile photo, an ID photo and a story photo. View them on the other phone. Delete the story.',
+ 'Photos show on the other phone (not the ID). Deleting the post removes the photo.'),
+T('P19','S','You','Two accounts on one phone',
+ 'Log out of account 1, log in as account 2 on the same phone. Then raise a request for account 1 from another phone.',
+ 'Account 1\'s notifications do not arrive on this phone any more.'),
+T('P20','B','You','Delete account in the middle of things',
+ 'Delete a test account that has an open request. Delete another that is the matched donor.',
+ 'Open requests are cancelled. A matched request goes back to other donors. The person can no longer sign in.'),
+T('P21','S','You','Uninstall and reinstall',
+ 'Uninstall the app, reinstall, log in.',
+ 'Login works. A new push token is saved. Notifications arrive again.'),
+T('P22','S','You','Block and report',
+ 'In a chat, report the other person and then block them. Look at the admin site and at "My reports".',
+ 'The report shows in admin. The reply shows in "My reports". Chat and calls are closed for both.'),
+T('P23','S','You','Ban a test user',
+ 'On the admin site ban a test account that has an open request and a public listing.',
+ 'They cannot sign in or write. (H9) Check what happens to their open request and their Find listing.'),
+T('P24','S','You','Admin broadcast',
+ 'Send a broadcast to everyone and one to a single blood group. Change a donor\'s blood group in the app and send to the new group.',
+ 'Arrives on the right phones. After the group change the donor gets the new group\'s messages.'),
+T('P25','L','You','Large text and screen reader',
+ 'Set the font to the biggest size, and turn on TalkBack. Go through Request, Chat and Call.',
+ 'No cut-off text. Buttons are read out by name.'),
+T('P26','S','You','Old and cheap phones',
+ 'Use a 2 GB phone and an Android 8 or 9 phone if you can: start up, scroll, call, save a certificate.',
+ 'No crashes. Start-up under about 6 seconds. Note anything that fails (see D8).'),
+T('P27','B','You','Brands that kill apps',
+ 'On a Xiaomi/Redmi, Realme, Oppo or Vivo phone close the app, leave it 30 minutes with the screen off, then send a push and a call.',
+ 'The push and the call still arrive. If not, tell me the brand and model.'),
+T('P28','S','You','Admin site with real data',
+ 'Open every admin page. Verify a donor: open the ID photo, mark verified, confirm the photo is deleted. Use "confirm donation" on a stuck request.',
+ 'Every page loads with data. The ID photo is gone after verifying.'),
+]},
+
+/* ---------------------------------------------------------------- Q */
+{id:'q', title:'iPhone and later', intro:'Android first. These only matter when you start the iPhone version.', items:[
+D('Q1','L','You','policy','Apple Developer organisation account ($99 a year)',
+ 'Needed to ship on iPhone. Nonprofits can ask for a fee waiver. It also needs the D-U-N-S number from A1.',
+ 'Apply after the Play account is moving.'),
+D('Q2','L','Both','code','iOS Firebase set-up and push key',
+ 'The iOS app has no Firebase config and no push key yet, so it would crash at launch and receive nothing.',
+ 'Run <code>flutterfire configure</code> for the bundle ID <code>com.raktabandhan.app</code>, create an APNs key and upload it to Firebase.'),
+D('Q3','L','Both','code','CallKit and PushKit so calls ring on iPhone',
+ 'Today a call on iPhone is only a normal alert. The iOS "voip" mode is deliberately off until this exists.',
+ 'Add CallKit and PushKit together. Test on two real iPhones.'),
+D('Q4','L','Both','docs','A Mac or Codemagic, then TestFlight',
+ 'iPhone builds need a Mac or a cloud build service.',
+ 'Use Codemagic if you have no Mac. Test on 2 iPhones through TestFlight.'),
+D('Q5','L','Both','policy','App Store privacy answers and review notes',
+ 'The App Privacy answers must match the privacy manifest and the real behaviour.',
+ 'I re-check <code>PrivacyInfo.xcprivacy</code> against the policy. The review notes must explain any simulated check that remains. No Sign in with Apple is needed because there is no social login.'),
+]},
+];
+
+/* ============================== LOGIC ============================== */
+const KEY = 'rb-readiness-v1';
+let state = {};
+try { state = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) { state = {}; }
+function save(){ try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+
+const WHO = {You:'You do it', Me:'I (Claude) do it', Both:'Both of us', Counsel:'Lawyer or doctor'};
+const PRI = {B:'Blocker', S:'Should', L:'Later'};
+const EV  = {code:'Seen in code', test:'Needs a real test', policy:'Advice / policy', docs:'Advice / console'};
+const ITEMS = [];
+SECTIONS.forEach(s => s.items.forEach(it => { it.sec = s.id; ITEMS.push(it); }));
+const byId = Object.fromEntries(ITEMS.map(i => [i.id, i]));
+
+function choices(it){
+  if (it.k === 'test') return [['pass','Pass','pos'],['fail','Fail','neg'],['skip','Skip','']];
+  if (it.o) return [...it.o.map((_,i) => [String.fromCharCode(65+i), 'Option ' + String.fromCharCode(65+i), 'pos']), ['change','Other',''], ['later','Later',''], ['skip','Skip','']];
+  return [['done','Done','pos'],['do','Do it','pos'],['later','Later',''],['skip','Skip',''],['change','Change','']];
+}
+function esc(s){ return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function plain(h){ const d = document.createElement('div'); d.innerHTML = h; return d.textContent.replace(/\s+/g,' ').trim(); }
+
+function cardHtml(it){
+  const isT = it.k === 'test';
+  const opts = it.o ? '<ul class="opts">' + it.o.map((t,i) => {
+      const L = String.fromCharCode(65+i);
+      return '<li class="' + (it.pick === L ? 'pick' : '') + '"><b>' + L + '</b><span>' + t + (it.pick === L ? '<span class="pk">MY PICK</span>' : '') + '</span></li>';
+    }).join('') + '</ul>' : '';
+  const seg = choices(it).map(c => '<button type="button" class="' + c[2] + '" data-s="' + c[0] + '" aria-pressed="false">' + c[1] + '</button>').join('');
+  return '<div class="ctop"><span class="id">' + it.id + '</span><h3 class="ctitle">' + it.title + '</h3>' +
+    '<div class="chips">' +
+      (it.key ? '<span class="chip key">Key decision</span>' : '') +
+      '<span class="chip ' + it.pri + '">' + PRI[it.pri] + '</span>' +
+      '<span class="chip">' + WHO[it.who] + '</span>' +
+      '<span class="chip">' + EV[it.ev] + '</span>' +
+    '</div></div>' +
+    '<div class="lab">' + (isT ? 'WHAT TO DO' : 'WHAT CAN GO WRONG') + '</div><p class="txt">' + it.what + '</p>' +
+    '<div class="lab">' + (isT ? 'WHAT SHOULD HAPPEN' : (it.o ? 'THE CHOICE' : 'MY SUGGESTION')) + '</div><p class="txt">' + it.fix + '</p>' + opts +
+    '<div class="seg" role="group" aria-label="Your decision for ' + it.id + '">' + seg + '</div>' +
+    '<textarea class="note" rows="1" placeholder="' + (isT ? 'What you saw (paste the red error text if any)' : 'Your own answer or a note (optional)') + '" aria-label="Note for ' + it.id + '"></textarea>';
+}
+
+const main = document.getElementById('main');
+const jump = document.getElementById('jump');
+SECTIONS.forEach(s => {
+  const sec = document.createElement('section');
+  sec.id = 'sec-' + s.id;
+  sec.innerHTML = '<div class="shead"><h2>' + s.title + '</h2><span class="small" data-count="' + s.id + '"></span></div>' +
+    (s.intro ? '<p class="intro">' + s.intro + '</p>' : '') + (s.table || '');
+  s.items.forEach(it => {
+    const c = document.createElement('div');
+    c.className = 'card';
+    c.id = 'c-' + it.id;
+    c.dataset.id = it.id;
+    c.innerHTML = cardHtml(it);
+    sec.appendChild(c);
+  });
+  main.appendChild(sec);
+  const a = document.createElement('a');
+  a.href = '#sec-' + s.id;
+  a.textContent = s.title;
+  jump.appendChild(a);
+});
+const outA = document.createElement('a'); outA.href = '#output'; outA.textContent = 'Copy my decisions'; jump.appendChild(outA);
+
+function paint(card){
+  const id = card.dataset.id, st = state[id] || {};
+  card.className = 'card' + (st.s ? (/^[A-Z]$/.test(st.s) ? ' s' + st.s : ' s-' + st.s) : '');
+  card.querySelectorAll('.seg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.s === st.s ? 'true' : 'false'));
+  const ta = card.querySelector('.note');
+  if (ta.value !== (st.n || '')) ta.value = st.n || '';
+}
+
+/* filters */
+const filt = {pri:'all', who:'all', st:'all', q:''};
+function applyFilters(){
+  let shown = 0;
+  document.querySelectorAll('.card').forEach(c => {
+    const it = byId[c.dataset.id], st = state[it.id] || {};
+    let ok = true;
+    if (filt.pri !== 'all' && it.pri !== filt.pri) ok = false;
+    if (filt.who !== 'all' && it.who !== filt.who) ok = false;
+    if (filt.st === 'open' && st.s) ok = false;
+    if (filt.st === 'key' && !it.key) ok = false;
+    if (filt.q) {
+      const hay = (it.id + ' ' + plain(it.title) + ' ' + plain(it.what) + ' ' + plain(it.fix) + ' ' + (it.o ? it.o.map(plain).join(' ') : '')).toLowerCase();
+      if (!hay.includes(filt.q)) ok = false;
+    }
+    c.hidden = !ok;
+    if (ok) shown++;
+  });
+  SECTIONS.forEach(s => {
+    const sec = document.getElementById('sec-' + s.id);
+    const any = sec.querySelectorAll('.card:not([hidden])').length > 0;
+    sec.style.display = any ? '' : 'none';
+  });
+  document.getElementById('empty').style.display = shown ? 'none' : 'block';
+}
+
+function progress(){
+  const total = ITEMS.length, done = ITEMS.filter(i => state[i.id] && state[i.id].s).length;
+  document.getElementById('pcount').textContent = done;
+  document.getElementById('ptotal').textContent = total;
+  document.getElementById('pbar').style.width = (100 * done / total) + '%';
+  SECTIONS.forEach(s => {
+    const n = s.items.filter(i => state[i.id] && state[i.id].s).length;
+    const el = document.querySelector('[data-count="' + s.id + '"]');
+    if (el) el.textContent = n + ' of ' + s.items.length + ' decided';
+  });
+}
+
+/* output text */
+function buildOutput(){
+  const g = {do:[],done:[],opt:[],change:[],later:[],skip:[],pass:[],fail:[],notes:[]}, open = [];
+  ITEMS.forEach(it => {
+    const st = state[it.id] || {}, note = (st.n || '').trim().replace(/\s*\n\s*/g,' ');
+    let line = '- ' + it.id + ' ' + plain(it.title);
+    if (!st.s) { if (note) g.notes.push(line + '\n    note: ' + note); else open.push(it.id); return; }
+    if (/^[A-Z]$/.test(st.s)) { const t = plain(it.o[st.s.charCodeAt(0)-65]); line += ' -> OPTION ' + st.s + ': ' + (t.length > 110 ? t.slice(0, 107) + '...' : t); }
+    if (note) line += '\n    note: ' + note;
+    (/^[A-Z]$/.test(st.s) ? g.opt : g[st.s]).push(line);
+  });
+  const total = ITEMS.length, decided = total - open.length - g.notes.length;
+  const date = new Date().toLocaleDateString('en-IN', {day:'numeric', month:'short', year:'numeric'});
+  const parts = ['RAKTA BANDHAN - MY LAUNCH DECISIONS', date + '  |  ' + decided + ' of ' + total + ' decided', ''];
+  const add = (t, a) => { if (a.length) { parts.push(t + ' (' + a.length + ')'); parts.push(...a); parts.push(''); } };
+  add('OPTIONS I CHOSE', g.opt);
+  add('DO IT (go with your suggestion)', g.do);
+  add('CHANGE (my own answer)', g.change);
+  add('ALREADY DONE', g.done);
+  add('LATER', g.later);
+  add('SKIP', g.skip);
+  add('TESTS PASSED', g.pass);
+  add('TESTS FAILED', g.fail);
+  add('NOTES WITHOUT A CHOICE', g.notes);
+  if (open.length) parts.push('NOT DECIDED YET (' + open.length + '): ' + open.join(', '));
+  return parts.join('\n');
+}
+const outEl = document.getElementById('outText');
+let outTimer;
+function refreshOut(){ clearTimeout(outTimer); outTimer = setTimeout(() => { outEl.value = buildOutput(); }, 120); }
+
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 2600);
+}
+async function copyAll(){
+  const text = buildOutput();
+  outEl.value = text;
+  let ok = false;
+  try { await navigator.clipboard.writeText(text); ok = true; }
+  catch (e) { try { outEl.removeAttribute('readonly'); outEl.select(); ok = document.execCommand('copy'); outEl.setAttribute('readonly',''); } catch (e2) { ok = false; } }
+  toast(ok ? 'Copied. Now paste it in the chat.' : 'Could not copy automatically. Select the text at the bottom and copy it.');
+  if (!ok) document.getElementById('output').scrollIntoView();
+}
+function download(){
+  const blob = new Blob([buildOutput()], {type:'text/plain'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'rakta-bandhan-decisions.txt';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+/* events */
+main.addEventListener('click', e => {
+  const b = e.target.closest('.seg button');
+  if (!b) return;
+  const card = b.closest('.card'), id = card.dataset.id;
+  const cur = state[id] || {};
+  cur.s = cur.s === b.dataset.s ? '' : b.dataset.s;
+  state[id] = cur;
+  if (cur.s === 'change') card.querySelector('.note').focus();
+  paint(card); save(); progress(); refreshOut();
+  if (filt.st === 'open') applyFilters();
+});
+main.addEventListener('input', e => {
+  if (!e.target.classList.contains('note')) return;
+  const id = e.target.closest('.card').dataset.id;
+  const cur = state[id] || {};
+  cur.n = e.target.value; state[id] = cur;
+  save(); refreshOut();
+});
+document.getElementById('filters').addEventListener('click', e => {
+  const b = e.target.closest('.f');
+  if (!b) return;
+  const grp = b.parentElement.dataset.f;
+  filt[grp] = b.dataset.v;
+  b.parentElement.querySelectorAll('.f').forEach(x => x.setAttribute('aria-pressed', x === b ? 'true' : 'false'));
+  applyFilters();
+});
+document.getElementById('q').addEventListener('input', e => { filt.q = e.target.value.trim().toLowerCase(); applyFilters(); });
+document.getElementById('copyBtn').addEventListener('click', copyAll);
+document.getElementById('copyBtn2').addEventListener('click', copyAll);
+document.getElementById('dlBtn').addEventListener('click', download);
+document.getElementById('resetBtn').addEventListener('click', () => {
+  if (!confirm('Clear every choice and note on this page?')) return;
+  state = {}; save();
+  document.querySelectorAll('.card').forEach(paint);
+  progress(); refreshOut(); applyFilters();
+});
+
+document.querySelectorAll('.card').forEach(paint);
+progress(); applyFilters(); outEl.value = buildOutput();
+</script>
+</body>
+</html>

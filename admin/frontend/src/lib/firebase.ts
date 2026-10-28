@@ -14,13 +14,13 @@ import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
 // Same project/web app the Flutter build's firebase_options.dart uses
 // (DefaultFirebaseOptions.web) — one Firebase project, two clients.
 const firebaseConfig = {
-  apiKey: "AIzaSyDX-ErtJ-YzGrsmA35-QVowcIGEcyIRPjs",
-  authDomain: "rakta-bandhan2026.firebaseapp.com",
-  projectId: "rakta-bandhan2026",
-  storageBucket: "rakta-bandhan2026.firebasestorage.app",
-  messagingSenderId: "686452527533",
-  appId: "1:686452527533:web:96e80f3e108d8f3015d124",
-  measurementId: "G-D7RXE48E0D",
+  apiKey: "AIzaSyA26RwQWBPJpSMOejUM9TRoHwZgHmc0sto",
+  authDomain: "rakta-bandhan-india.firebaseapp.com",
+  projectId: "rakta-bandhan-india",
+  storageBucket: "rakta-bandhan-india.firebasestorage.app",
+  messagingSenderId: "469374681836",
+  appId: "1:469374681836:web:71d7edb17ba9c1de355bc9",
+  measurementId: "G-WDEZZBY3QD",
 };
 
 const app = initializeApp(firebaseConfig);

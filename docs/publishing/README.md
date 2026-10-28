@@ -16,7 +16,7 @@ Legend: ✅ done in the repo · ⬜ someone must do it (needs an account, a deci
 - ⬜ **Delete the old test accounts.** Accounts made with the old any-code test login (`p+91…@phone.raktabandhan.local`) share one password. Delete them in Firebase console › Authentication before launch; they can't create anything any more (rules require a verified email) but can still read.
 - ⬜ **Team copy approval.** The About page bios for CSK and Adarsh Betala are role descriptions written from the roles given — have each person approve their paragraph, and send photographs if wanted.
 - ⬜ **Firebase for iOS** (App Store phase). `lib/firebase_options.dart` has no iOS config yet.
-  - Run `flutterfire configure --project=rakta-bandhan2026 --platforms=android,ios,web`, registering bundle ID **`com.raktabandhan.app`**.
+  - Run `flutterfire configure --project=rakta-bandhan-india --platforms=android,ios,web`, registering bundle ID **`com.raktabandhan.app`**.
   - Upload an APNs key in Firebase › Project settings › Cloud Messaging, so iOS gets push.
 - ⬜ **Rotary mark.** The full logo includes the Rotary International wheel, a registered trademark. Confirm the club's use in a public app follows Rotary's brand guidelines (Apple guideline 5.2.1). The app icon deliberately uses only the droplet-and-heart mark.
 
@@ -65,11 +65,11 @@ Not testable here: real push delivery, real calls between two phones, and the Go
    ```
    cd admin/frontend && npm run build && cd ../..
    python tool/export_legal_html.py && python tool/make_share_page.py
-   firebase deploy --project rakta-bandhan2026 --only firestore:rules,firestore:indexes,functions,hosting
+   firebase deploy --project rakta-bandhan-india --only firestore:rules,firestore:indexes,functions,hosting
    ```
    - Accept the Artifact Registry cleanup policy when asked.
    - Index builds take a few minutes; the Find map and feeds fail until they show "Enabled".
-6. Open `/legal/privacy.html`, `/legal/terms.html`, `/legal/community-guidelines.html`, `/legal/delete-account.html` and `/app/` on `rakta-bandhan2026.web.app` — these are the store URLs.
+6. Open `/legal/privacy.html`, `/legal/terms.html`, `/legal/community-guidelines.html`, `/legal/delete-account.html` and `/app/` on `rakta-bandhan-india.web.app` — these are the store URLs.
 
 ### 2. Google Maps key (recommended before launch)
 1. Google Cloud console (same project) › APIs › enable **Maps SDK for Android** (and **for iOS** later).
@@ -99,10 +99,10 @@ Not testable here: real push delivery, real calls between two phones, and the Go
    3. Upload to **Internal testing** first.
    4. New personal developer accounts must run a closed test with at least 12 testers for 14 days before production access.
    5. App content › **Foreground service** declaration: *Phone call* (see `store-listing.md`).
-   6. App content › **App access**: choose "All or some functionality is restricted" and paste the sign-in instructions from the App Review notes in `store-listing.md` (the two review emails and the review code). Reviewers can't read an email, which is why those two addresses use a fixed code.
+   6. App content › **App access**: choose "All or some functionality is restricted" and paste the sign-in instructions from the App Review notes in `store-listing.md`. **Free-plan build (the one to upload now):** the two review emails and their passwords. Reviewers can't read an email, so never use the emailed-code mode for review unless the fixed review code is seeded (`functions/scripts/seed-review-accounts.mjs`).
 6. **Two-phone checklist** on the internal-testing build (one phone signed in as a requester, one as a donor):
-   - [ ] Sign in with an email address → the 6-digit code arrives by email → entering it opens the app (a new account continues to registration).
-   - [ ] A wrong code is refused, and a resent code arrives after the 30-second wait.
+   - [ ] **Free-plan build:** create an account with email + password → the labelled email check accepts `123456` (or Skip) → registration → phone check accepts `246810`. A wrong password is refused.
+   - [ ] **Emailed-code build (after Blaze, `EMAIL_CODE_LIVE=true`):** sign in with an email address → the 6-digit code arrives by email → entering it opens the app. A wrong code is refused, and a resent code arrives after the 30-second wait.
    - [ ] Donor registers (mobile number, area by GPS and by "Pin on map").
    - [ ] Requester raises an urgent request → donor's phone gets a notification **with the app closed** (and the loud urgent alert if urgent alerts are on).
    - [ ] Donor accepts → requester gets "A donor accepted your request".

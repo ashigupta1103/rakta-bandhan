@@ -6,7 +6,7 @@ Checked locally on 2026-10-02, branch `feat/prelaunch`. Application/backend code
 
 - Firebase CLI has a signed-in account. This does not confirm project permissions, the billing plan, the Firestore region or deployed resources; production was not queried or changed.
 - Wrangler reports no authenticated Cloudflare account on this machine.
-- No local Worker credentials, admin `.env.local`, Functions `.env.rakta-bandhan2026` or Android `key.properties` were present.
+- No local Worker credentials, admin `.env.local`, Functions `.env.rakta-bandhan-india` or Android `key.properties` were present.
 - Local Functions discovery exports the expected login, account, notification, expiry/reactivation and support handlers, all in `asia-south1`. Login binds `SMTP_URL` and `REVIEW_CODE`; support binds `SMTP_URL`.
 - A real APK cannot sign in until Blaze, Functions and an email sender exist, so live R2/TURN connections cannot be exercised yet.
 
@@ -14,13 +14,13 @@ Checked locally on 2026-10-02, branch `feat/prelaunch`. Application/backend code
 
 | Input | Where it belongs | Needed for |
 |---|---|---|
-| Firebase Blaze status and actual Firestore region | Owner confirmation; project stays `rakta-bandhan2026` | Functions rollout; app/server regions must agree |
-| Cloudflare account ID `361246d2529c9324af1bacc33d2adfb8` | Already set in `edge/wrangler.toml`; select this account for Wrangler login | Worker deployment |
+| Firebase Blaze status and actual Firestore region | Owner confirmation; project stays `rakta-bandhan-india` | Functions rollout; app/server regions must agree |
+| Cloudflare account ID `6201e4d84a008753d32f482a2f1912d1` | Already set in `edge/wrangler.toml`; select this account for Wrangler login | Worker deployment |
 | TURN Server's key ID and API token (**set 2026-10-02**) | Cloudflare Worker secrets `TURN_KEY_ID` and `TURN_API_TOKEN`; see [the dashboard walkthrough](CLOUDFLARE_SETUP.md) | Authenticated short-lived relay credentials; RealtimeKit/SFU application tokens do not work here |
-| Verified Resend domain and sender address | `MAIL_FROM` in ignored `functions/.env.rakta-bandhan2026` | Email codes for real users |
+| Verified Resend domain and sender address | `MAIL_FROM` in ignored `functions/.env.rakta-bandhan-india` | Email codes for real users |
 | Resend API key | Firebase `SMTP_URL` secret, formatted as below | Functions email delivery |
 | Production review code | Firebase `REVIEW_CODE` secret | Required secret binding for first deployment, even with review access off |
-| Deployed Worker HTTPS URL | **Done 2026-10-02:** `https://rakta-bandhan-edge.rakta-bandhan-edge.workers.dev`. Flutter `EDGE_URL`; admin `VITE_EDGE_URL` (already set in the ignored `admin/frontend/.env.local`) | Photo uploads/reads/deletion and calls |
+| Deployed Worker HTTPS URL | **Done 2026-10-02:** `https://rakta-bandhan-edge.raktabandhan.workers.dev`. Flutter `EDGE_URL`; admin `VITE_EDGE_URL` (already set in the ignored `admin/frontend/.env.local`) | Photo uploads/reads/deletion and calls |
 | LocationIQ key | Flutter `LOCATIONIQ_KEY` build define | Production address search; public Nominatim fallback is for development |
 | Owner signing configuration and certificate fingerprints | Ignored `android/key.properties`, private keystore; Firebase App Check | Signed real APK and later enforcement |
 | Google Maps key, if native maps are wanted | Ignored `android/local.properties`; package/SHA-1 restrictions | Native Android maps with `GOOGLE_MAPS=true` |
@@ -28,12 +28,12 @@ Checked locally on 2026-10-02, branch `feat/prelaunch`. Application/backend code
 
 Share public account IDs, domain names, sender addresses and service URLs in chat. For server keys, share only an ignored local file path, or set them directly in the provider's secret store. Never share account passwords, private keys or tokens in chat. No Firebase service-account key, R2 S3 key or D1 database is needed under the accepted plan.
 
-Resend SMTP secret format: `smtps://resend:<RESEND_API_KEY>@smtp.resend.com:465`. Provision it interactively using `npx -y firebase-tools@latest functions:secrets:set SMTP_URL --project rakta-bandhan2026`. Provision a privately generated six-digit `REVIEW_CODE` the same way. Leave `REVIEW_EMAILS` empty: having the secret bound does not enable review access for any address. Emulator/demo codes are not production credentials.
+Resend SMTP secret format: `smtps://resend:<RESEND_API_KEY>@smtp.resend.com:465`. Provision it interactively using `npx -y firebase-tools@latest functions:secrets:set SMTP_URL --project rakta-bandhan-india`. Provision a privately generated six-digit `REVIEW_CODE` the same way. Leave `REVIEW_EMAILS` empty: having the secret bound does not enable review access for any address. Emulator/demo codes are not production credentials.
 
 Use a project-specific ignored params file rather than editing tracked defaults:
 
 ```dotenv
-# functions/.env.rakta-bandhan2026 -- replace the sender with the verified address
+# functions/.env.rakta-bandhan-india -- replace the sender with the verified address
 MAIL_FROM="Rakta Bandhan <no-reply@YOUR_VERIFIED_DOMAIN>"
 REVIEW_EMAILS=
 ENFORCE_APP_CHECK=false

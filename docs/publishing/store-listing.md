@@ -51,11 +51,11 @@ Deploy Hosting first; see the README. The pages come from the in-app text.
 
 | Field | URL |
 |---|---|
-| Privacy policy (both stores) | `https://rakta-bandhan2026.web.app/legal/privacy.html` |
-| Terms (optional field / EULA link) | `https://rakta-bandhan2026.web.app/legal/terms.html` |
-| Community guidelines | `https://rakta-bandhan2026.web.app/legal/community-guidelines.html` |
-| Play "Delete account URL" | `https://rakta-bandhan2026.web.app/legal/delete-account.html` |
-| Website / marketing URL (share card) | `https://rakta-bandhan2026.web.app/app/` |
+| Privacy policy (both stores) | `https://rakta-bandhan-india.web.app/legal/privacy.html` |
+| Terms (optional field / EULA link) | `https://rakta-bandhan-india.web.app/legal/terms.html` |
+| Community guidelines | `https://rakta-bandhan-india.web.app/legal/community-guidelines.html` |
+| Play "Delete account URL" | `https://rakta-bandhan-india.web.app/legal/delete-account.html` |
+| Website / marketing URL (share card) | `https://rakta-bandhan-india.web.app/app/` |
 | Support URL (App Store, required) | the share page above, until a support page exists — **fill `kLegalContactEmail` first** |
 
 ## Google Play — Data safety
@@ -96,6 +96,19 @@ Deploy Hosting first; see the README. The pages come from the in-app text.
   - Neither violence nor gambling.
   - Expected rating: Everyone / 3+. Some regions add a "users interact" descriptor.
 
+## Google Play — App access (paste into App content › App access)
+
+Choose "All or some functionality is restricted". Instructions for the **free-plan build** (email + password):
+
+> Sign in with email and password. Two review accounts:
+> - Requester: `<REVIEW_EMAIL_A>` / `<REVIEW_PASSWORD_A>`
+> - Donor: `<REVIEW_EMAIL_B>` / `<REVIEW_PASSWORD_B>`
+>
+> Where the app asks to check an email address or phone number, those steps are clearly labelled simulations (no message is sent). If you meet one, use `123456` for the email check (or tap Skip) and `246810` for the phone check.
+> To see matching, chat and calling, sign in as the requester on one device and the donor on another, then follow the steps in the review notes below. Deleting an account: My Page › Settings › Delete my account.
+
+The two accounts must exist, with the donor registered, available and verified in the admin console, **before** you submit. They must be created in the same Firebase project the uploaded build talks to. If the emailed-code build is uploaded instead, replace this text with the `<REVIEW_CODE>` instructions below.
+
 ## App Store — App Privacy ("nutrition label")
 
 Tracking: **No** (no IDFA, no data brokers, no cross-app tracking).
@@ -133,6 +146,7 @@ Tracking: **No** (no IDFA, no data brokers, no cross-app tracking).
 > 2. On device B (already registered), the request appears on the Request tab. Tap "View request" › Accept.
 > 3. Both devices are now matched. Tap Message to chat, or the phone icon for an in-app voice call.
 >
+> **Labelled simulations:** until an SMS/WhatsApp provider exists, the phone-number check after registration (code `246810`) verifies nothing, and on the free plan the email check (code `123456`, skippable) sends nothing. Both screens say so on their face.
 > **Account deletion:** My Page › Settings › Delete my account.
 > **Report and block:** in any chat, tap the header or the ··· menu.
 > **Microphone** is used only for in-app voice calls between matched users. **Location** is used only while the app is open, to show nearby requests and donors. The **camera or photo library** is used only for the optional ID-proof photo, optional profile photo and optional community post photos; **photo saving** only when the user taps Save on their donation certificate.

@@ -121,7 +121,7 @@ class DonationCertificateCard extends StatelessWidget {
                                 children: [
                                   TextSpan(text: 'A service project of\n'),
                                   TextSpan(
-                                    text: 'Rotary Club of Madras Cosmos &\nRotary Club of Chennai Capital',
+                                    text: 'Rotary Club of Madras Cosmos',
                                     style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.ink),
                                   ),
                                 ],

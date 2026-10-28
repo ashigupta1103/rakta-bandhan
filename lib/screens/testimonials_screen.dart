@@ -6,6 +6,9 @@ import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/rb_icon.dart';
 
+/// The exception text, only in test builds (`--dart-define=SHOW_ERRORS=true`).
+String _detail(Object? error) => const bool.fromEnvironment('SHOW_ERRORS') ? '\n$error' : '';
+
 /// Testimonials — curated and verified by Rakta Bandhan, distinct from the
 /// anonymous-handle Community stories feed. Real quotes are published by an
 /// admin from the console's Content tab into `testimonials`, a collection
@@ -62,6 +65,10 @@ class TestimonialsScreen extends StatelessWidget {
                         builder: (context, snapshot) {
                           if (!snapshot.hasData && !snapshot.hasError) {
                             return const SizedBox(height: 80, child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary)));
+                          }
+                          if (snapshot.hasError) {
+                            return Text('Could not load testimonials. Please try again later.${_detail(snapshot.error)}',
+                                style: const TextStyle(fontSize: 14, height: 1.45, color: AppColors.ink2));
                           }
                           final docs = snapshot.data?.docs ?? const [];
                           if (docs.isEmpty) return _emptyState();
@@ -202,9 +209,9 @@ class _TestimonialSheetState extends State<TestimonialSheet> {
       await Backend.instance.submitTestimonial(quote: _quote.text, role: _role.text);
       navigator.pop();
       messenger.showSnackBar(const SnackBar(content: Text('Thank you! Our team will review it before it appears here.')));
-    } catch (_) {
+    } catch (e) {
       if (mounted) setState(() => _sending = false);
-      messenger.showSnackBar(const SnackBar(content: Text('Could not send it. Please try again.')));
+      messenger.showSnackBar(SnackBar(content: Text('Could not send it. Please try again.${_detail(e)}')));
     }
   }
 
